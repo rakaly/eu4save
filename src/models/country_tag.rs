@@ -1,8 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use std::fmt;
 
-#[derive(Debug, Clone, Serialize, Hash, Eq, PartialEq, Deserialize)]
-#[serde(from = "String")]
+#[derive(Debug, Clone, Serialize, Hash, Eq, PartialEq)]
 pub struct CountryTag(String);
 
 impl CountryTag {
@@ -45,5 +44,37 @@ impl Into<String> for CountryTag {
 impl fmt::Display for CountryTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for CountryTag {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct CountryTagVisitor;
+
+        impl<'de> de::Visitor<'de> for CountryTagVisitor {
+            type Value = CountryTag;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct CountryTag")
+            }
+
+            fn visit_str<A>(self, v: &str) -> Result<Self::Value, A>
+            where
+                A: de::Error,
+            {
+                if v.len() != 3 {
+                    Err(de::Error::custom(
+                        "a country tag should be a sequence of 3 letters",
+                    ))
+                } else {
+                    Ok(CountryTag::from(v))
+                }
+            }
+        }
+
+        deserializer.deserialize_str(CountryTagVisitor)
     }
 }

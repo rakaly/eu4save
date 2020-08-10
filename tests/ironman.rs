@@ -1,6 +1,8 @@
 #![cfg(ironman)]
 
-use eu4save::{query::Query, CountryTag, Encoding, Eu4ExtractorBuilder, FailedResolveStrategy, Eu4Date};
+use eu4save::{
+    query::Query, CountryTag, Encoding, Eu4Date, Eu4ExtractorBuilder, FailedResolveStrategy,
+};
 use paste::paste;
 use std::io::Cursor;
 
