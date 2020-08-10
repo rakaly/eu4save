@@ -1,0 +1,4 @@
+assets/saves/*
+/target
+**/*.rs.bk
+Cargo.lock
