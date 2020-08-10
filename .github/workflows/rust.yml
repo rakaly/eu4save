@@ -61,3 +61,4 @@ jobs:
       run: |
         cargo install cargo-fuzz
         cargo fuzz build fuzz_melt
+        cargo fuzz build fuzz_extract

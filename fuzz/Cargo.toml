@@ -21,3 +21,9 @@ members = ["."]
 [[bin]]
 name = "fuzz_melt"
 path = "fuzz_targets/fuzz_melt.rs"
+
+[[bin]]
+name = "fuzz_extract"
+path = "fuzz_targets/fuzz_extract.rs"
+test = false
+doc = false
