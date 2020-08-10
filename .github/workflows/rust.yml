@@ -15,29 +15,29 @@ jobs:
       matrix:
         build:
         - stable
-#        - beta
-#        - nightly
-#        - macos
-#        - win-msvc
+        - beta
+        - nightly
+        - macos
+        - win-msvc
         include:
         - build: stable
           os: ubuntu-latest
           rust: stable
-#        - build: beta
-#          os: ubuntu-latest
-#          rust: beta
-#        - build: nightly
-#          os: ubuntu-latest
-#          rust: nightly
-#        - build: macos
-#          os: macos-latest
-#          rust: stable
-#        - build: win-msvc
-#          os: windows-latest
-#          rust: stable
+        - build: beta
+          os: ubuntu-latest
+          rust: beta
+        - build: nightly
+          os: ubuntu-latest
+          rust: nightly
+        - build: macos
+          os: macos-latest
+          rust: stable
+        - build: win-msvc
+          os: windows-latest
+          rust: stable
     steps:
     - uses: actions/checkout@v2
-    - name: Cache git lfs
+    - name: Cache eu4 saves
       uses: actions/cache@v1.1.0
       with:
         path: assets/saves
