@@ -12,9 +12,9 @@ pub const EU4_START_DATE: Eu4Date = Eu4Date {
 /// A date in EU4. It has no concept of leap years!
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Eu4Date {
-    pub year: u16,
-    pub month: u8,
-    pub day: u8,
+    year: u16,
+    month: u8,
+    day: u8,
 }
 
 impl PartialOrd for Eu4Date {
@@ -39,6 +39,39 @@ impl Eu4Date {
         } else {
             None
         }
+    }
+
+    /// Year of the date
+    ///
+    /// ```
+    /// use eu4save::Eu4Date;
+    /// let date = Eu4Date::parse_from_str("1445.02.03").expect("to parse date");
+    /// assert_eq!(date.year(), 1445);
+    /// ```
+    pub fn year(&self) -> u16 {
+        self.year
+    }
+
+    /// Month of the date
+    ///
+    /// ```
+    /// use eu4save::Eu4Date;
+    /// let date = Eu4Date::parse_from_str("1445.02.03").expect("to parse date");
+    /// assert_eq!(date.month(), 2);
+    /// ```
+    pub fn month(&self) -> u8 {
+        self.month
+    }
+
+    /// Day of the date
+    ///
+    /// ```
+    /// use eu4save::Eu4Date;
+    /// let date = Eu4Date::parse_from_str("1445.02.03").expect("to parse date");
+    /// assert_eq!(date.day(), 3);
+    /// ```
+    pub fn day(&self) -> u8 {
+        self.day
     }
 
     pub fn parse_from_str<T: AsRef<str>>(s: T) -> Option<Self> {
