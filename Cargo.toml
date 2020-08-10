@@ -3,7 +3,13 @@ name = "eu4save"
 version = "0.1.0"
 authors = ["Nick Babcock <nbabcock19@hotmail.com>"]
 edition = "2018"
-exclude = ["/assets/*"]
+exclude = ["/assets/*", "/fuzz/*"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/rakaly/eu4save.git"
+description = "Ergonomically work with all EU4 saves (ironman and multiplayer)"
+keywords = ["eu4", "ironman"]
+categories = ["parsing"]
 
 [features]
 mmap = ['memmap', 'tempfile']
