@@ -1,9 +1,16 @@
-use s3::{creds::Credentials, region::Region, bucket::Bucket};
-use std::path::Path;
+use s3::{bucket::Bucket, creds::Credentials, region::Region};
 use std::fs;
+use std::path::Path;
 
+/// Fetch an eu4 save file. Save files can be quite large, so the save files are not stored in the
+/// repo. Instead they are stored in a public S3 bucket. This function will check if the file has
+/// been cached, else fetch it from the S3 bucket. Previous implementations used git lfs, but had
+/// to be migrated away as we ran out of the monthly free bandwidth (1GB) on day 1 (and even git
+/// lfs caching was used). The S3 implementation used is backblaze, which provides 1GB free
+/// download per day, so I'm not anticipating paying more than a few cents a year to maintain this
+/// repository of saves.
 pub fn request<S: AsRef<str>>(input: S) -> Vec<u8> {
-    let reffed = input.as_ref(); 
+    let reffed = input.as_ref();
     let cache = Path::new("assets").join("saves").join(reffed);
     if cache.exists() {
         println!("cache hit: {}", reffed);
@@ -13,7 +20,10 @@ pub fn request<S: AsRef<str>>(input: S) -> Vec<u8> {
         let bucket_name = "eu4saves-test-cases";
         let region_name = "us-west-002".to_string();
         let endpoint = "s3.us-west-002.backblazeb2.com".to_string();
-        let region = Region::Custom { region: region_name, endpoint };
+        let region = Region::Custom {
+            region: region_name,
+            endpoint,
+        };
         let credentials = Credentials::anonymous().unwrap();
         let bucket = Bucket::new(bucket_name, region, credentials).unwrap();
         let (data, code) = bucket.get_object_blocking(reffed).unwrap();

@@ -1,5 +1,5 @@
-use crate::{Eu4Error, Eu4Save, Eu4SaveMeta, GameState, Meta, TokenLookup};
-use jomini::{BinaryDeserializer, TextDeserializer, TextTape};
+use crate::{Eu4Error, Eu4Save, Eu4SaveMeta, FailedResolveStrategy, GameState, Meta, TokenLookup};
+use jomini::{BinaryDeserializerBuilder, TextDeserializer, TextTape};
 use serde::de::DeserializeOwned;
 use std::fmt;
 use std::io::{Read, Seek, SeekFrom};
@@ -35,21 +35,56 @@ pub enum Extraction {
 }
 
 #[derive(Debug, Clone)]
+pub struct Eu4ExtractorBuilder {
+    extraction: Extraction,
+    on_failed_resolve: FailedResolveStrategy,
+}
+
+impl Default for Eu4ExtractorBuilder {
+    fn default() -> Self {
+        Eu4ExtractorBuilder::new()
+    }
+}
+
+impl Eu4ExtractorBuilder {
+    pub fn new() -> Self {
+        Eu4ExtractorBuilder {
+            extraction: Extraction::InMemory,
+            on_failed_resolve: FailedResolveStrategy::Ignore,
+        }
+    }
+
+    pub fn with_extraction(mut self, extraction: Extraction) -> Self {
+        self.extraction = extraction;
+        self
+    }
+
+    pub fn with_on_failed_resolve(mut self, strategy: FailedResolveStrategy) -> Self {
+        self.on_failed_resolve = strategy;
+        self
+    }
+
+    pub fn build(self) -> Eu4Extractor {
+        Eu4Extractor {
+            extraction: self.extraction,
+            on_failed_resolve: self.on_failed_resolve,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Eu4Extractor {
     extraction: Extraction,
+    on_failed_resolve: FailedResolveStrategy,
 }
 
 impl Default for Eu4Extractor {
     fn default() -> Self {
-        Eu4Extractor::new(Extraction::InMemory)
+        Eu4ExtractorBuilder::new().build()
     }
 }
 
 impl Eu4Extractor {
-    pub fn new(extraction: Extraction) -> Self {
-        Eu4Extractor { extraction }
-    }
-
     pub fn extract_meta<R>(&self, mut reader: R) -> Result<(Meta, Encoding), Eu4Error>
     where
         R: Read + Seek,
@@ -66,10 +101,14 @@ impl Eu4Extractor {
             reader.seek(SeekFrom::Start(0)).map_err(Eu4Error::IoErr)?;
             let mut zip = zip::ZipArchive::new(reader).map_err(Eu4Error::ZipCentralDirectory)?;
             match self.extraction {
-                Extraction::InMemory => melt_in_memory(&mut buffer, "meta", &mut zip),
+                Extraction::InMemory => {
+                    melt_in_memory(&mut buffer, "meta", &mut zip, self.on_failed_resolve)
+                }
 
                 #[cfg(feature = "mmap")]
-                Extraction::MmapTemporaries => melt_with_temporary("meta", &mut zip),
+                Extraction::MmapTemporaries => {
+                    melt_with_temporary("meta", &mut zip, self.on_failed_resolve)
+                }
             }
         } else {
             Err(Eu4Error::UnknownHeader)
@@ -94,17 +133,25 @@ impl Eu4Extractor {
             reader.seek(SeekFrom::Start(0)).map_err(Eu4Error::IoErr)?;
             let mut zip = zip::ZipArchive::new(reader).map_err(Eu4Error::ZipCentralDirectory)?;
             let (meta, encoding) = match self.extraction {
-                Extraction::InMemory => melt_in_memory(&mut buffer, "meta", &mut zip),
+                Extraction::InMemory => {
+                    melt_in_memory(&mut buffer, "meta", &mut zip, self.on_failed_resolve)
+                }
 
                 #[cfg(feature = "mmap")]
-                Extraction::MmapTemporaries => melt_with_temporary("meta", &mut zip),
+                Extraction::MmapTemporaries => {
+                    melt_with_temporary("meta", &mut zip, self.on_failed_resolve)
+                }
             }?;
 
             let (game, _) = match self.extraction {
-                Extraction::InMemory => melt_in_memory(&mut buffer, "gamestate", &mut zip),
+                Extraction::InMemory => {
+                    melt_in_memory(&mut buffer, "gamestate", &mut zip, self.on_failed_resolve)
+                }
 
                 #[cfg(feature = "mmap")]
-                Extraction::MmapTemporaries => melt_with_temporary("gamestate", &mut zip),
+                Extraction::MmapTemporaries => {
+                    melt_with_temporary("gamestate", &mut zip, self.on_failed_resolve)
+                }
             }?;
 
             Ok((Eu4Save { meta, game }, encoding))
@@ -139,10 +186,14 @@ impl Eu4Extractor {
             reader.seek(SeekFrom::Start(0)).map_err(Eu4Error::IoErr)?;
             let mut zip = zip::ZipArchive::new(reader).map_err(Eu4Error::ZipCentralDirectory)?;
             let (meta, encoding) = match self.extraction {
-                Extraction::InMemory => melt_in_memory(&mut buffer, "meta", &mut zip),
+                Extraction::InMemory => {
+                    melt_in_memory(&mut buffer, "meta", &mut zip, self.on_failed_resolve)
+                }
 
                 #[cfg(feature = "mmap")]
-                Extraction::MmapTemporaries => melt_with_temporary("meta", &mut zip),
+                Extraction::MmapTemporaries => {
+                    melt_with_temporary("meta", &mut zip, self.on_failed_resolve)
+                }
             }?;
 
             Ok((Eu4SaveMeta { meta, game: None }, encoding))
@@ -156,6 +207,7 @@ fn melt_in_memory<T, R>(
     mut buffer: &mut Vec<u8>,
     name: &'static str,
     zip: &mut zip::ZipArchive<R>,
+    on_failed_resolve: FailedResolveStrategy,
 ) -> Result<(T, Encoding), Eu4Error>
 where
     R: Read + Seek,
@@ -177,12 +229,13 @@ where
         .map_err(|e| Eu4Error::ZipExtraction(name, e))?;
 
     if let Some(data) = is_bin(&buffer) {
-        let res = BinaryDeserializer::from_slice(data, TokenLookup).map_err(|e| {
-            Eu4Error::Deserialize {
+        let res = BinaryDeserializerBuilder::new()
+            .on_failed_resolve(on_failed_resolve)
+            .from_slice(data, TokenLookup)
+            .map_err(|e| Eu4Error::Deserialize {
                 part: Some(name.to_string()),
                 err: e,
-            }
-        })?;
+            })?;
         Ok((res, Encoding::BinZip))
     } else if let Some(data) = is_text(&buffer) {
         let res = TextDeserializer::from_slice(data)?;
@@ -196,6 +249,7 @@ where
 fn melt_with_temporary<T, R>(
     name: &'static str,
     zip: &mut zip::ZipArchive<R>,
+    on_failed_resolve: FailedResolveStrategy,
 ) -> Result<(T, Encoding), Eu4Error>
 where
     R: Read + Seek,
@@ -225,12 +279,13 @@ where
     let buffer = &mmap[..];
 
     if let Some(data) = is_bin(&buffer) {
-        let res = BinaryDeserializer::from_slice(data, TokenLookup).map_err(|e| {
-            Eu4Error::Deserialize {
+        let res = BinaryDeserializerBuilder::new()
+            .on_failed_resolve(on_failed_resolve)
+            .from_slice(data, TokenLookup)
+            .map_err(|e| Eu4Error::Deserialize {
                 part: Some(name.to_string()),
                 err: e,
-            }
-        })?;
+            })?;
         Ok((res, Encoding::BinZip))
     } else if let Some(data) = is_text(&buffer) {
         let res = TextDeserializer::from_slice(data)?;

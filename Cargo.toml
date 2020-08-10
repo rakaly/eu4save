@@ -17,8 +17,8 @@ tempfile = { version = "3", optional = true }
 memmap = { version = "0.7", optional = true }
 
 [dev-dependencies]
-walkdir = "2"
 rust-s3 = "0.22"
+paste = "1"
 
 # We override the test profile so that our tests run in a tolerable time as
 # some of the asset files are heavyweight and can take a significant amount of

@@ -5,7 +5,6 @@ use eu4save::{
 };
 use std::collections::HashSet;
 use std::error::Error;
-use std::fs;
 use std::io::{Cursor, Read};
 
 mod utils;
@@ -222,22 +221,6 @@ fn test_eu4_same_campaign_id() {
 
 #[cfg(ironman)]
 #[test]
-fn test_eu4_ita2() {
-    let data = utils::request("ita2_later13.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
-    assert_eq!(encoding, Encoding::BinZip);
-    assert_eq!(save.meta.player, CountryTag::from("ITA"));
-    let query = Query::from_save(save);
-    assert_eq!(query.starting_country, Some(CountryTag::from("MLO")));
-    assert_eq!(
-        query.players.iter().cloned().collect::<Vec<_>>(),
-        vec![String::from("comagoosie")]
-    );
-}
-
-#[cfg(ironman)]
-#[test]
 fn test_roundtrip_melt() {
     let data = utils::request("kandy2.bin.eu4");
     let out = eu4save::melt(&data[..], eu4save::FailedResolveStrategy::Error).unwrap();
@@ -245,13 +228,6 @@ fn test_roundtrip_melt() {
     let (save, encoding) = extractor.extract_save(Cursor::new(&out[..])).unwrap();
     assert_eq!(encoding, Encoding::Text);
     assert_eq!(save.meta.player, CountryTag::from("BHA"));
-}
-
-#[cfg(ironman)]
-#[test]
-fn test_melt_revolution_center() {
-    let data = utils::request("cologne2.eu4");
-    eu4save::melt(&data[..], eu4save::FailedResolveStrategy::Error).unwrap();
 }
 
 #[test]
