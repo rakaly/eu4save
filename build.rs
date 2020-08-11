@@ -8,6 +8,7 @@ fn main() {
     let mut writer = BufWriter::new(File::create(&out_path).unwrap());
     writeln!(writer, "match token {{").unwrap();
 
+    println!("cargo:rerun-if-env-changed=EU4_IRONMAN_TOKENS");
     if let Ok(v) = env::var("EU4_IRONMAN_TOKENS") {
         println!("cargo:rustc-cfg=ironman");
         println!("cargo:rerun-if-changed={}", v);
