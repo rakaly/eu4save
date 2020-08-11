@@ -1,9 +1,4 @@
-use eu4save::{
-    query::{CountryQuery, Query},
-    CountryEvent, CountryTag, Encoding, Eu4Extractor, GameDifficulty, ProvinceId,
-    TaxManpowerModifier,
-};
-use std::collections::HashSet;
+use eu4save::{query::Query, CountryEvent, CountryTag, Encoding, Eu4Extractor};
 use std::error::Error;
 use std::io::{Cursor, Read};
 
@@ -60,33 +55,6 @@ fn test_eu4_compressed_text_mmap() {
     assert_eq!(save.meta.player, CountryTag::from("ENG"));
 }
 
-#[cfg(ironman)]
-#[test]
-fn test_eu4_bin() {
-    let data = utils::request("ragusa2.bin.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
-    assert_eq!(encoding, Encoding::BinZip);
-    assert_eq!(save.meta.player, CountryTag::from("CRO"));
-
-    let (save2, _) = extractor
-        .extract_meta_optimistic(Cursor::new(&data[..]))
-        .unwrap();
-    assert!(save2.game.is_none());
-
-    let query = Query::from_save(save);
-    assert_eq!(query.starting_country, Some(CountryTag::from("RAG")));
-    assert_eq!(
-        query.players.iter().cloned().collect::<Vec<String>>(),
-        Vec::<String>::new()
-    );
-
-    let mut players = HashSet::new();
-    players.insert(CountryTag::from("RAG"));
-    players.insert(CountryTag::from("CRO"));
-    assert_eq!(query.player_countries, players);
-}
-
 #[test]
 pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let data = utils::request("mp_Uesugi.eu4");
@@ -94,140 +62,6 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let (save, _encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
     assert!(save.meta.multiplayer);
     Ok(())
-}
-
-#[cfg(ironman)]
-#[test]
-fn test_eu4_kandy_bin() {
-    let data = utils::request("kandy2.bin.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
-    assert_eq!(encoding, Encoding::BinZip);
-    assert_eq!(save.meta.player, CountryTag::from("BHA"));
-
-    let query = Query::from_save(save);
-    let mut players = HashSet::new();
-    players.insert(CountryTag::from("KND"));
-    players.insert(CountryTag::from("BHA"));
-    assert_eq!(query.player_countries, players);
-    assert!(!query
-        .save
-        .game
-        .countries
-        .get(&CountryTag::from("BHA"))
-        .unwrap()
-        .completed_missions
-        .is_empty());
-
-    assert_eq!(
-        query.country_tag_hex_color(&CountryTag::from("BHA")),
-        Some(String::from("#50a50a"))
-    );
-
-    assert_eq!(
-        query
-            .save
-            .game
-            .provinces
-            .get(&ProvinceId::from(1))
-            .unwrap()
-            .owner
-            .as_ref()
-            .unwrap(),
-        &CountryTag::from("SCA")
-    );
-
-    assert_eq!(query.starting_country, Some(CountryTag::from("KND")));
-    assert_eq!(
-        query.players.iter().cloned().collect::<Vec<_>>(),
-        vec![String::from("comagoosie")]
-    );
-
-    let subjects: Vec<CountryTag> = vec![
-        CountryTag::from("TEO"),
-        CountryTag::from("YOK"),
-        CountryTag::from("C21"),
-        CountryTag::from("C23"),
-    ];
-
-    assert_eq!(
-        query
-            .save
-            .game
-            .countries
-            .get(&CountryTag::from("BHA"))
-            .unwrap()
-            .subjects,
-        subjects
-    );
-
-    let blank: Vec<String> = Vec::new();
-    let ledgers = query.annual_ledgers(&[CountryQuery::Greats], &blank, &blank);
-
-    // When querying for great powers in the ledger and a current great power is from a reformed
-    // country (like russia or great britain), ensure that their predecessor is included.
-    let mos = ledgers.income.iter().find(|&x| x.name.as_str() == "MOS");
-    assert!(mos.is_some());
-
-    // I had a score of zero in 1450, but the ledger doesn't report zero values
-    let knd_score = ledgers.score.iter().find(|&l| {
-        l.name.as_str() == "KND" && l.data.iter().find(|(x, y)| *x == 1450 && *y == 0).is_some()
-    });
-    assert!(knd_score.is_some());
-}
-
-#[cfg(ironman)]
-#[test]
-fn test_eu4_ita1() {
-    let data = utils::request("ita1.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
-    assert_eq!(encoding, Encoding::BinZip);
-    assert_eq!(save.meta.player, CountryTag::from("ITA"));
-    let settings = &save.game.gameplay_settings.options;
-    assert_eq!(settings.difficulty, GameDifficulty::Normal);
-    assert_eq!(
-        settings.tax_manpower_modifier,
-        TaxManpowerModifier::Historical
-    );
-
-    let all_dlc_recognized = save
-        .meta
-        .dlc_enabled
-        .iter()
-        .map(|x| eu4save::dlc::dlc_id(x.as_str()))
-        .all(|x| x.is_some());
-    assert!(all_dlc_recognized);
-
-    let query = Query::from_save(save);
-    assert_eq!(query.starting_country, Some(CountryTag::from("LAN")));
-    assert_eq!(
-        query.players.iter().cloned().collect::<Vec<_>>(),
-        vec![String::from("comagoosie")]
-    );
-}
-
-#[cfg(ironman)]
-#[test]
-fn test_eu4_same_campaign_id() {
-    let data = utils::request("ita2.eu4");
-    let data2 = utils::request("ita2_later.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, _) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
-    let (save2, _) = extractor.extract_save(Cursor::new(&data2[..])).unwrap();
-    assert_eq!(save.meta.campaign_id, save2.meta.campaign_id);
-    assert!(save.meta.date < save2.meta.date);
-}
-
-#[cfg(ironman)]
-#[test]
-fn test_roundtrip_melt() {
-    let data = utils::request("kandy2.bin.eu4");
-    let out = eu4save::melt(&data[..], eu4save::FailedResolveStrategy::Error).unwrap();
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&out[..])).unwrap();
-    assert_eq!(encoding, Encoding::Text);
-    assert_eq!(save.meta.player, CountryTag::from("BHA"));
 }
 
 #[test]
