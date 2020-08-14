@@ -38,7 +38,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Cache eu4 saves
-      uses: actions/cache@v1.1.0
+      uses: actions/cache@v2
       with:
         path: assets/saves
         key: assets/saves
