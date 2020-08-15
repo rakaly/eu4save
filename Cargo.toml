@@ -16,7 +16,7 @@ mmap = ['memmap', 'tempfile']
 serialize = []
 
 [dependencies]
-jomini = "0.1"
+jomini = "0.2"
 zip = { version =  "0.5", default-features = false, features = ["deflate"] }
 serde = { version = "1", features = ["derive"] }
 tempfile = { version = "3", optional = true }

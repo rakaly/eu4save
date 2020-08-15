@@ -12,8 +12,9 @@ fn melter(
     let mut in_objects = Vec::new();
     let mut in_object = 1;
     let mut token_idx = 0;
+    let tokens = tape.tokens();
 
-    while let Some(token) = tape.token_tape.get(token_idx) {
+    while let Some(token) = tokens.get(token_idx) {
         let mut did_change = false;
         if in_object == 1 {
             let depth = match token {
@@ -65,7 +66,7 @@ fn melter(
                 }
             }
             BinaryToken::Text(x) => {
-                let data = tape.data_tape[*x].view_data();
+                let data = x.view_data();
                 let end_idx = match data.last() {
                     Some(x) if *x == b'\n' => data.len() - 1,
                     Some(_x) => data.len(),
@@ -91,8 +92,7 @@ fn melter(
                     if (id == "is_ironman" || (id == "checksum" && !write_checksum))
                         && in_object == 1 =>
                 {
-                    let skip = tape
-                        .token_tape
+                    let skip = tokens
                         .get(token_idx + 1)
                         .map(|next_token| match next_token {
                             BinaryToken::Object(end) => end + 1,
@@ -110,8 +110,7 @@ fn melter(
                         return Err(Eu4Error::UnknownToken { token_id: *x });
                     }
                     FailedResolveStrategy::Ignore if in_object == 1 => {
-                        let skip = tape
-                            .token_tape
+                        let skip = tokens
                             .get(token_idx + 1)
                             .map(|next_token| match next_token {
                                 BinaryToken::Object(end) => end + 1,
@@ -129,8 +128,7 @@ fn melter(
                     }
                 },
             },
-            BinaryToken::Rgb(x) => {
-                let color = tape.rgb_tape[*x];
+            BinaryToken::Rgb(color) => {
                 writer.extend_from_slice(b"rgb {");
                 writer.extend_from_slice(format!("{} ", color.r).as_bytes());
                 writer.extend_from_slice(format!("{} ", color.g).as_bytes());
