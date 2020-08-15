@@ -1,3 +1,7 @@
+## v0.1.2 - 2020-08-15
+
+- Bump jomini to v0.2
+
 ## v0.1.1 - 2020-08-11
 
 - Rerun the build when ironman token env var changes
