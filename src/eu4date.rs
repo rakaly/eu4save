@@ -187,7 +187,7 @@ impl Eu4Date {
     }
 
     pub fn eu4_fmt(&self) -> String {
-        format!("{:04}.{:02}.{:02}", self.year, self.month, self.day)
+        format!("{}.{}.{}", self.year, self.month, self.day)
     }
 }
 
@@ -249,6 +249,24 @@ mod tests {
     fn test_date_roundtrip() {
         let date = Eu4Date::parse_from_str("1400.1.2").unwrap();
         assert_eq!(date.iso_8601(), String::from("1400-01-02"));
+    }
+
+    #[test]
+    fn test_eu4_fmt() {
+        let test_cases = [
+            "1400.1.2",
+            "1457.3.5",
+            "1.1.1",
+            "1444.11.11",
+            "1444.11.30",
+            "1444.2.19"
+        ];
+
+        for case in &test_cases {
+            let date = Eu4Date::parse_from_str(case).unwrap();
+            assert_eq!(date.eu4_fmt(), case.to_string());
+        }
+
     }
 
     #[test]
