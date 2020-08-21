@@ -1,3 +1,7 @@
+## v0.1.4 - 2020-08-20
+
+- Fix province building deserialization for ironman saves
+
 ## v0.1.3 - 2020-08-20
 
 - `Eu4Date::eu4_fmt` omits leading zeros in date
