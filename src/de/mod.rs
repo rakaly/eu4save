@@ -6,9 +6,11 @@ mod token_bool;
 mod vec_pair;
 mod war_events;
 mod war_history;
+mod yes_map;
 
 pub(crate) use token_bool::*;
 pub(crate) use vec_pair::*;
+pub(crate) use yes_map::*;
 
 use serde::{Deserialize, Deserializer};
 

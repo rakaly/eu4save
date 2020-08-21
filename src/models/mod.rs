@@ -181,7 +181,7 @@ pub struct Province {
     pub is_city: bool,
     #[serde(default, deserialize_with = "deserialize_token_bool")]
     pub hre: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_yes_map")]
     pub buildings: HashMap<String, bool>,
     #[serde(default)]
     pub building_builders: HashMap<String, CountryTag>,
