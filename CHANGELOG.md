@@ -1,3 +1,8 @@
+## v0.1.3 - 2020-08-20
+
+- `Eu4Date::eu4_fmt` omits leading zeros in date
+- Building information extraction from saves
+
 ## v0.1.2 - 2020-08-15
 
 - Bump jomini to v0.2
