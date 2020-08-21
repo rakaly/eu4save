@@ -259,14 +259,13 @@ mod tests {
             "1.1.1",
             "1444.11.11",
             "1444.11.30",
-            "1444.2.19"
+            "1444.2.19",
         ];
 
         for case in &test_cases {
             let date = Eu4Date::parse_from_str(case).unwrap();
             assert_eq!(date.eu4_fmt(), case.to_string());
         }
-
     }
 
     #[test]

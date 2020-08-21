@@ -1,4 +1,4 @@
-use eu4save::{query::Query, CountryEvent, CountryTag, Encoding, Eu4Extractor};
+use eu4save::{query::Query, CountryEvent, CountryTag, Encoding, Eu4Extractor, ProvinceId};
 use std::error::Error;
 use std::io::{Cursor, Read};
 
@@ -22,6 +22,18 @@ fn test_eu4_text() {
     assert_eq!(
         query.players.iter().cloned().collect::<Vec<String>>(),
         Vec::<String>::new()
+    );
+
+    let london = query
+        .save
+        .game
+        .provinces
+        .get(&ProvinceId::from(236))
+        .unwrap();
+    assert_eq!(london.buildings.get("fort_15th"), Some(&true));
+    assert_eq!(
+        london.building_builders.get("fort_15th"),
+        Some(&CountryTag::from("ENG"))
     );
 
     let (save, _) = extractor
