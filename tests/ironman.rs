@@ -3,7 +3,7 @@
 use eu4save::{
     query::{CountryQuery, Query},
     CountryTag, Encoding, Eu4Date, Eu4Extractor, Eu4ExtractorBuilder, FailedResolveStrategy,
-    GameDifficulty, ProvinceId, TaxManpowerModifier,
+    GameDifficulty, ProvinceEvent, ProvinceEventValue, ProvinceId, TaxManpowerModifier,
 };
 use paste::paste;
 use std::collections::HashSet;
@@ -114,6 +114,28 @@ fn test_eu4_kandy_bin() {
         l.name.as_str() == "KND" && l.data.iter().find(|(x, y)| *x == 1450 && *y == 0).is_some()
     });
     assert!(knd_score.is_some());
+
+    // Testing binary encoded saves can extract province building history perfectly fine
+    let london = query
+        .save
+        .game
+        .provinces
+        .get(&ProvinceId::from(236))
+        .unwrap();
+
+    let (date, _marketplace, val) = london
+        .history
+        .events
+        .iter()
+        .flat_map(|(date, events)| events.0.iter().map(move |event| (date.clone(), event)))
+        .filter_map(|(date, event)| match event {
+            ProvinceEvent::KV((key, value)) => Some((date, key, value)),
+            _ => None,
+        })
+        .find(|(_date, key, _value)| key.as_str() == "marketplace")
+        .unwrap();
+    assert!(matches!(val, ProvinceEventValue::Bool(v) if v == &true));
+    assert_eq!(date.eu4_fmt().as_str(), "1486.6.3");
 }
 
 #[test]

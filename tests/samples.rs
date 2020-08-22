@@ -1,4 +1,7 @@
-use eu4save::{query::Query, CountryEvent, CountryTag, Encoding, Eu4Extractor, ProvinceId};
+use eu4save::{
+    query::Query, CountryEvent, CountryTag, Encoding, Eu4Extractor, ProvinceEvent,
+    ProvinceEventValue, ProvinceId,
+};
 use std::error::Error;
 use std::io::{Cursor, Read};
 
@@ -73,6 +76,22 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let extractor = Eu4Extractor::default();
     let (save, _encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
     assert!(save.meta.multiplayer);
+
+    // Testing text encoded saves can extract province building history perfectly fine
+    let london = save.game.provinces.get(&ProvinceId::from(236)).unwrap();
+    let (date, _marketplace, val) = london
+        .history
+        .events
+        .iter()
+        .flat_map(|(date, events)| events.0.iter().map(move |event| (date.clone(), event)))
+        .filter_map(|(date, event)| match event {
+            ProvinceEvent::KV((key, value)) => Some((date, key, value)),
+            _ => None,
+        })
+        .find(|(_date, key, _value)| key.as_str() == "marketplace")
+        .unwrap();
+    assert!(matches!(val, ProvinceEventValue::Bool(v) if v == &true));
+    assert_eq!(date.eu4_fmt().as_str(), "1506.5.25");
     Ok(())
 }
 
