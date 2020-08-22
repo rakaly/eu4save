@@ -176,6 +176,9 @@ pub struct Province {
     pub culture: Option<String>,
     pub religion: Option<String>,
     pub original_religion: Option<String>,
+    pub base_tax: Option<f32>,
+    pub base_production: Option<f32>,
+    pub base_manpower: Option<f32>,
     pub capital: Option<String>,
     #[serde(default)]
     pub is_city: bool,
@@ -185,6 +188,40 @@ pub struct Province {
     pub buildings: HashMap<String, bool>,
     #[serde(default)]
     pub building_builders: HashMap<String, CountryTag>,
+    #[serde(default)]
+    pub history: ProvinceHistory,
+}
+
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct ProvinceHistory {
+    pub owner: Option<CountryTag>,
+    pub base_tax: Option<f32>,
+    pub base_production: Option<f32>,
+    pub base_manpower: Option<f32>,
+    pub events: Vec<(Eu4Date, ProvinceEvents)>,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct ProvinceEvents(pub Vec<ProvinceEvent>);
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub enum ProvinceEvent {
+    Owner(CountryTag),
+    KV((String, ProvinceEventValue)),
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub enum ProvinceEventValue {
+    String(String),
+    Float(f32),
+    Int(i32),
+    Bool(bool),
+    Object,
+    Array,
 }
 
 #[derive(Debug, Clone, JominiDeserialize, Default)]
