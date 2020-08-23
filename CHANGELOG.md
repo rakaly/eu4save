@@ -1,3 +1,9 @@
+## v0.1.5 - 2020-08-23
+
+- Add province base tax, production, and manpower
+- Start extracting province history
+- Add province building history query to query engine
+
 ## v0.1.4 - 2020-08-20
 
 - Fix province building deserialization for ironman saves
