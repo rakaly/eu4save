@@ -136,6 +136,12 @@ fn test_eu4_kandy_bin() {
         .unwrap();
     assert!(matches!(val, ProvinceEventValue::Bool(v) if v == &true));
     assert_eq!(date.eu4_fmt().as_str(), "1486.6.3");
+
+    let building_date = query
+        .province_building_history(london)
+        .get("marketplace")
+        .map(|x| x.eu4_fmt());
+    assert_eq!(building_date, Some(String::from("1486.6.3")))
 }
 
 #[test]

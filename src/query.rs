@@ -1,4 +1,7 @@
-use crate::{Country, CountryEvent, CountryTag, Eu4Save, LedgerData, LedgerDatum};
+use crate::{
+    Country, CountryEvent, CountryTag, Eu4Date, Eu4Save, LedgerData, LedgerDatum, Province,
+    ProvinceEvent,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -503,6 +506,27 @@ impl Query {
             dip: self.mana_spent_indexed(&country.dip_spent_indexed),
             mil: self.mana_spent_indexed(&country.mil_spent_indexed),
         }
+    }
+
+    pub fn province_building_history<'a>(
+        &'a self,
+        province: &'a Province,
+    ) -> HashMap<&'a str, Eu4Date> {
+        let buildings = &province.buildings;
+        province
+            .history
+            .events
+            .iter()
+            .map(|(date, events)| {
+                events.0.iter().filter_map(move |event| match event {
+                    ProvinceEvent::KV((key, _value)) if buildings.contains_key(key) => {
+                        Some((key.as_str(), date.clone()))
+                    }
+                    _ => None,
+                })
+            })
+            .flatten()
+            .collect()
     }
 }
 
