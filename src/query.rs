@@ -513,6 +513,14 @@ impl Query {
         province: &'a Province,
     ) -> HashMap<&'a str, Eu4Date> {
         let buildings = &province.buildings;
+        let initial_buildings = province.history.other.iter().filter_map(|(key, _event)| {
+            if buildings.contains_key(key) {
+                Some((key.as_str(), self.save.game.start_date.clone()))
+            } else {
+                None
+            }
+        });
+
         province
             .history
             .events
@@ -526,6 +534,7 @@ impl Query {
                 })
             })
             .flatten()
+            .chain(initial_buildings)
             .collect()
     }
 }

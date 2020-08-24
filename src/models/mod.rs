@@ -199,6 +199,7 @@ pub struct ProvinceHistory {
     pub base_tax: Option<f32>,
     pub base_production: Option<f32>,
     pub base_manpower: Option<f32>,
+    pub other: HashMap<String, ProvinceEventValue>,
     pub events: Vec<(Eu4Date, ProvinceEvents)>,
 }
 

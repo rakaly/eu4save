@@ -141,7 +141,13 @@ fn test_eu4_kandy_bin() {
         .province_building_history(london)
         .get("marketplace")
         .map(|x| x.eu4_fmt());
-    assert_eq!(building_date, Some(String::from("1486.6.3")))
+    assert_eq!(building_date, Some(String::from("1486.6.3")));
+
+    let building_date = query
+        .province_building_history(london)
+        .get("fort_15th")
+        .cloned();
+    assert_eq!(building_date, Some(query.save.game.start_date));
 }
 
 #[test]

@@ -1,5 +1,6 @@
 use crate::{Eu4Date, ProvinceHistory};
 use serde::{de, Deserialize, Deserializer};
+use std::collections::HashMap;
 use std::fmt;
 
 impl<'de> Deserialize<'de> for ProvinceHistory {
@@ -38,6 +39,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                 let mut base_production = None;
                 let mut base_manpower = None;
                 let mut events = Vec::new();
+                let mut other = HashMap::new();
 
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
@@ -49,6 +51,8 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                             if let Some(date) = Eu4Date::parse_from_str(x) {
                                 let event = map.next_value()?;
                                 events.push((date, event));
+                            } else {
+                                other.insert(key, map.next_value()?);
                             }
                         }
                     }
@@ -60,6 +64,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                     base_production,
                     base_manpower,
                     events,
+                    other,
                 })
             }
         }
