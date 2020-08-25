@@ -135,7 +135,7 @@ impl Eu4Date {
             6 => 150,
             7 => 180,
             8 => 211,
-            9 => 241,
+            9 => 242,
             10 => 272,
             11 => 303,
             12 => 333,
@@ -392,6 +392,17 @@ mod tests {
         let actual = date.add_days(0);
         let expected = Eu4Date::parse_from_str("1400.1.2").unwrap();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_all_days() {
+        let start = Eu4Date::parse_from_str("1400.1.1").unwrap();
+        for i in 0..364 {
+            let (month, day) = Eu4Date::month_day_from_julian(i);
+            let next = Eu4Date::parse_from_str(format!("1400.{}.{}", month, day)).unwrap();
+            assert_eq!(start.add_days(i), next);
+            assert_eq!(start.days_until(&next), i);
+        }
     }
 
     #[test]
