@@ -16,7 +16,7 @@ const DAYS_PER_MONTH: [u8; 13] = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30,
 ///
 /// A date in EU4 does not follow any traditional calendar and instead views the
 /// world on simpler terms: that every year should be treated as a non-leap year.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Eu4Date {
     year: u16,
     month: u8,
