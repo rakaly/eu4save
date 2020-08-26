@@ -21,14 +21,14 @@ fn test_eu4_text() {
     assert_eq!(save.meta.player, CountryTag::from("ENG"));
 
     let query = Query::from_save(save);
-    assert_eq!(query.starting_country, Some(CountryTag::from("ENG")));
+    assert_eq!(query.starting_country(), Some(&CountryTag::from("ENG")));
     assert_eq!(
-        query.players.iter().cloned().collect::<Vec<String>>(),
+        query.players().iter().cloned().collect::<Vec<String>>(),
         Vec::<String>::new()
     );
 
     let london = query
-        .save
+        .save()
         .game
         .provinces
         .get(&ProvinceId::from(236))

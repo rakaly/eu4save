@@ -39,7 +39,7 @@ let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let extractor = Eu4Extractor::default();
 let (save, _encoding) = extractor.extract_save(Cursor::new(&data[..]))?;
 let save_query = Query::from_save(save);
-let trade = save_query.save.game.countries.get(&CountryTag::from("ENG"))
+let trade = save_query.save().game.countries.get(&CountryTag::from("ENG"))
     .map(|country| save_query.country_income_breakdown(country))
     .map(|income| income.trade);
 assert_eq!(Some(17.982), trade);
