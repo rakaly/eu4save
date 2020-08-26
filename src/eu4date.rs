@@ -3,13 +3,19 @@ use serde::{de, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::cmp::Ordering;
 use std::fmt;
 
+/// EU4's start date
 pub const EU4_START_DATE: Eu4Date = Eu4Date {
     year: 1444,
     month: 11,
     day: 11,
 };
 
-/// A date in EU4. It has no concept of leap years!
+const DAYS_PER_MONTH: [u8; 13] = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/// A date in EU4
+///
+/// A date in EU4 does not follow any traditional calendar and instead views the
+/// world on simpler terms: that every year should be treated as a non-leap year.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Eu4Date {
     year: u16,
@@ -33,12 +39,30 @@ impl Ord for Eu4Date {
 }
 
 impl Eu4Date {
+    /// Create a new EU4 date from year, month, and day parts
+    ///
+    /// Will return `None` if the date does not exist
+    ///
+    /// ```
+    /// use eu4save::Eu4Date;
+    /// assert_eq!(Eu4Date::new(1444, 11, 11), Eu4Date::parse_from_str("1444.11.11"));
+    /// assert_eq!(Eu4Date::new(800, 5, 3), Eu4Date::parse_from_str("800.5.3"));
+    /// assert!(Eu4Date::new(800, 0, 3).is_none());
+    /// assert!(Eu4Date::new(800, 1, 0).is_none());
+    /// assert!(Eu4Date::new(800, 13, 1).is_none());
+    /// assert!(Eu4Date::new(800, 12, 32).is_none());
+    /// assert!(Eu4Date::new(2020, 2, 29).is_none());
+    /// ```
     pub fn new(year: u16, month: u8, day: u8) -> Option<Self> {
-        if year != 0 && month > 0 && month < 13 && day > 0 && day < 32 {
-            Some(Eu4Date { year, month, day })
-        } else {
-            None
+        if year != 0 && month != 0 && day != 0 {
+            if let Some(&days) = DAYS_PER_MONTH.get(usize::from(month)) {
+                if day <= days {
+                    return Some(Eu4Date { year, month, day });
+                }
+            }
         }
+
+        return None;
     }
 
     /// Year of the date
@@ -74,11 +98,17 @@ impl Eu4Date {
         self.day
     }
 
+    /// Parses a string and returns a new Eu4Date if valid.
+    ///
+    /// ```
+    /// use eu4save::Eu4Date;
+    /// let date = Eu4Date::parse_from_str("1444.11.11").expect("to parse date");
+    /// assert_eq!(date.year(), 1444);
+    /// assert_eq!(date.month(), 11);
+    /// assert_eq!(date.day(), 11);
+    /// ```
     pub fn parse_from_str<T: AsRef<str>>(s: T) -> Option<Self> {
-        // binary saves can have newlines in their date strings. Ugh
-        let input = s.as_ref().trim_end();
-
-        let mut sections = input.split('.');
+        let mut sections = s.as_ref().trim_end().split('.');
         if let Some(year) = sections.next() {
             if let Some(month) = sections.next() {
                 if let Some(day) = sections.next() {
@@ -102,25 +132,6 @@ impl Eu4Date {
         }
 
         None
-    }
-
-    fn month_day_from_julian(days_since_jan1: i32) -> (i32, i32) {
-        // https://landweb.modaps.eosdis.nasa.gov/browse/calendar.html
-        match days_since_jan1 {
-            0..=30 => (1, days_since_jan1 + 1),
-            31..=58 => (2, days_since_jan1 - 30),
-            59..=89 => (3, days_since_jan1 - 58),
-            90..=119 => (4, days_since_jan1 - 89),
-            120..=150 => (5, days_since_jan1 - 119),
-            151..=180 => (6, days_since_jan1 - 150),
-            181..=211 => (7, days_since_jan1 - 180),
-            212..=242 => (8, days_since_jan1 - 211),
-            243..=272 => (9, days_since_jan1 - 242),
-            273..=303 => (10, days_since_jan1 - 272),
-            304..=333 => (11, days_since_jan1 - 303),
-            334..=364 => (12, days_since_jan1 - 333),
-            _ => unreachable!(),
-        }
     }
 
     pub fn days(&self) -> i32 {
@@ -154,7 +165,7 @@ impl Eu4Date {
         let new_days = self.days() + days;
         let days_since_jan1 = new_days % 365;
         let year = new_days / 365;
-        let (month, day) = Eu4Date::month_day_from_julian(days_since_jan1);
+        let (month, day) = month_day_from_julian(days_since_jan1);
 
         Eu4Date {
             year: year as u16,
@@ -173,7 +184,7 @@ impl Eu4Date {
             return None;
         }
 
-        let (month, day) = Eu4Date::month_day_from_julian(days_since_jan1);
+        let (month, day) = month_day_from_julian(days_since_jan1);
 
         Some(Eu4Date {
             year: year as u16,
@@ -182,12 +193,47 @@ impl Eu4Date {
         })
     }
 
+    /// Formats an EU4 date in the ISO 8601 format: YYYY-MM-DD
+    ///
+    /// ```
+    /// use eu4save::Eu4Date;
+    /// let date = Eu4Date::parse_from_str("1400.1.2").expect("to parse date");
+    /// assert_eq!(date.iso_8601(), String::from("1400-01-02"));
+    /// ```
     pub fn iso_8601(&self) -> String {
         format!("{:04}-{:02}-{:02}", self.year, self.month, self.day)
     }
 
+    /// Formats an EU4 date in the EU4 format: Y.M.D
+    ///
+    /// ```
+    /// use eu4save::Eu4Date;
+    /// let date = Eu4Date::parse_from_str("1400.1.2").expect("to parse date");
+    /// let end_date = date.add_days(30);
+    /// assert_eq!(end_date.eu4_fmt(), String::from("1400.2.1"));
+    /// ```
     pub fn eu4_fmt(&self) -> String {
         format!("{}.{}.{}", self.year, self.month, self.day)
+    }
+}
+
+fn month_day_from_julian(days_since_jan1: i32) -> (i32, i32) {
+    // https://landweb.modaps.eosdis.nasa.gov/browse/calendar.html
+    // except we start at 0 instead of 1
+    match days_since_jan1 {
+        0..=30 => (1, days_since_jan1 + 1),
+        31..=58 => (2, days_since_jan1 - 30),
+        59..=89 => (3, days_since_jan1 - 58),
+        90..=119 => (4, days_since_jan1 - 89),
+        120..=150 => (5, days_since_jan1 - 119),
+        151..=180 => (6, days_since_jan1 - 150),
+        181..=211 => (7, days_since_jan1 - 180),
+        212..=242 => (8, days_since_jan1 - 211),
+        243..=272 => (9, days_since_jan1 - 242),
+        273..=303 => (10, days_since_jan1 - 272),
+        304..=333 => (11, days_since_jan1 - 303),
+        334..=364 => (12, days_since_jan1 - 333),
+        _ => unreachable!(),
     }
 }
 
@@ -398,7 +444,7 @@ mod tests {
     fn test_all_days() {
         let start = Eu4Date::parse_from_str("1400.1.1").unwrap();
         for i in 0..364 {
-            let (month, day) = Eu4Date::month_day_from_julian(i);
+            let (month, day) = month_day_from_julian(i);
             let next = Eu4Date::parse_from_str(format!("1400.{}.{}", month, day)).unwrap();
             assert_eq!(start.add_days(i), next);
             assert_eq!(start.days_until(&next), i);
