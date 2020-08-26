@@ -2,6 +2,7 @@ use crate::{
     Country, CountryEvent, CountryTag, Eu4Date, Eu4Save, LedgerData, LedgerDatum, Province,
     ProvinceEvent,
 };
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -141,23 +142,39 @@ pub struct CountryManaSpend {
 
 #[derive(Debug)]
 pub struct Query {
-    pub save: Eu4Save,
-    pub players: HashSet<String>,
-    pub player_countries: HashSet<CountryTag>,
-    pub starting_country: Option<CountryTag>,
+    save: Eu4Save,
+    players: OnceCell<HashSet<String>>,
+    player_countries: OnceCell<HashSet<CountryTag>>,
+    starting_country: OnceCell<Option<CountryTag>>,
 }
 
 impl Query {
     pub fn from_save(save: Eu4Save) -> Self {
-        let players = calc_players(&save);
-        let player_countries = calc_player_countries(&save);
-        let starting_country = calc_starting_country(&save);
         Query {
             save,
-            player_countries,
-            players,
-            starting_country,
+            players: OnceCell::default(),
+            player_countries: OnceCell::default(),
+            starting_country: OnceCell::default(),
         }
+    }
+
+    pub fn save(&self) -> &Eu4Save {
+        &self.save
+    }
+
+    pub fn players(&self) -> &HashSet<String> {
+        self.players.get_or_init(|| calc_players(&self.save))
+    }
+
+    pub fn player_countries(&self) -> &HashSet<CountryTag> {
+        self.player_countries
+            .get_or_init(|| calc_player_countries(&self.save))
+    }
+
+    pub fn starting_country(&self) -> Option<&CountryTag> {
+        self.starting_country
+            .get_or_init(|| calc_starting_country(&self.save))
+            .as_ref()
     }
 
     pub fn country_tag_hex_color(&self, country_tag: &CountryTag) -> Option<String> {
@@ -198,10 +215,11 @@ impl Query {
         excludes: &[P],
     ) -> HashSet<CountryTag> {
         let mut filter_set = HashSet::new();
+        let player_countries = self.player_countries();
         for q in query {
             match q {
                 CountryQuery::Players => {
-                    filter_set = filter_set.union(&self.player_countries).cloned().collect();
+                    filter_set = filter_set.union(player_countries).cloned().collect();
                 }
                 CountryQuery::Greats => {
                     for (tag, country) in &self.save.game.countries {

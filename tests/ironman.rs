@@ -25,16 +25,16 @@ fn test_eu4_bin() {
     assert!(save2.game.is_none());
 
     let query = Query::from_save(save);
-    assert_eq!(query.starting_country, Some(CountryTag::from("RAG")));
+    assert_eq!(query.starting_country(), Some(&CountryTag::from("RAG")));
     assert_eq!(
-        query.players.iter().cloned().collect::<Vec<String>>(),
+        query.players().iter().cloned().collect::<Vec<String>>(),
         Vec::<String>::new()
     );
 
     let mut players = HashSet::new();
     players.insert(CountryTag::from("RAG"));
     players.insert(CountryTag::from("CRO"));
-    assert_eq!(query.player_countries, players);
+    assert_eq!(query.player_countries(), &players);
 }
 
 #[test]
@@ -49,9 +49,9 @@ fn test_eu4_kandy_bin() {
     let mut players = HashSet::new();
     players.insert(CountryTag::from("KND"));
     players.insert(CountryTag::from("BHA"));
-    assert_eq!(query.player_countries, players);
+    assert_eq!(query.player_countries(), &players);
     assert!(!query
-        .save
+        .save()
         .game
         .countries
         .get(&CountryTag::from("BHA"))
@@ -66,7 +66,7 @@ fn test_eu4_kandy_bin() {
 
     assert_eq!(
         query
-            .save
+            .save()
             .game
             .provinces
             .get(&ProvinceId::from(1))
@@ -77,9 +77,9 @@ fn test_eu4_kandy_bin() {
         &CountryTag::from("SCA")
     );
 
-    assert_eq!(query.starting_country, Some(CountryTag::from("KND")));
+    assert_eq!(query.starting_country(), Some(&CountryTag::from("KND")));
     assert_eq!(
-        query.players.iter().cloned().collect::<Vec<_>>(),
+        query.players().iter().cloned().collect::<Vec<_>>(),
         vec![String::from("comagoosie")]
     );
 
@@ -92,7 +92,7 @@ fn test_eu4_kandy_bin() {
 
     assert_eq!(
         query
-            .save
+            .save()
             .game
             .countries
             .get(&CountryTag::from("BHA"))
@@ -117,7 +117,7 @@ fn test_eu4_kandy_bin() {
 
     // Testing binary encoded saves can extract province building history perfectly fine
     let london = query
-        .save
+        .save()
         .game
         .provinces
         .get(&ProvinceId::from(236))
@@ -147,7 +147,7 @@ fn test_eu4_kandy_bin() {
         .province_building_history(london)
         .get("fort_15th")
         .cloned();
-    assert_eq!(building_date, Some(query.save.game.start_date));
+    assert_eq!(building_date, Some(query.save().game.start_date));
 }
 
 #[test]
@@ -184,9 +184,9 @@ fn test_eu4_ita1() {
     assert!(all_dlc_recognized);
 
     let query = Query::from_save(save);
-    assert_eq!(query.starting_country, Some(CountryTag::from("LAN")));
+    assert_eq!(query.starting_country(), Some(&CountryTag::from("LAN")));
     assert_eq!(
-        query.players.iter().cloned().collect::<Vec<_>>(),
+        query.players().iter().cloned().collect::<Vec<_>>(),
         vec![String::from("comagoosie")]
     );
 }
@@ -236,7 +236,7 @@ macro_rules! ironman_test {
                 let query = Query::from_save(save);
 
                 assert_eq!(
-                    query.starting_country.as_ref().unwrap(),
+                    query.starting_country().unwrap(),
                     &CountryTag::from(expected.starting)
                 );
 
@@ -317,7 +317,7 @@ ironman_test!(
     },
     |query: Query| {
         assert_eq!(
-            query.players.iter().cloned().collect::<Vec<_>>(),
+            query.players().iter().cloned().collect::<Vec<_>>(),
             vec![String::from("comagoosie")]
         );
     }
