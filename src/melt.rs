@@ -1,4 +1,4 @@
-use crate::{Eu4Date, Eu4Error, TokenLookup};
+use crate::{Eu4Date, Eu4Error, Eu4ErrorKind, TokenLookup};
 use jomini::{BinaryTape, BinaryToken, FailedResolveStrategy, TokenResolver};
 use std::io::{Cursor, Read, Write};
 
@@ -85,8 +85,8 @@ fn melter(
                     writer.push(b'"');
                 }
             }
-            BinaryToken::F32(x) => write!(writer, "{}", x).map_err(Eu4Error::IoErr)?,
-            BinaryToken::Q16(x) => write!(writer, "{}", x).map_err(Eu4Error::IoErr)?,
+            BinaryToken::F32(x) => write!(writer, "{}", x).map_err(Eu4ErrorKind::IoErr)?,
+            BinaryToken::Q16(x) => write!(writer, "{}", x).map_err(Eu4ErrorKind::IoErr)?,
             BinaryToken::Token(x) => match TokenLookup.resolve(*x) {
                 Some(id)
                     if (id == "is_ironman" || (id == "checksum" && !write_checksum))
@@ -107,7 +107,7 @@ fn melter(
                 Some(id) => writer.extend_from_slice(&id.as_bytes()),
                 None => match failed_resolver {
                     FailedResolveStrategy::Error => {
-                        return Err(Eu4Error::UnknownToken { token_id: *x });
+                        return Err(Eu4ErrorKind::UnknownToken { token_id: *x }.into());
                     }
                     FailedResolveStrategy::Ignore if in_object == 1 => {
                         let skip = tokens
@@ -162,13 +162,13 @@ fn melt_zip(
     let mut inflated_data = Vec::new();
 
     let zip_reader = Cursor::new(&zip_data);
-    let mut zip = zip::ZipArchive::new(zip_reader).map_err(Eu4Error::ZipCentralDirectory)?;
+    let mut zip = zip::ZipArchive::new(zip_reader).map_err(Eu4ErrorKind::ZipCentralDirectory)?;
 
     // Pre-allocate enough data in the inflated data based on the uncompressed size of the ironman
     // data
     let size = zip
         .by_name("gamestate")
-        .map_err(|e| Eu4Error::ZipMissingEntry("gamestate", e))
+        .map_err(|e| Eu4ErrorKind::ZipMissingEntry("gamestate", e))
         .map(|x| x.size())?;
     out.reserve((size as usize) * 2);
 
@@ -176,14 +176,14 @@ fn melt_zip(
         inflated_data.clear();
         let mut zip_file = zip
             .by_name(file)
-            .map_err(|e| Eu4Error::ZipMissingEntry(file, e))?;
+            .map_err(|e| Eu4ErrorKind::ZipMissingEntry(file, e))?;
 
         zip_file
             .read_to_end(&mut inflated_data)
-            .map_err(|e| Eu4Error::ZipExtraction(file, e))?;
+            .map_err(|e| Eu4ErrorKind::ZipExtraction(file, e))?;
 
         let tape = BinaryTape::from_slice(&inflated_data["EU4bin".len()..]).map_err(|e| {
-            Eu4Error::Deserialize {
+            Eu4ErrorKind::Deserialize {
                 part: Some(file.to_string()),
                 err: e,
             }

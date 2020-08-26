@@ -1,4 +1,7 @@
-use crate::{Eu4Error, Eu4Save, Eu4SaveMeta, FailedResolveStrategy, GameState, Meta, TokenLookup};
+use crate::{
+    Eu4Error, Eu4ErrorKind, Eu4Save, Eu4SaveMeta, FailedResolveStrategy, GameState, Meta,
+    TokenLookup,
+};
 use jomini::{BinaryDeserializerBuilder, TextDeserializer, TextTape};
 use serde::de::DeserializeOwned;
 use std::fmt;
@@ -90,16 +93,17 @@ impl Eu4Extractor {
         R: Read + Seek,
     {
         let mut header = [0; "EU4txt".len()];
-        reader.read_exact(&mut header).map_err(Eu4Error::IoErr)?;
+        reader.read_exact(&mut header)?;
 
         let mut buffer = Vec::with_capacity(0);
         if is_text(&header).is_some() {
-            reader.read_to_end(&mut buffer).map_err(Eu4Error::IoErr)?;
+            reader.read_to_end(&mut buffer)?;
             let meta = TextDeserializer::from_slice(&buffer)?;
             Ok((meta, Encoding::Text))
         } else if is_zip(&header) {
-            reader.seek(SeekFrom::Start(0)).map_err(Eu4Error::IoErr)?;
-            let mut zip = zip::ZipArchive::new(reader).map_err(Eu4Error::ZipCentralDirectory)?;
+            reader.seek(SeekFrom::Start(0))?;
+            let mut zip =
+                zip::ZipArchive::new(reader).map_err(Eu4ErrorKind::ZipCentralDirectory)?;
             match self.extraction {
                 Extraction::InMemory => {
                     melt_in_memory(&mut buffer, "meta", &mut zip, self.on_failed_resolve)
@@ -111,7 +115,7 @@ impl Eu4Extractor {
                 }
             }
         } else {
-            Err(Eu4Error::UnknownHeader)
+            Err(Eu4ErrorKind::UnknownHeader.into())
         }
     }
 
@@ -120,18 +124,19 @@ impl Eu4Extractor {
         R: Read + Seek,
     {
         let mut header = [0; "EU4txt".len()];
-        reader.read_exact(&mut header).map_err(Eu4Error::IoErr)?;
+        reader.read_exact(&mut header)?;
 
         let mut buffer = Vec::with_capacity(0);
         if is_text(&header).is_some() {
-            reader.read_to_end(&mut buffer).map_err(Eu4Error::IoErr)?;
+            reader.read_to_end(&mut buffer)?;
             let tape = TextTape::from_slice(&buffer)?;
             let meta: Meta = TextDeserializer::from_tape(&tape)?;
             let game: GameState = TextDeserializer::from_tape(&tape)?;
             Ok((Eu4Save { meta, game }, Encoding::Text))
         } else if is_zip(&header) {
-            reader.seek(SeekFrom::Start(0)).map_err(Eu4Error::IoErr)?;
-            let mut zip = zip::ZipArchive::new(reader).map_err(Eu4Error::ZipCentralDirectory)?;
+            reader.seek(SeekFrom::Start(0))?;
+            let mut zip =
+                zip::ZipArchive::new(reader).map_err(Eu4ErrorKind::ZipCentralDirectory)?;
             let (meta, encoding) = match self.extraction {
                 Extraction::InMemory => {
                     melt_in_memory(&mut buffer, "meta", &mut zip, self.on_failed_resolve)
@@ -156,7 +161,7 @@ impl Eu4Extractor {
 
             Ok((Eu4Save { meta, game }, encoding))
         } else {
-            Err(Eu4Error::UnknownHeader)
+            Err(Eu4ErrorKind::UnknownHeader.into())
         }
     }
 
@@ -170,21 +175,22 @@ impl Eu4Extractor {
         R: Read + Seek,
     {
         let mut header = [0; "EU4txt".len()];
-        reader.read_exact(&mut header).map_err(Eu4Error::IoErr)?;
+        reader.read_exact(&mut header)?;
 
         let mut buffer = Vec::with_capacity(0);
 
         // If we're encountering text then since we have to read through the whole document anyways
         // to extract the metadata we might as well extract the game state too.
         if is_text(&header).is_some() {
-            reader.read_to_end(&mut buffer).map_err(Eu4Error::IoErr)?;
+            reader.read_to_end(&mut buffer)?;
             let tape = TextTape::from_slice(&buffer)?;
             let meta: Meta = TextDeserializer::from_tape(&tape)?;
             let game: Option<GameState> = TextDeserializer::from_tape(&tape).map(Some)?;
             Ok((Eu4SaveMeta { meta, game }, Encoding::Text))
         } else if is_zip(&header) {
-            reader.seek(SeekFrom::Start(0)).map_err(Eu4Error::IoErr)?;
-            let mut zip = zip::ZipArchive::new(reader).map_err(Eu4Error::ZipCentralDirectory)?;
+            reader.seek(SeekFrom::Start(0))?;
+            let mut zip =
+                zip::ZipArchive::new(reader).map_err(Eu4ErrorKind::ZipCentralDirectory)?;
             let (meta, encoding) = match self.extraction {
                 Extraction::InMemory => {
                     melt_in_memory(&mut buffer, "meta", &mut zip, self.on_failed_resolve)
@@ -198,7 +204,7 @@ impl Eu4Extractor {
 
             Ok((Eu4SaveMeta { meta, game: None }, encoding))
         } else {
-            Err(Eu4Error::UnknownHeader)
+            Err(Eu4ErrorKind::UnknownHeader.into())
         }
     }
 }
@@ -216,23 +222,23 @@ where
     buffer.clear();
     let mut zip_file = zip
         .by_name(name)
-        .map_err(|e| Eu4Error::ZipMissingEntry(name, e))?;
+        .map_err(|e| Eu4ErrorKind::ZipMissingEntry(name, e))?;
 
     // protect against excessively large uncompressed data
     if zip_file.size() > 1024 * 1024 * 200 {
-        return Err(Eu4Error::ZipSize(name));
+        return Err(Eu4ErrorKind::ZipSize(name).into());
     }
 
     buffer.reserve(zip_file.size() as usize);
     zip_file
         .read_to_end(&mut buffer)
-        .map_err(|e| Eu4Error::ZipExtraction(name, e))?;
+        .map_err(|e| Eu4ErrorKind::ZipExtraction(name, e))?;
 
     if let Some(data) = is_bin(&buffer) {
         let res = BinaryDeserializerBuilder::new()
             .on_failed_resolve(on_failed_resolve)
             .from_slice(data, TokenLookup)
-            .map_err(|e| Eu4Error::Deserialize {
+            .map_err(|e| Eu4ErrorKind::Deserialize {
                 part: Some(name.to_string()),
                 err: e,
             })?;
@@ -241,7 +247,7 @@ where
         let res = TextDeserializer::from_slice(data)?;
         Ok((res, Encoding::TextZip))
     } else {
-        Err(Eu4Error::UnknownHeader)
+        Err(Eu4ErrorKind::UnknownHeader.into())
     }
 }
 
@@ -266,16 +272,12 @@ where
         return Err(Eu4Error::ZipSize(name));
     }
 
-    let file = tempfile::tempfile().map_err(Eu4Error::IoErr)?;
+    let file = tempfile::tempfile()?;
     let mut writer = BufWriter::new(file);
     std::io::copy(&mut zip_file, &mut writer).map_err(|e| Eu4Error::ZipExtraction(name, e))?;
-    writer.flush().map_err(Eu4Error::IoErr)?;
+    writer.flush()?;
     let file = writer.into_inner().unwrap();
-    let mmap = unsafe {
-        memmap::MmapOptions::new()
-            .map(&file)
-            .map_err(Eu4Error::IoErr)?
-    };
+    let mmap = unsafe { memmap::MmapOptions::new().map(&file)? };
     let buffer = &mmap[..];
 
     if let Some(data) = is_bin(&buffer) {
