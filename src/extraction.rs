@@ -265,16 +265,16 @@ where
 
     let mut zip_file = zip
         .by_name(name)
-        .map_err(|e| Eu4Error::ZipMissingEntry(name, e))?;
+        .map_err(|e| Eu4ErrorKind::ZipMissingEntry(name, e))?;
 
     // protect against excessively large uncompressed data
     if zip_file.size() > 1024 * 1024 * 200 {
-        return Err(Eu4Error::ZipSize(name));
+        return Err(Eu4ErrorKind::ZipSize(name).into());
     }
 
     let file = tempfile::tempfile()?;
     let mut writer = BufWriter::new(file);
-    std::io::copy(&mut zip_file, &mut writer).map_err(|e| Eu4Error::ZipExtraction(name, e))?;
+    std::io::copy(&mut zip_file, &mut writer).map_err(|e| Eu4ErrorKind::ZipExtraction(name, e))?;
     writer.flush()?;
     let file = writer.into_inner().unwrap();
     let mmap = unsafe { memmap::MmapOptions::new().map(&file)? };
@@ -284,7 +284,7 @@ where
         let res = BinaryDeserializerBuilder::new()
             .on_failed_resolve(on_failed_resolve)
             .from_slice(data, TokenLookup)
-            .map_err(|e| Eu4Error::Deserialize {
+            .map_err(|e| Eu4ErrorKind::Deserialize {
                 part: Some(name.to_string()),
                 err: e,
             })?;
@@ -293,7 +293,7 @@ where
         let res = TextDeserializer::from_slice(data)?;
         Ok((res, Encoding::TextZip))
     } else {
-        Err(Eu4Error::UnknownHeader)
+        Err(Eu4ErrorKind::UnknownHeader.into())
     }
 }
 
