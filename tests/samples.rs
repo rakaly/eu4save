@@ -62,9 +62,11 @@ fn test_eu4_compressed_text() {
 #[cfg(feature = "mmap")]
 #[test]
 fn test_eu4_compressed_text_mmap() {
-    use eu4save::Extraction;
+    use eu4save::{Eu4ExtractorBuilder, Extraction};
     let data = utils::request("eng.txt.compressed.eu4");
-    let extractor = Eu4Extractor::new(Extraction::MmapTemporaries);
+    let extractor = Eu4ExtractorBuilder::new()
+        .with_extraction(Extraction::MmapTemporaries)
+        .build();
     let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
     assert_eq!(encoding, Encoding::TextZip);
     assert_eq!(save.meta.player, CountryTag::from("ENG"));
