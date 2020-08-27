@@ -14,14 +14,11 @@ mod utils;
 #[test]
 fn test_eu4_bin() {
     let data = utils::request("ragusa2.bin.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert_eq!(encoding, Encoding::BinZip);
     assert_eq!(save.meta.player, CountryTag::from("CRO"));
 
-    let (save2, _) = extractor
-        .extract_meta_optimistic(Cursor::new(&data[..]))
-        .unwrap();
+    let (save2, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&data[..])).unwrap();
     assert!(save2.game.is_none());
 
     let query = Query::from_save(save);
@@ -40,8 +37,7 @@ fn test_eu4_bin() {
 #[test]
 fn test_eu4_kandy_bin() {
     let data = utils::request("kandy2.bin.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert_eq!(encoding, Encoding::BinZip);
     assert_eq!(save.meta.player, CountryTag::from("BHA"));
 
@@ -154,9 +150,8 @@ fn test_eu4_kandy_bin() {
 fn test_eu4_same_campaign_id() {
     let data = utils::request("ita2.eu4");
     let data2 = utils::request("ita2_later.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, _) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
-    let (save2, _) = extractor.extract_save(Cursor::new(&data2[..])).unwrap();
+    let (save, _) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
+    let (save2, _) = Eu4Extractor::extract_save(Cursor::new(&data2[..])).unwrap();
     assert_eq!(save.meta.campaign_id, save2.meta.campaign_id);
     assert!(save.meta.date < save2.meta.date);
 }
@@ -164,8 +159,7 @@ fn test_eu4_same_campaign_id() {
 #[test]
 fn test_eu4_ita1() {
     let data = utils::request("ita1.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert_eq!(encoding, Encoding::BinZip);
     assert_eq!(save.meta.player, CountryTag::from("ITA"));
     let settings = &save.game.gameplay_settings.options;
@@ -195,8 +189,7 @@ fn test_eu4_ita1() {
 fn test_roundtrip_melt() {
     let data = utils::request("kandy2.bin.eu4");
     let out = eu4save::melt(&data[..], eu4save::FailedResolveStrategy::Error).unwrap();
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&out[..])).unwrap();
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&out[..])).unwrap();
     assert_eq!(encoding, Encoding::Text);
     assert_eq!(save.meta.player, CountryTag::from("BHA"));
 }
@@ -214,10 +207,10 @@ macro_rules! ironman_test {
                 let melted = eu4save::melt(&data[..], FailedResolveStrategy::Error).unwrap();
                 assert!(!melted.is_empty());
 
-                let extractor = Eu4ExtractorBuilder::new()
+                let (save, encoding) = Eu4ExtractorBuilder::new()
                     .with_on_failed_resolve(FailedResolveStrategy::Error)
-                    .build();
-                let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
+                    .extract_save(Cursor::new(&data[..]))
+                    .unwrap();
                 assert_eq!(encoding, Encoding::BinZip);
                 let expected = $query;
                 assert_eq!(save.meta.player, CountryTag::from(expected.player));

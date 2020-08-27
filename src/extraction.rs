@@ -67,27 +67,6 @@ impl Eu4ExtractorBuilder {
         self
     }
 
-    pub fn build(self) -> Eu4Extractor {
-        Eu4Extractor {
-            extraction: self.extraction,
-            on_failed_resolve: self.on_failed_resolve,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Eu4Extractor {
-    extraction: Extraction,
-    on_failed_resolve: FailedResolveStrategy,
-}
-
-impl Default for Eu4Extractor {
-    fn default() -> Self {
-        Eu4ExtractorBuilder::new().build()
-    }
-}
-
-impl Eu4Extractor {
     pub fn extract_meta<R>(&self, mut reader: R) -> Result<(Meta, Encoding), Eu4Error>
     where
         R: Read + Seek,
@@ -206,6 +185,38 @@ impl Eu4Extractor {
         } else {
             Err(Eu4ErrorKind::UnknownHeader.into())
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Eu4Extractor {}
+
+impl Eu4Extractor {
+    pub fn builder() -> Eu4ExtractorBuilder {
+        Eu4ExtractorBuilder::new()
+    }
+
+    pub fn extract_meta<R>(reader: R) -> Result<(Meta, Encoding), Eu4Error>
+    where
+        R: Read + Seek,
+    {
+        Self::builder().extract_meta(reader)
+    }
+
+    pub fn extract_save<R>(reader: R) -> Result<(Eu4Save, Encoding), Eu4Error>
+    where
+        R: Read + Seek,
+    {
+        Self::builder().extract_save(reader)
+    }
+
+    // For the times where all you want is the metadata but will accept the game state too save on
+    // future needless double parsing.
+    pub fn extract_meta_optimistic<R>(reader: R) -> Result<(Eu4SaveMeta, Encoding), Eu4Error>
+    where
+        R: Read + Seek,
+    {
+        Self::builder().extract_meta_optimistic(reader)
     }
 }
 

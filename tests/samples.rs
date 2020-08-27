@@ -15,8 +15,7 @@ fn test_eu4_text() {
     let mut zip_file = zip.by_index(0).unwrap();
     let mut buffer = Vec::with_capacity(0);
     zip_file.read_to_end(&mut buffer).unwrap();
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&buffer)).unwrap();
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer)).unwrap();
     assert_eq!(encoding, Encoding::Text);
     assert_eq!(save.meta.player, CountryTag::from("ENG"));
 
@@ -39,35 +38,30 @@ fn test_eu4_text() {
         Some(&CountryTag::from("ENG"))
     );
 
-    let (save, _) = extractor
-        .extract_meta_optimistic(Cursor::new(&buffer))
-        .unwrap();
+    let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&buffer)).unwrap();
     assert!(save.game.is_some());
 }
 
 #[test]
 fn test_eu4_compressed_text() {
     let data = utils::request("eng.txt.compressed.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert_eq!(encoding, Encoding::TextZip);
     assert_eq!(save.meta.player, CountryTag::from("ENG"));
 
-    let (save, _) = extractor
-        .extract_meta_optimistic(Cursor::new(&data[..]))
-        .unwrap();
+    let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&data[..])).unwrap();
     assert!(save.game.is_none());
 }
 
 #[cfg(feature = "mmap")]
 #[test]
 fn test_eu4_compressed_text_mmap() {
-    use eu4save::{Eu4ExtractorBuilder, Extraction};
+    use eu4save::Extraction;
     let data = utils::request("eng.txt.compressed.eu4");
-    let extractor = Eu4ExtractorBuilder::new()
+    let (save, encoding) = Eu4Extractor::builder()
         .with_extraction(Extraction::MmapTemporaries)
-        .build();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
+        .extract_save(Cursor::new(&data[..]))
+        .unwrap();
     assert_eq!(encoding, Encoding::TextZip);
     assert_eq!(save.meta.player, CountryTag::from("ENG"));
 }
@@ -75,8 +69,7 @@ fn test_eu4_compressed_text_mmap() {
 #[test]
 pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let data = utils::request("mp_Uesugi.eu4");
-    let extractor = Eu4Extractor::default();
-    let (save, _encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
+    let (save, _encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert!(save.meta.multiplayer);
 
     // Testing text encoded saves can extract province building history perfectly fine
@@ -106,8 +99,7 @@ fn test_missing_leader_activation_save() {
     let mut buffer = Vec::with_capacity(0);
     zip_file.read_to_end(&mut buffer).unwrap();
 
-    let extractor = Eu4Extractor::default();
-    let (save, encoding) = extractor.extract_save(Cursor::new(&buffer[..])).unwrap();
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer[..])).unwrap();
     assert_eq!(encoding, Encoding::Text);
     assert_eq!(save.meta.player, CountryTag::from("NED"));
 
@@ -136,7 +128,6 @@ fn test_handle_heavily_nested_events() {
     // "flavor_eng.9880" or the symposium event for great britain where every ten years the event
     // fires. https://eu4.paradoxwikis.com/English_events#Symposium
     let data = utils::request("HashMP_Game56_S7End.eu4");
-    let extractor = Eu4Extractor::default();
-    let (_save, encoding) = extractor.extract_save(Cursor::new(&data[..])).unwrap();
+    let (_save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert_eq!(encoding, Encoding::TextZip);
 }
