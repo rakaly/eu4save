@@ -1,4 +1,4 @@
-use crate::{Eu4Date, Eu4Error, Eu4ErrorKind, TokenLookup};
+use crate::{tokens::TokenLookup, Eu4Date, Eu4Error, Eu4ErrorKind};
 use jomini::{BinaryTape, BinaryToken, FailedResolveStrategy, TokenResolver};
 use std::io::{Cursor, Read, Write};
 

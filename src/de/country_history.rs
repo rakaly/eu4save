@@ -1,4 +1,4 @@
-use crate::{CountryHistory, Eu4Date};
+use crate::{models::CountryHistory, Eu4Date};
 use serde::{de, Deserialize, Deserializer};
 use std::fmt;
 

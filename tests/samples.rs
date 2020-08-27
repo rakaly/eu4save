@@ -1,7 +1,5 @@
-use eu4save::{
-    query::Query, CountryEvent, CountryTag, Encoding, Eu4Extractor, ProvinceEvent,
-    ProvinceEventValue, ProvinceId,
-};
+use eu4save::models::{CountryEvent, ProvinceEvent, ProvinceEventValue};
+use eu4save::{query::Query, CountryTag, Encoding, Eu4Extractor, ProvinceId};
 use std::error::Error;
 use std::io::{Cursor, Read};
 

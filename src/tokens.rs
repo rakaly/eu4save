@@ -1,6 +1,6 @@
 use jomini::TokenResolver;
 
-pub struct TokenLookup;
+pub(crate) struct TokenLookup;
 
 impl TokenResolver for TokenLookup {
     fn resolve(&self, token: u16) -> Option<&str> {

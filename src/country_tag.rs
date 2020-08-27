@@ -1,6 +1,7 @@
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::fmt;
 
+/// Wrapper around a Country's unique three character tag
 #[derive(Debug, Clone, Serialize, Hash, Eq, PartialEq)]
 pub struct CountryTag(String);
 

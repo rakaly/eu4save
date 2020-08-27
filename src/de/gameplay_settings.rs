@@ -1,4 +1,4 @@
-use crate::{GameDifficulty, GameplayOptions, TaxManpowerModifier};
+use crate::models::{GameDifficulty, GameplayOptions, TaxManpowerModifier};
 use serde::{de, Deserialize, Deserializer};
 use std::fmt;
 

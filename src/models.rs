@@ -1,13 +1,8 @@
 use crate::de::*;
-use crate::Eu4Date;
+use crate::{CountryTag, Eu4Date, ProvinceId};
 use jomini::JominiDeserialize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-mod country_tag;
-mod province_id;
-pub use country_tag::*;
-pub use province_id::*;
 
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]

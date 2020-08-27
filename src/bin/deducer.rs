@@ -1,4 +1,7 @@
-use eu4save::{Country, Eu4Extractor, Eu4Save};
+use eu4save::{
+    models::{Country, Eu4Save},
+    Eu4Extractor,
+};
 use std::collections::HashSet;
 use std::env;
 use std::io::Cursor;

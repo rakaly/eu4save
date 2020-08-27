@@ -1,4 +1,4 @@
-use crate::{WarEvent, WarEvents};
+use crate::models::{WarEvent, WarEvents};
 use serde::{de, Deserialize, Deserializer};
 use std::fmt;
 

@@ -1,4 +1,4 @@
-use crate::LeaderKind;
+use crate::models::LeaderKind;
 use serde::{de, Deserialize, Deserializer};
 use std::fmt;
 

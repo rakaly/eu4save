@@ -1,4 +1,4 @@
-use crate::{CountryEvent, CountryEvents};
+use crate::models::{CountryEvent, CountryEvents};
 use serde::{de, Deserialize, Deserializer};
 use std::fmt;
 
