@@ -272,8 +272,6 @@ where
     R: Read + Seek,
     T: DeserializeOwned,
 {
-    use std::io::{BufWriter, Write};
-
     let mut zip_file = zip
         .by_name(name)
         .map_err(|e| Eu4ErrorKind::ZipMissingEntry(name, e))?;
@@ -283,12 +281,9 @@ where
         return Err(Eu4ErrorKind::ZipSize(name).into());
     }
 
-    let file = tempfile::tempfile()?;
-    let mut writer = BufWriter::new(file);
-    std::io::copy(&mut zip_file, &mut writer).map_err(|e| Eu4ErrorKind::ZipExtraction(name, e))?;
-    writer.flush()?;
-    let file = writer.into_inner().unwrap();
-    let mmap = unsafe { memmap::MmapOptions::new().map(&file)? };
+    let mut mmap = memmap::MmapMut::map_anon(zip_file.size() as usize)?;
+    std::io::copy(&mut zip_file, &mut mmap.as_mut())
+        .map_err(|e| Eu4ErrorKind::ZipExtraction(name, e))?;
     let buffer = &mmap[..];
 
     if let Some(data) = is_bin(&buffer) {
