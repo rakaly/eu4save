@@ -1,3 +1,14 @@
+/// Map dlc name to its id
+///
+/// Every dlc has an id. This id is not present in the save file but it can be useful
+/// to have the id so one doesn't need to compare strings.
+///
+/// For more information on IDs see the wiki:
+/// https://eu4.paradoxwikis.com/Downloadable_content
+///
+/// ```rust
+/// assert_eq!(eu4save::dlc_id("Dharma"), Some(90))
+/// ```
 pub fn dlc_id(name: &str) -> Option<i32> {
     match name {
         "Conquest of Paradise" => Some(10),

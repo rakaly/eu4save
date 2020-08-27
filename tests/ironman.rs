@@ -173,7 +173,7 @@ fn test_eu4_ita1() {
         .meta
         .dlc_enabled
         .iter()
-        .map(|x| eu4save::dlc::dlc_id(x.as_str()))
+        .map(|x| eu4save::dlc_id(x.as_str()))
         .all(|x| x.is_some());
     assert!(all_dlc_recognized);
 

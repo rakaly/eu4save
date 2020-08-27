@@ -66,7 +66,7 @@ for inspiration.
 */
 
 mod de;
-pub mod dlc;
+mod dlc;
 mod errors;
 mod eu4date;
 mod extraction;
@@ -82,3 +82,4 @@ pub use jomini::FailedResolveStrategy;
 pub use melt::*;
 pub use models::*;
 pub use tokens::*;
+pub use dlc::*;
