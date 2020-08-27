@@ -62,7 +62,7 @@ impl Eu4Date {
             }
         }
 
-        return None;
+        None
     }
 
     /// Year of the date

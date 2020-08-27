@@ -533,7 +533,7 @@ impl Query {
         let buildings = &province.buildings;
         let initial_buildings = province.history.other.iter().filter_map(|(key, _event)| {
             if buildings.contains_key(key) {
-                Some((key.as_str(), self.save.game.start_date.clone()))
+                Some((key.as_str(), self.save.game.start_date))
             } else {
                 None
             }
@@ -546,7 +546,7 @@ impl Query {
             .map(|(date, events)| {
                 events.0.iter().filter_map(move |event| match event {
                     ProvinceEvent::KV((key, _value)) if buildings.contains_key(key) => {
-                        Some((key.as_str(), date.clone()))
+                        Some((key.as_str(), *date))
                     }
                     _ => None,
                 })
@@ -576,7 +576,7 @@ fn calc_starting_country(save: &Eu4Save) -> Option<CountryTag> {
         .find(|(_, country)| country.human);
 
     if let Some((first_tag, _country)) = first {
-        let mut track_date = save.meta.date.clone();
+        let mut track_date = save.meta.date;
         let mut tag = first_tag.clone();
 
         while let Some(country) = save.game.countries.get(first_tag) {
@@ -586,14 +586,14 @@ fn calc_starting_country(save: &Eu4Save) -> Option<CountryTag> {
                 .iter()
                 .rev()
                 .filter(|(date, _events)| date < &track_date)
-                .flat_map(|(date, events)| events.0.iter().map(move |event| (date.clone(), event)))
+                .flat_map(|(date, events)| events.0.iter().map(move |event| (*date, event)))
                 .filter_map(|(date, event)| match event {
                     CountryEvent::ChangedTagFrom(x) => Some((date, x)),
                     _ => None,
                 });
 
             if let Some((date, change_tag)) = country_changes.next() {
-                track_date = date.clone();
+                track_date = date;
                 tag = change_tag.clone();
             } else {
                 break;
