@@ -56,6 +56,10 @@ jobs:
     - name: Run tests with memmap and serialize
       run: cargo test --features "mmap serialize" --all --verbose -- --nocapture
 
+    - name: Compile benchmarks
+      if: matrix.build == 'stable'
+      run: cargo bench --verbose --no-run
+
     - name: Compile fuzz
       if: matrix.build == 'nightly'
       run: |
