@@ -9,8 +9,7 @@ use eu4save::{Eu4Extractor, Encoding, CountryTag};
 use std::io::Cursor;
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
-let extractor = Eu4Extractor::default();
-let (save, encoding) = extractor.extract_save(Cursor::new(&data[..]))?;
+let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
 assert_eq!(encoding, Encoding::TextZip);
 assert_eq!(save.meta.player, CountryTag::from("ENG"));
 ```
@@ -38,8 +37,7 @@ use eu4save::{Eu4Extractor, Encoding, CountryTag, query::Query};
 use std::io::Cursor;
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
-let extractor = Eu4Extractor::default();
-let (save, _encoding) = extractor.extract_save(Cursor::new(&data[..]))?;
+let (save, _encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
 let save_query = Query::from_save(save);
 let trade = save_query.save().game.countries.get(&CountryTag::from("ENG"))
     .map(|country| save_query.country_income_breakdown(country))

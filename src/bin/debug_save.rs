@@ -7,8 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let file = File::open(&args[1])?;
     let reader = BufReader::new(file);
-    let extractor = Eu4Extractor::default();
-    let (save, _encoding) = extractor.extract_save(reader)?;
+    let (save, _encoding) = Eu4Extractor::extract_save(reader)?;
     print!("{:#?}", save.meta.date);
     Ok(())
 }

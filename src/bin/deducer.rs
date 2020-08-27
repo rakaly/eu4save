@@ -48,8 +48,7 @@ fn deduce_vec(save: &Eu4Save, f: impl Fn(&Country) -> &[f32]) {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let data = std::fs::read(&args[1])?;
-    let extractor = Eu4Extractor::default();
-    let (save, _encoding) = extractor.extract_save(Cursor::new(&data[..]))?;
+    let (save, _encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
     deduce_vec(&save, |c| &c.ledger.income);
     deduce_vec(&save, |c| &c.ledger.expense);
 
