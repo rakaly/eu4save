@@ -1,9 +1,10 @@
 #![cfg(ironman)]
 
+use eu4save::models::{GameDifficulty, ProvinceEvent, ProvinceEventValue, TaxManpowerModifier};
 use eu4save::{
     query::{CountryQuery, Query},
     CountryTag, Encoding, Eu4Date, Eu4Extractor, Eu4ExtractorBuilder, FailedResolveStrategy,
-    GameDifficulty, ProvinceEvent, ProvinceEventValue, ProvinceId, TaxManpowerModifier,
+    ProvinceId,
 };
 use paste::paste;
 use std::collections::HashSet;

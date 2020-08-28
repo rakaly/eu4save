@@ -1,4 +1,4 @@
-use crate::{Eu4Date, ProvinceHistory};
+use crate::{models::ProvinceHistory, Eu4Date};
 use serde::{de, Deserialize, Deserializer};
 use std::collections::HashMap;
 use std::fmt;

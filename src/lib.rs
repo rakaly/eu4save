@@ -65,21 +65,25 @@ You may look to other projects EU4 ironman projects like ironmelt or paperman
 for inspiration.
 */
 
+mod country_tag;
 mod de;
 mod dlc;
 mod errors;
 mod eu4date;
 mod extraction;
 mod melt;
-mod models;
+/// Repository of raw structs extracted from a save file
+pub mod models;
+mod province_id;
+/// Ergonomic module for querying info from a save file
 pub mod query;
 mod tokens;
 
+pub use country_tag::*;
+pub use dlc::*;
 pub use errors::*;
 pub use eu4date::*;
 pub use extraction::*;
 pub use jomini::FailedResolveStrategy;
 pub use melt::*;
-pub use models::*;
-pub use tokens::*;
-pub use dlc::*;
+pub use province_id::*;

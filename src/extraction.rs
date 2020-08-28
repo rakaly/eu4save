@@ -1,7 +1,5 @@
-use crate::{
-    Eu4Error, Eu4ErrorKind, Eu4Save, Eu4SaveMeta, FailedResolveStrategy, GameState, Meta,
-    TokenLookup,
-};
+use crate::models::{Eu4Save, Eu4SaveMeta, GameState, Meta};
+use crate::{tokens::TokenLookup, Eu4Error, Eu4ErrorKind, FailedResolveStrategy};
 use jomini::{BinaryDeserializerBuilder, TextDeserializer, TextTape};
 use serde::de::DeserializeOwned;
 use std::fmt;
@@ -30,9 +28,15 @@ impl fmt::Display for Encoding {
     }
 }
 
+/// The memory allocation strategy for handling zip files
+///
+/// When the `mmap` feature is enabled, the
 #[derive(Debug, Clone, Copy)]
 pub enum Extraction {
+    /// Extract the zip data into memory
     InMemory,
+
+    /// Extract the zip data into a temporary file that is memmapped
     #[cfg(feature = "mmap")]
     MmapTemporaries,
 }

@@ -1,4 +1,4 @@
-use crate::ProvinceEventValue;
+use crate::models::ProvinceEventValue;
 use serde::{de, Deserialize, Deserializer};
 use std::fmt;
 
