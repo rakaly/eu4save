@@ -108,30 +108,48 @@ impl Eu4Date {
     /// assert_eq!(date.day(), 11);
     /// ```
     pub fn parse_from_str<T: AsRef<str>>(s: T) -> Option<Self> {
-        let input = s.as_ref();
-        if input.as_bytes().get(0).map_or(true, |b| *b > b'9') {
+        let data = s.as_ref().as_bytes();
+        let mut state = 0;
+        let mut span1: &[u8] = &[];
+        let mut span2: &[u8] = &[];
+        let mut start = 0;
+        let mut pos = 0;
+
+        // micro-optimization: check the first byte to see if the first character (if available)
+        // is outside our upper bound (ie: not a number). This micro optimization doesn't
+        // harm the happy path (input is a date) by more than a few percent, but if the input
+        // is not a date, this shaves off 20-25% in date parsing benchmarks.
+        if data.get(0).map_or(true, |c| *c > b'9') {
             return None;
         }
 
-        let mut sections = input.split('.');
-        if let Some(year) = sections.next() {
-            if let Some(month) = sections.next() {
-                if let Some(day) = sections.next() {
-                    if sections.next().is_some() {
-                        return None;
+        for &c in data {
+            if c == b'.' {
+                match state {
+                    0 => {
+                        span1 = &data[start..pos];
+                        state = 1;
                     }
-
-                    let scale_year = Scalar::new(year.as_bytes());
-                    let scale_month = Scalar::new(month.as_bytes());
-                    let scale_day = Scalar::new(day.as_bytes());
-
-                    if let Ok(y) = scale_year.to_u64() {
-                        if let Ok(m) = scale_month.to_u64() {
-                            if let Ok(d) = scale_day.to_u64() {
-                                return Eu4Date::new(y as u16, m as u8, d as u8);
-                            }
-                        }
+                    1 => {
+                        span2 = &data[start..pos];
+                        state = 2;
                     }
+                    _ => return None,
+                }
+                start = pos + 1;
+            } else if c > b'9' || c < b'0' {
+                return None;
+            }
+
+            pos += 1;
+        }
+
+        let span3 = &data[start..];
+
+        if let Ok(y) = Scalar::new(span1).to_u64() {
+            if let Ok(m) = Scalar::new(span2).to_u64() {
+                if let Ok(d) = Scalar::new(span3).to_u64() {
+                    return Eu4Date::new(y as u16, m as u8, d as u8);
                 }
             }
         }
