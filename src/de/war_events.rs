@@ -26,8 +26,8 @@ impl<'de> Deserialize<'de> for WarEvents {
                     Vec::new()
                 };
 
-                while let Some(key) = map.next_key::<String>()? {
-                    let val = match key.as_str() {
+                while let Some(key) = map.next_key::<&str>()? {
+                    let val = match key {
                         "add_attacker" => WarEvent::AddAttacker(map.next_value()?),
                         "add_defender" => WarEvent::AddDefender(map.next_value()?),
                         "rem_attacker" => WarEvent::RemoveAttacker(map.next_value()?),

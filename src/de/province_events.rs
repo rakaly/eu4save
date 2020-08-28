@@ -21,7 +21,7 @@ impl<'de> Deserialize<'de> for ProvinceEvents {
                 A: de::SeqAccess<'de>,
             {
                 // Hmm empty object
-                let abc = seq.next_element::<String>()?;
+                let abc = seq.next_element::<&str>()?;
                 if abc.is_some() {
                     return Err(de::Error::custom("unexpected sequence!"));
                 }
@@ -39,10 +39,10 @@ impl<'de> Deserialize<'de> for ProvinceEvents {
                     Vec::new()
                 };
 
-                while let Some(key) = map.next_key::<String>()? {
-                    let val = match key.as_str() {
+                while let Some(key) = map.next_key::<&str>()? {
+                    let val = match key {
                         "owner" => ProvinceEvent::Owner(map.next_value()?),
-                        _ => ProvinceEvent::KV((key.clone(), map.next_value()?)),
+                        _ => ProvinceEvent::KV((key.to_string(), map.next_value()?)),
                     };
 
                     values.push(val);

@@ -21,7 +21,7 @@ impl<'de> Deserialize<'de> for WarHistory {
                 A: de::SeqAccess<'de>,
             {
                 // Hmm empty object
-                let abc = seq.next_element::<String>()?;
+                let abc = seq.next_element::<&str>()?;
                 if abc.is_some() {
                     return Err(de::Error::custom("unexpected sequence!"));
                 }
@@ -38,8 +38,8 @@ impl<'de> Deserialize<'de> for WarHistory {
                 let mut succession = None;
                 let mut events = Vec::new();
 
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
                         "name" => name = map.next_value()?,
                         "war_goal" => war_goal = map.next_value()?,
                         "succession" => succession = map.next_value()?,

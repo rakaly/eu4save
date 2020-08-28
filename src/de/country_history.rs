@@ -21,7 +21,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                 A: de::SeqAccess<'de>,
             {
                 // Hmm empty object
-                let abc = seq.next_element::<String>()?;
+                let abc = seq.next_element::<&str>()?;
                 if abc.is_some() {
                     return Err(de::Error::custom("unexpected sequence!"));
                 }
@@ -38,8 +38,8 @@ impl<'de> Deserialize<'de> for CountryHistory {
                 let mut primary_culture = None;
                 let mut events = Vec::new();
 
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
                         "government" => government = map.next_value()?,
                         "technology_group" => technology_group = map.next_value()?,
                         "primary_culture" => primary_culture = map.next_value()?,

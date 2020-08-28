@@ -22,7 +22,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                 A: de::SeqAccess<'de>,
             {
                 // Hmm empty object
-                let abc = seq.next_element::<String>()?;
+                let abc = seq.next_element::<&str>()?;
                 if abc.is_some() {
                     return Err(de::Error::custom("unexpected sequence!"));
                 }
@@ -41,8 +41,8 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                 let mut events = Vec::new();
                 let mut other = HashMap::new();
 
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
                         "owner" => owner = map.next_value()?,
                         "base_tax" => base_tax = map.next_value()?,
                         "base_production" => base_production = map.next_value()?,
@@ -52,7 +52,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                                 let event = map.next_value()?;
                                 events.push((date, event));
                             } else {
-                                other.insert(key, map.next_value()?);
+                                other.insert(key.to_string(), map.next_value()?);
                             }
                         }
                     }

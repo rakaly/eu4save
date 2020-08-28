@@ -271,7 +271,7 @@ where
     if let Some(data) = is_bin(&buffer) {
         let res = BinaryDeserializerBuilder::new()
             .on_failed_resolve(on_failed_resolve)
-            .from_slice(data, TokenLookup)
+            .from_slice(data, &TokenLookup)
             .map_err(|e| Eu4ErrorKind::Deserialize {
                 part: Some(name.to_string()),
                 err: e,
