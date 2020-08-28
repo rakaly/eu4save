@@ -136,14 +136,16 @@ fn test_eu4_kandy_bin() {
 
     let building_date = query
         .province_building_history(london)
-        .get("marketplace")
-        .map(|x| x.eu4_fmt());
+        .iter()
+        .find(|x| x.building == "marketplace")
+        .map(|x| x.date.eu4_fmt());
     assert_eq!(building_date, Some(String::from("1486.6.3")));
 
     let building_date = query
         .province_building_history(london)
-        .get("fort_15th")
-        .cloned();
+        .iter()
+        .find(|x| x.building == "fort_15th")
+        .map(|x| x.date);
     assert_eq!(building_date, Some(query.save().game.start_date));
 }
 

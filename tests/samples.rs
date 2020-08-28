@@ -1,5 +1,8 @@
-use eu4save::models::{CountryEvent, ProvinceEvent, ProvinceEventValue};
-use eu4save::{query::Query, CountryTag, Encoding, Eu4Extractor, ProvinceId};
+use eu4save::models::CountryEvent;
+use eu4save::{
+    query::{BuildingConstruction, BuildingEvent, Query},
+    CountryTag, Encoding, Eu4Date, Eu4Extractor, ProvinceId,
+};
 use std::error::Error;
 use std::io::{Cursor, Read};
 
@@ -70,21 +73,41 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let (save, _encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert!(save.meta.multiplayer);
 
-    // Testing text encoded saves can extract province building history perfectly fine
-    let london = save.game.provinces.get(&ProvinceId::from(236)).unwrap();
-    let (date, _marketplace, val) = london
-        .history
-        .events
-        .iter()
-        .flat_map(|(date, events)| events.0.iter().map(move |event| (date.clone(), event)))
-        .filter_map(|(date, event)| match event {
-            ProvinceEvent::KV((key, value)) => Some((date, key, value)),
-            _ => None,
-        })
-        .find(|(_date, key, _value)| key.as_str() == "marketplace")
+    let query = Query::from_save(save);
+
+    let london = query
+        .save()
+        .game
+        .provinces
+        .get(&ProvinceId::from(236))
         .unwrap();
-    assert!(matches!(val, ProvinceEventValue::Bool(v) if v == &true));
-    assert_eq!(date.eu4_fmt().as_str(), "1506.5.25");
+    let history = query.province_building_history(london);
+
+    let marketplace_date = history
+        .iter()
+        .find(|x| x.building == "marketplace")
+        .map(|x| x.date.eu4_fmt());
+    assert_eq!(marketplace_date, Some(String::from("1506.5.25")));
+
+    let fort_history: Vec<BuildingEvent> = history
+        .iter()
+        .filter(|x| x.building == "fort_15th")
+        .cloned()
+        .collect();
+    let expected = vec![
+        BuildingEvent {
+            building: "fort_15th",
+            date: Eu4Date::new(1444, 11, 11).unwrap(),
+            action: BuildingConstruction::Constructed,
+        },
+        BuildingEvent {
+            building: "fort_15th",
+            date: Eu4Date::new(1476, 11, 2).unwrap(),
+            action: BuildingConstruction::Destroyed,
+        },
+    ];
+
+    assert_eq!(fort_history, expected);
     Ok(())
 }
 

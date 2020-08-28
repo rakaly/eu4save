@@ -1,5 +1,6 @@
 use crate::models::{
     Country, CountryEvent, Eu4Save, LedgerData, LedgerDatum, Province, ProvinceEvent,
+    ProvinceEventValue,
 };
 use crate::{CountryTag, Eu4Date};
 use once_cell::sync::OnceCell;
@@ -140,12 +141,26 @@ pub struct CountryManaSpend {
     pub other: i32,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
+pub enum BuildingConstruction {
+    Constructed,
+    Destroyed,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct BuildingEvent<'a> {
+    pub building: &'a str,
+    pub date: Eu4Date,
+    pub action: BuildingConstruction,
+}
+
 #[derive(Debug)]
 pub struct Query {
     save: Eu4Save,
     players: OnceCell<HashSet<String>>,
     player_countries: OnceCell<HashSet<CountryTag>>,
     starting_country: OnceCell<Option<CountryTag>>,
+    buildings: OnceCell<HashSet<String>>,
 }
 
 impl Query {
@@ -155,6 +170,7 @@ impl Query {
             players: OnceCell::default(),
             player_countries: OnceCell::default(),
             starting_country: OnceCell::default(),
+            buildings: OnceCell::default(),
         }
     }
 
@@ -526,34 +542,62 @@ impl Query {
         }
     }
 
-    pub fn province_building_history<'a>(
-        &'a self,
-        province: &'a Province,
-    ) -> HashMap<&'a str, Eu4Date> {
-        let buildings = &province.buildings;
+    /// Return all unique buildings in the world that are built
+    pub fn built_buildings(&self) -> &HashSet<String> {
+        self.buildings.get_or_init(|| {
+            self.save
+                .game
+                .provinces
+                .values()
+                .flat_map(|x| x.buildings.keys())
+                .cloned()
+                .collect()
+        })
+    }
+
+    pub fn province_building_history<'a>(&'a self, province: &'a Province) -> Vec<BuildingEvent> {
+        let buildings = self.built_buildings();
         let initial_buildings = province.history.other.iter().filter_map(|(key, _event)| {
-            if buildings.contains_key(key) {
-                Some((key.as_str(), self.save.game.start_date))
+            if buildings.contains(key) {
+                Some(BuildingEvent {
+                    building: key.as_str(),
+                    date: self.save.game.start_date,
+                    action: BuildingConstruction::Constructed,
+                })
             } else {
                 None
             }
         });
 
-        province
+        let over_time = province
             .history
             .events
             .iter()
             .map(|(date, events)| {
                 events.0.iter().filter_map(move |event| match event {
-                    ProvinceEvent::KV((key, _value)) if buildings.contains_key(key) => {
-                        Some((key.as_str(), *date))
+                    ProvinceEvent::KV((key, value)) => {
+                        let constructed = if let ProvinceEventValue::Bool(x) = value {
+                            if *x {
+                                BuildingConstruction::Constructed
+                            } else {
+                                BuildingConstruction::Destroyed
+                            }
+                        } else {
+                            return None;
+                        };
+
+                        Some(BuildingEvent {
+                            building: key.as_str(),
+                            date: *date,
+                            action: constructed,
+                        })
                     }
                     _ => None,
                 })
             })
-            .flatten()
-            .chain(initial_buildings)
-            .collect()
+            .flatten();
+
+        initial_buildings.chain(over_time).collect()
     }
 }
 
