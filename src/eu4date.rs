@@ -108,7 +108,12 @@ impl Eu4Date {
     /// assert_eq!(date.day(), 11);
     /// ```
     pub fn parse_from_str<T: AsRef<str>>(s: T) -> Option<Self> {
-        let mut sections = s.as_ref().split('.');
+        let input = s.as_ref();
+        if input.as_bytes().get(0).map_or(true, |b| *b > b'9') {
+            return None;
+        }
+
+        let mut sections = input.split('.');
         if let Some(year) = sections.next() {
             if let Some(month) = sections.next() {
                 if let Some(day) = sections.next() {
