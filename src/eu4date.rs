@@ -108,7 +108,7 @@ impl Eu4Date {
     /// assert_eq!(date.day(), 11);
     /// ```
     pub fn parse_from_str<T: AsRef<str>>(s: T) -> Option<Self> {
-        let mut sections = s.as_ref().trim_end().split('.');
+        let mut sections = s.as_ref().split('.');
         if let Some(year) = sections.next() {
             if let Some(month) = sections.next() {
                 if let Some(day) = sections.next() {
@@ -312,12 +312,6 @@ mod tests {
             let date = Eu4Date::parse_from_str(case).unwrap();
             assert_eq!(date.eu4_fmt(), case.to_string());
         }
-    }
-
-    #[test]
-    fn test_date_newline() {
-        let date = Eu4Date::parse_from_str("1400.1.2\n").unwrap();
-        assert_eq!(date.iso_8601(), String::from("1400-01-02"));
     }
 
     #[test]
