@@ -1,3 +1,14 @@
+## v0.2.0 - 2020-08-28
+
+- Fix `Eu4Date::days_until` calculation involving September dates
+- Add additional validation when constructing `Eu4Date` so that nonsensical dates can't be created
+- `Eu4Date` now implements `Copy`
+- Migrate memory map extraction to use anonymous region instead of temporary file
+- Query engine reorganized to hide fields behind public methods to aid transparent caches
+- Expose dlc function at root of docs
+- Move data structs behind model module
+- Include destroyed buildings in province building history
+
 ## v0.1.6 - 2020-08-24
 
 - Include initial buildings in province building history query
