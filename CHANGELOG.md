@@ -3,6 +3,7 @@
 - Fix `Eu4Date::days_until` calculation involving September dates
 - Add additional validation when constructing `Eu4Date` so that nonsensical dates can't be created
 - `Eu4Date` now implements `Copy`
+- Major performance improvements to parsing Eu4Dates
 - Migrate memory map extraction to use anonymous region instead of temporary file
 - Query engine reorganized to hide fields behind public methods to aid transparent caches
 - Expose dlc function at root of docs
