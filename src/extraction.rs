@@ -5,10 +5,16 @@ use serde::de::DeserializeOwned;
 use std::fmt;
 use std::io::{Read, Seek, SeekFrom};
 
+/// Describes the format of the save before decoding
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Encoding {
+    /// Save is a plaintext document
     Text,
+
+    /// Save is a zip that contained plaintext documents
     TextZip,
+
+    /// Save is a zip that contained binary documents
     BinZip,
 }
 
@@ -41,6 +47,7 @@ pub enum Extraction {
     MmapTemporaries,
 }
 
+/// Customize how a save is extracted
 #[derive(Debug, Clone)]
 pub struct Eu4ExtractorBuilder {
     extraction: Extraction,
@@ -54,6 +61,8 @@ impl Default for Eu4ExtractorBuilder {
 }
 
 impl Eu4ExtractorBuilder {
+    /// Create a new extractor with default values: extract zips into memory
+    // and ignore unknown binary tokens
     pub fn new() -> Self {
         Eu4ExtractorBuilder {
             extraction: Extraction::InMemory,
@@ -61,16 +70,20 @@ impl Eu4ExtractorBuilder {
         }
     }
 
+    /// Set the memory allocation extraction behavior for when a zip is encountered
     pub fn with_extraction(mut self, extraction: Extraction) -> Self {
         self.extraction = extraction;
         self
     }
 
+    /// Set the behavior for when an unresolved binary token is encountered
     pub fn with_on_failed_resolve(mut self, strategy: FailedResolveStrategy) -> Self {
         self.on_failed_resolve = strategy;
         self
     }
 
+    /// Extract just the metadata from the save. This can be efficiently done if
+    /// a file is zip encoded.
     pub fn extract_meta<R>(&self, mut reader: R) -> Result<(Meta, Encoding), Eu4Error>
     where
         R: Read + Seek,
@@ -102,6 +115,7 @@ impl Eu4ExtractorBuilder {
         }
     }
 
+    /// Extract all info from a save
     pub fn extract_save<R>(&self, mut reader: R) -> Result<(Eu4Save, Encoding), Eu4Error>
     where
         R: Read + Seek,
@@ -148,8 +162,8 @@ impl Eu4ExtractorBuilder {
         }
     }
 
-    // For the times where all you want is the metadata but will accept the game state too save on
-    // future needless double parsing.
+    /// For the times where all you want is the metadata but will accept the game state too save on
+    /// future needless double parsing.
     pub fn extract_meta_optimistic<R>(
         &self,
         mut reader: R,
@@ -192,14 +206,18 @@ impl Eu4ExtractorBuilder {
     }
 }
 
+/// Logic container for extracting data from an EU4 save
 #[derive(Debug, Clone)]
 pub struct Eu4Extractor {}
 
 impl Eu4Extractor {
+    /// Create a customized container
     pub fn builder() -> Eu4ExtractorBuilder {
         Eu4ExtractorBuilder::new()
     }
 
+    /// Extract just the metadata from the save. This can be efficiently done if
+    /// a file is zip encoded.
     pub fn extract_meta<R>(reader: R) -> Result<(Meta, Encoding), Eu4Error>
     where
         R: Read + Seek,
@@ -207,6 +225,7 @@ impl Eu4Extractor {
         Self::builder().extract_meta(reader)
     }
 
+    /// Extract all info from a save
     pub fn extract_save<R>(reader: R) -> Result<(Eu4Save, Encoding), Eu4Error>
     where
         R: Read + Seek,
@@ -214,8 +233,8 @@ impl Eu4Extractor {
         Self::builder().extract_save(reader)
     }
 
-    // For the times where all you want is the metadata but will accept the game state too save on
-    // future needless double parsing.
+    /// For the times where all you want is the metadata but will accept the game state too save on
+    /// future needless double parsing.
     pub fn extract_meta_optimistic<R>(reader: R) -> Result<(Eu4SaveMeta, Encoding), Eu4Error>
     where
         R: Read + Seek,

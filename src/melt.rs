@@ -196,6 +196,7 @@ fn melt_zip(
     Ok(())
 }
 
+/// Convert ironman data to plaintext
 pub fn melt(data: &[u8], failed_resolver: FailedResolveStrategy) -> Result<Vec<u8>, Eu4Error> {
     let mut out: Vec<u8> = b"EU4txt\r\n".to_vec();
 
