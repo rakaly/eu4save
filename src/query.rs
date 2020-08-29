@@ -577,10 +577,14 @@ impl Query {
                 events.0.iter().filter_map(move |event| match event {
                     ProvinceEvent::KV((key, value)) => {
                         let constructed = if let ProvinceEventValue::Bool(x) = value {
-                            if *x {
-                                BuildingConstruction::Constructed
+                            if buildings.contains(key) {
+                                if *x {
+                                    BuildingConstruction::Constructed
+                                } else {
+                                    BuildingConstruction::Destroyed
+                                }
                             } else {
-                                BuildingConstruction::Destroyed
+                                return None;
                             }
                         } else {
                             return None;

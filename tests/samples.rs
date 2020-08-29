@@ -108,6 +108,17 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     ];
 
     assert_eq!(fort_history, expected);
+
+    let stockholm = query
+        .save()
+        .game
+        .provinces
+        .get(&ProvinceId::from(1))
+        .unwrap();
+    let history2 = query.province_building_history(stockholm);
+    assert_eq!(history2.iter().find(|x| x.building == "hre"), None);
+    assert_eq!(history2.iter().find(|x| x.building == "is_city"), None);
+
     Ok(())
 }
 
