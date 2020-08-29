@@ -1,3 +1,7 @@
+## v0.2.1 - 2020-08-28
+
+- Fix mmap feature compilation
+
 ## v0.2.0 - 2020-08-28
 
 - Fix `Eu4Date::days_until` calculation involving September dates
