@@ -1,3 +1,7 @@
+## v0.2.2 - 2020-08-29
+
+- Exclude other boolean province values from being detected as buildings in `Query::province_building_history`
+
 ## v0.2.1 - 2020-08-28
 
 - Fix mmap feature compilation
