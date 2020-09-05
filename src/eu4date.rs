@@ -113,7 +113,6 @@ impl Eu4Date {
         let mut span1: &[u8] = &[];
         let mut span2: &[u8] = &[];
         let mut start = 0;
-        let mut pos = 0;
 
         // micro-optimization: check the first byte to see if the first character (if available)
         // is outside our upper bound (ie: not a number). This micro optimization doesn't
@@ -123,7 +122,7 @@ impl Eu4Date {
             return None;
         }
 
-        for &c in data {
+        for (pos, &c) in data.into_iter().enumerate() {
             if c == b'.' {
                 match state {
                     0 => {
@@ -140,8 +139,6 @@ impl Eu4Date {
             } else if c > b'9' || c < b'0' {
                 return None;
             }
-
-            pos += 1;
         }
 
         let span3 = &data[start..];
