@@ -85,8 +85,8 @@ fn melter(
                     writer.push(b'"');
                 }
             }
-            BinaryToken::F32(x) => write!(writer, "{}", x).map_err(Eu4ErrorKind::IoErr)?,
-            BinaryToken::Q16(x) => write!(writer, "{}", x).map_err(Eu4ErrorKind::IoErr)?,
+            BinaryToken::F32_1(x) => write!(writer, "{}", x).map_err(Eu4ErrorKind::IoErr)?,
+            BinaryToken::F32_2(x) => write!(writer, "{}", x).map_err(Eu4ErrorKind::IoErr)?,
             BinaryToken::Token(x) => match TokenLookup.resolve(*x) {
                 Some(id)
                     if (id == "is_ironman" || (id == "checksum" && !write_checksum))
