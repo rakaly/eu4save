@@ -1,6 +1,6 @@
 use crate::models::{Eu4Save, Eu4SaveMeta, GameState, Meta};
 use crate::{tokens::TokenLookup, Eu4Error, Eu4ErrorKind, FailedResolveStrategy};
-use jomini::{BinaryDeserializerBuilder, TextDeserializer, TextTape};
+use jomini::{BinaryDeserializer, TextDeserializer, TextTape};
 use serde::de::DeserializeOwned;
 use std::fmt;
 use std::io::{Read, Seek, SeekFrom};
@@ -269,7 +269,7 @@ where
         .map_err(|e| Eu4ErrorKind::ZipExtraction(name, e))?;
 
     if let Some(data) = is_bin(&buffer) {
-        let res = BinaryDeserializerBuilder::new()
+        let res = BinaryDeserializer::builder()
             .on_failed_resolve(on_failed_resolve)
             .from_slice(data, &TokenLookup)
             .map_err(|e| Eu4ErrorKind::Deserialize {
@@ -310,7 +310,7 @@ where
     let buffer = &mmap[..];
 
     if let Some(data) = is_bin(&buffer) {
-        let res = BinaryDeserializerBuilder::new()
+        let res = BinaryDeserializer::builder()
             .on_failed_resolve(on_failed_resolve)
             .from_slice(data, &TokenLookup)
             .map_err(|e| Eu4ErrorKind::Deserialize {
