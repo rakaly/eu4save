@@ -1,3 +1,8 @@
+## v0.2.3 - 2020-09-07
+
+- Parsing dates from strings became 30% faster, so may have a marginal impact on save parsing performance
+- Update internal parser, jomini, to latest version
+
 ## v0.2.2 - 2020-08-29
 
 - Exclude other boolean province values from being detected as buildings in `Query::province_building_history`
