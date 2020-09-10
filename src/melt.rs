@@ -182,7 +182,7 @@ fn melt_zip(
             .read_to_end(&mut inflated_data)
             .map_err(|e| Eu4ErrorKind::ZipExtraction(file, e))?;
 
-        let tape = BinaryTape::from_slice(&inflated_data["EU4bin".len()..]).map_err(|e| {
+        let tape = BinaryTape::from_eu4(&inflated_data["EU4bin".len()..]).map_err(|e| {
             Eu4ErrorKind::Deserialize {
                 part: Some(file.to_string()),
                 err: e,
@@ -216,7 +216,7 @@ pub fn melt(data: &[u8], failed_resolver: FailedResolveStrategy) -> Result<Vec<u
         } else {
             0
         };
-        let tape = BinaryTape::from_slice(&data[cut_header_len..])?;
+        let tape = BinaryTape::from_eu4(&data[cut_header_len..])?;
         melter(&mut out, &tape, failed_resolver, true)?;
     }
 
