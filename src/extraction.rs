@@ -94,7 +94,7 @@ impl Eu4ExtractorBuilder {
         let mut buffer = Vec::with_capacity(0);
         if is_text(&header).is_some() {
             reader.read_to_end(&mut buffer)?;
-            let meta = TextDeserializer::from_slice(&buffer)?;
+            let meta = TextDeserializer::from_windows1252_slice(&buffer)?;
             Ok((meta, Encoding::Text))
         } else if is_zip(&header) {
             reader.seek(SeekFrom::Start(0))?;
@@ -127,8 +127,8 @@ impl Eu4ExtractorBuilder {
         if is_text(&header).is_some() {
             reader.read_to_end(&mut buffer)?;
             let tape = TextTape::from_slice(&buffer)?;
-            let meta: Meta = TextDeserializer::from_tape(&tape)?;
-            let game: GameState = TextDeserializer::from_tape(&tape)?;
+            let meta: Meta = TextDeserializer::from_windows1252_tape(&tape)?;
+            let game: GameState = TextDeserializer::from_windows1252_tape(&tape)?;
             Ok((Eu4Save { meta, game }, Encoding::Text))
         } else if is_zip(&header) {
             reader.seek(SeekFrom::Start(0))?;
@@ -181,8 +181,8 @@ impl Eu4ExtractorBuilder {
         if is_text(&header).is_some() {
             reader.read_to_end(&mut buffer)?;
             let tape = TextTape::from_slice(&buffer)?;
-            let meta: Meta = TextDeserializer::from_tape(&tape)?;
-            let game: Option<GameState> = TextDeserializer::from_tape(&tape).map(Some)?;
+            let meta: Meta = TextDeserializer::from_windows1252_tape(&tape)?;
+            let game: Option<GameState> = TextDeserializer::from_windows1252_tape(&tape).map(Some)?;
             Ok((Eu4SaveMeta { meta, game }, Encoding::Text))
         } else if is_zip(&header) {
             reader.seek(SeekFrom::Start(0))?;
@@ -269,7 +269,7 @@ where
         .map_err(|e| Eu4ErrorKind::ZipExtraction(name, e))?;
 
     if let Some(data) = is_bin(&buffer) {
-        let res = BinaryDeserializer::builder()
+        let res = BinaryDeserializer::eu4_builder()
             .on_failed_resolve(on_failed_resolve)
             .from_slice(data, &TokenLookup)
             .map_err(|e| Eu4ErrorKind::Deserialize {
@@ -278,7 +278,7 @@ where
             })?;
         Ok((res, Encoding::BinZip))
     } else if let Some(data) = is_text(&buffer) {
-        let res = TextDeserializer::from_slice(data)?;
+        let res = TextDeserializer::from_windows1252_slice(data)?;
         Ok((res, Encoding::TextZip))
     } else {
         Err(Eu4ErrorKind::UnknownHeader.into())
@@ -310,7 +310,7 @@ where
     let buffer = &mmap[..];
 
     if let Some(data) = is_bin(&buffer) {
-        let res = BinaryDeserializer::builder()
+        let res = BinaryDeserializer::eu4_builder()
             .on_failed_resolve(on_failed_resolve)
             .from_slice(data, &TokenLookup)
             .map_err(|e| Eu4ErrorKind::Deserialize {
@@ -319,7 +319,7 @@ where
             })?;
         Ok((res, Encoding::BinZip))
     } else if let Some(data) = is_text(&buffer) {
-        let res = TextDeserializer::from_slice(data)?;
+        let res = TextDeserializer::from_windows1252_slice(data)?;
         Ok((res, Encoding::TextZip))
     } else {
         Err(Eu4ErrorKind::UnknownHeader.into())
