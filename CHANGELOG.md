@@ -1,3 +1,7 @@
+## v0.2.4 - 2020-09-12
+
+- Update internal parser to latest which should bring additional performance and robustness against malicious input
+
 ## v0.2.3 - 2020-09-07
 
 - Parsing dates from strings became 30% faster, so may have a marginal impact on save parsing performance
