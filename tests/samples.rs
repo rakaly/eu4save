@@ -86,7 +86,7 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let marketplace_date = history
         .iter()
         .find(|x| x.building == "marketplace")
-        .map(|x| x.date.eu4_fmt());
+        .map(|x| x.date.game_fmt());
     assert_eq!(marketplace_date, Some(String::from("1506.5.25")));
 
     let fort_history: Vec<BuildingEvent> = history

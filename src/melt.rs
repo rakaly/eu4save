@@ -35,6 +35,12 @@ fn melter(
                 in_objects.push(in_object);
                 in_object = 1;
             }
+            BinaryToken::HiddenObject(_) => {
+                did_change = true;
+                depth += 1;
+                in_objects.push(in_object);
+                in_object = 1;
+            }
             BinaryToken::Array(_) => {
                 did_change = true;
                 writer.push(b'{');
@@ -42,8 +48,11 @@ fn melter(
                 in_objects.push(in_object);
                 in_object = 0;
             }
-            BinaryToken::End(_) => {
-                writer.push(b'}');
+            BinaryToken::End(x) => {
+                if !matches!(tokens.get(*x), Some(BinaryToken::HiddenObject(_))) {
+                    writer.push(b'}');
+                }
+
                 let obj = in_objects.pop();
 
                 // The binary parser should already ensure that this will be something, but this is
@@ -59,8 +68,8 @@ fn melter(
             BinaryToken::U32(x) => writer.extend_from_slice(format!("{}", x).as_bytes()),
             BinaryToken::U64(x) => writer.extend_from_slice(format!("{}", x).as_bytes()),
             BinaryToken::I32(x) => {
-                if let Some(date) = Eu4Date::from_i32(*x) {
-                    writer.extend_from_slice(date.eu4_fmt().as_bytes());
+                if let Some(date) = Eu4Date::from_binary(*x) {
+                    writer.extend_from_slice(date.game_fmt().as_bytes());
                 } else {
                     writer.extend_from_slice(format!("{}", x).as_bytes());
                 }
