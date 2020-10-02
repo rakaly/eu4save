@@ -16,7 +16,7 @@ mmap = ['memmap']
 serialize = []
 
 [dependencies]
-jomini = "0.6"
+jomini = "0.7"
 once_cell = "1"
 zip = { version =  "0.5", default-features = false, features = ["deflate"] }
 serde = { version = "1", features = ["derive"] }

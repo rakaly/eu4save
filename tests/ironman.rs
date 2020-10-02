@@ -132,13 +132,13 @@ fn test_eu4_kandy_bin() {
         .find(|(_date, key, _value)| key.as_str() == "marketplace")
         .unwrap();
     assert!(matches!(val, ProvinceEventValue::Bool(v) if v == &true));
-    assert_eq!(date.eu4_fmt().as_str(), "1486.6.3");
+    assert_eq!(date.game_fmt().as_str(), "1486.6.3");
 
     let building_date = query
         .province_building_history(london)
         .iter()
         .find(|x| x.building == "marketplace")
-        .map(|x| x.date.eu4_fmt());
+        .map(|x| x.date.game_fmt());
     assert_eq!(building_date, Some(String::from("1486.6.3")));
 
     let building_date = query
