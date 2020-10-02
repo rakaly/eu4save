@@ -1,3 +1,9 @@
+## v0.3.0 - 2020-10-02
+
+- Update internal parser to latest
+- API change: `Eu4Date::eu4_fmt` -> `Eu4Date::game_fmt`
+- API change: `Eu4Date::EU4_START_DATE` -> `Eu4Date::eu4_start_date()`
+
 ## v0.2.4 - 2020-09-12
 
 - Update internal parser to latest which should bring additional performance and robustness against malicious input
