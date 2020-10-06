@@ -318,3 +318,14 @@ ironman_test!(
         );
     }
 );
+
+ironman_test!(
+    burg,
+    "burg.eu4",
+    IronmanQuery {
+        starting: "BUR",
+        player: "BUR",
+        patch: "1.30.4.0",
+        date: Eu4Date::parse_from_str("1821.01.03").unwrap()
+    }
+);
