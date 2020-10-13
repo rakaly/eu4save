@@ -27,6 +27,7 @@ pub struct Meta {
     #[serde(default, alias = "multi_player")]
     pub multiplayer: bool,
     pub not_observer: bool,
+    #[serde(default)]
     pub dlc_enabled: Vec<String>,
     pub checksum: String,
     pub savegame_version: SavegameVersion,

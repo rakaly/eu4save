@@ -329,3 +329,14 @@ ironman_test!(
         date: Eu4Date::parse_from_str("1821.01.03").unwrap()
     }
 );
+
+ironman_test!(
+    no_dlc,
+    "no-dlc.eu4",
+    IronmanQuery {
+        starting: "BYZ",
+        player: "BYZ",
+        patch: "1.30.4.0",
+        date: Eu4Date::parse_from_str("1513.05.25").unwrap()
+    }
+);
