@@ -1,3 +1,7 @@
+## v0.3.1 - 2020-10-13
+
+- Deserialize saves that have no DLC enabled
+
 ## v0.3.0 - 2020-10-02
 
 - Update internal parser to latest
