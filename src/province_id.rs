@@ -16,6 +16,10 @@ impl ProvinceId {
     pub fn new(x: i32) -> Self {
         ProvinceId(x.abs())
     }
+
+    pub fn as_u16(&self) -> u16 {
+        self.0 as u16
+    }
 }
 
 impl From<i32> for ProvinceId {
