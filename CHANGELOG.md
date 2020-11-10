@@ -1,3 +1,9 @@
+## v0.3.3 - 2020-11-09
+
+- `ProvinceId` implements `Ord` and `PartialOrd`
+- `CountryTag` implements `Ord` and `PartialOrd`
+- `ProvinceId` numeric id exposed in `as_u16`
+
 ## v0.3.2 - 2020-10-29
 
 - Update internal parser for performance improvements
