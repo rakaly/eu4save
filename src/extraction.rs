@@ -182,7 +182,8 @@ impl Eu4ExtractorBuilder {
             reader.read_to_end(&mut buffer)?;
             let tape = TextTape::from_slice(&buffer)?;
             let meta: Meta = TextDeserializer::from_windows1252_tape(&tape)?;
-            let game: Option<GameState> = TextDeserializer::from_windows1252_tape(&tape).map(Some)?;
+            let game: Option<GameState> =
+                TextDeserializer::from_windows1252_tape(&tape).map(Some)?;
             Ok((Eu4SaveMeta { meta, game }, Encoding::Text))
         } else if is_zip(&header) {
             reader.seek(SeekFrom::Start(0))?;
