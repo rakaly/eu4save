@@ -2,7 +2,7 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 use std::fmt;
 
 /// Wrapper around a Country's unique three character tag
-#[derive(Debug, Clone, Serialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub struct CountryTag(String);
 
 impl CountryTag {
@@ -73,5 +73,15 @@ impl<'de> Deserialize<'de> for CountryTag {
         }
 
         deserializer.deserialize_str(CountryTagVisitor)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tag_order() {
+        assert!(CountryTag::from("AAA") < CountryTag::from("BBB"));
     }
 }
