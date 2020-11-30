@@ -16,7 +16,10 @@ pub fn request<S: AsRef<str>>(input: S) -> Vec<u8> {
         fs::read(cache).unwrap()
     } else {
         println!("cache miss: {}", reffed);
-        let url = format!("https://eu4saves-test-cases.s3.us-west-002.backblazeb2.com/{}", reffed);
+        let url = format!(
+            "https://eu4saves-test-cases.s3.us-west-002.backblazeb2.com/{}",
+            reffed
+        );
         let resp = attohttpc::get(&url).send().unwrap();
 
         if !resp.is_success() {

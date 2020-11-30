@@ -47,14 +47,14 @@ fn test_eu4_kandy_bin() {
     players.insert(CountryTag::from("KND"));
     players.insert(CountryTag::from("BHA"));
     assert_eq!(query.player_countries(), &players);
-    assert!(!query
+
+    let player = query
         .save()
         .game
         .countries
         .get(&CountryTag::from("BHA"))
-        .unwrap()
-        .completed_missions
-        .is_empty());
+        .unwrap();
+    assert!(!player.completed_missions.is_empty());
 
     assert_eq!(
         query.country_tag_hex_color(&CountryTag::from("BHA")),
@@ -147,6 +147,12 @@ fn test_eu4_kandy_bin() {
         .find(|x| x.building == "fort_15th")
         .map(|x| x.date);
     assert_eq!(building_date, Some(query.save().game.start_date));
+
+    assert_eq!(player.active_idea_groups.len(), 9);
+    assert_eq!(
+        player.active_idea_groups[8],
+        (String::from("economic_ideas"), 2)
+    );
 }
 
 #[test]

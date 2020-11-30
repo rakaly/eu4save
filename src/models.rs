@@ -325,6 +325,8 @@ pub struct Country {
     #[jomini(default)]
     pub completed_missions: Vec<String>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
+    pub active_idea_groups: Vec<(String, u8)>,
+    #[jomini(default, deserialize_with = "deserialize_vec_pair")]
     pub adm_spent_indexed: Vec<(i32, i32)>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
     pub dip_spent_indexed: Vec<(i32, i32)>,
