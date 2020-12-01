@@ -543,11 +543,27 @@ fn default_strength() -> f32 {
     1.0
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, JominiDeserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct PreviousWar {
     pub name: String,
     pub history: WarHistory,
+    #[jomini(duplicated, default)]
+    pub participants: Vec<WarParticipant>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WarParticipant {
+    pub value: f32,
+    pub tag: CountryTag,
+    #[serde(default)]
+    pub losses: WarParticipantLosses,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct WarParticipantLosses {
+    #[serde(default)]
+    pub members: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
