@@ -63,6 +63,8 @@ pub struct GameState {
     pub nation_size_statistics: LedgerData,
     pub score_statistics: LedgerData,
     pub inflation_statistics: LedgerData,
+    #[jomini(duplicated, alias = "active_war")]
+    pub active_wars: Vec<ActiveWar>,
     #[jomini(duplicated, alias = "previous_war")]
     pub previous_wars: Vec<PreviousWar>,
     pub achievement_ok: bool,
@@ -332,6 +334,8 @@ pub struct Country {
     pub dip_spent_indexed: Vec<(i32, i32)>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
     pub mil_spent_indexed: Vec<(i32, i32)>,
+    #[jomini(default)]
+    pub losses: WarParticipantLosses,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -541,6 +545,15 @@ pub struct Regiment {
 
 fn default_strength() -> f32 {
     1.0
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct ActiveWar {
+    pub name: String,
+    pub history: WarHistory,
+    #[jomini(duplicated, default)]
+    pub participants: Vec<WarParticipant>,
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
