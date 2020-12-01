@@ -553,6 +553,7 @@ pub struct PreviousWar {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct WarParticipant {
     pub value: f32,
     pub tag: CountryTag,
@@ -561,6 +562,7 @@ pub struct WarParticipant {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct WarParticipantLosses {
     #[serde(default)]
     pub members: Vec<u32>,
