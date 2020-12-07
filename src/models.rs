@@ -385,18 +385,26 @@ pub enum CountryEvent {
     RemoveAcceptedCulture(String),
 }
 
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Monarch {
+    pub id: ObjId,
+    pub name: String,
+    pub country: CountryTag,
     #[serde(alias = "DIP")]
     pub dip: u16,
-
     #[serde(alias = "ADM")]
     pub adm: u16,
-
     #[serde(alias = "MIL")]
     pub mil: u16,
-
-    pub name: String,
+    #[serde(default, deserialize_with = "deserialize_token_bool")]
+    pub regent: bool,
+    #[serde(default)]
+    pub culture: Option<String>,
+    #[serde(default)]
+    pub religion: Option<String>,
+    pub birth_date: Eu4Date,
+    #[serde(default, deserialize_with = "deserialize_vec_pair")]
+    pub personalities: Vec<(String, String)>,
     pub leader_id: Option<ObjId>,
     pub leader: Option<Leader>,
 }
