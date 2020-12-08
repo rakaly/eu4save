@@ -375,6 +375,8 @@ pub struct CountryEvents(pub Vec<CountryEvent>);
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub enum CountryEvent {
     Monarch(Monarch),
+    Heir(Monarch),
+    Queen(Monarch),
     Union(u32),
     Capital(u32),
     ChangedCountryNameFrom(String),
