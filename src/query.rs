@@ -425,6 +425,25 @@ impl Query {
             .collect()
     }
 
+    pub fn countries_expense_breakdown(&self) -> HashMap<CountryTag, CountryExpenseLedger> {
+        self.save
+            .game
+            .countries
+            .iter()
+            .filter(|(_, country)| country.num_of_cities > 0)
+            .map(|(tag, country)| (tag.clone(), self.country_expense_breakdown(country)))
+            .collect()
+    }
+
+    pub fn countries_total_expense_breakdown(&self) -> HashMap<CountryTag, CountryExpenseLedger> {
+        self.save
+            .game
+            .countries
+            .iter()
+            .map(|(tag, country)| (tag.clone(), self.country_total_expense_breakdown(country)))
+            .collect()
+    }
+
     fn expense_ledger_breakdown(&self, ledger: &[f32]) -> CountryExpenseLedger {
         CountryExpenseLedger {
             advisor_maintenance: *ledger.get(0).unwrap_or(&0.0),
