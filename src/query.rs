@@ -440,6 +440,7 @@ impl Query {
             .game
             .countries
             .iter()
+            .filter(|(_, c)| c.ledger.totalexpensetable.iter().any(|&x| x > 0.0))
             .map(|(tag, country)| (tag.clone(), self.country_total_expense_breakdown(country)))
             .collect()
     }
