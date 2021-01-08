@@ -564,6 +564,8 @@ pub struct ActiveWar {
     pub history: WarHistory,
     #[jomini(duplicated, default)]
     pub participants: Vec<WarParticipant>,
+    pub original_attacker: CountryTag,
+    pub original_defender: CountryTag,
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
@@ -573,6 +575,8 @@ pub struct PreviousWar {
     pub history: WarHistory,
     #[jomini(duplicated, default)]
     pub participants: Vec<WarParticipant>,
+    pub original_attacker: CountryTag,
+    pub original_defender: CountryTag,
 }
 
 #[derive(Debug, Clone, Deserialize)]
