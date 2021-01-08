@@ -651,7 +651,7 @@ pub struct BattleSide {
     #[serde(default)]
     pub artillery: u32,
     pub losses: u32,
-    pub country: String,
+    pub country: CountryTag,
 
     #[serde(deserialize_with = "empty_string_is_none")]
     pub commander: Option<String>,
