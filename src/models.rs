@@ -650,6 +650,14 @@ pub struct BattleSide {
     pub infantry: u32,
     #[serde(default)]
     pub artillery: u32,
+    #[serde(default)]
+    pub heavy_ship: u32,
+    #[serde(default)]
+    pub light_ship: u32,
+    #[serde(default)]
+    pub galley: u32,
+    #[serde(default)]
+    pub transport: u32,
     pub losses: u32,
     pub country: CountryTag,
 
