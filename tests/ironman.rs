@@ -346,3 +346,20 @@ ironman_test!(
         date: Eu4Date::parse_from_str("1513.05.25").unwrap()
     }
 );
+
+ironman_test!(
+    chinese_supplementary,
+    "chinese-supplementary.eu4",
+    IronmanQuery {
+        starting: "SZO",
+        player: "SZO",
+        patch: "1.30.4.0",
+        date: Eu4Date::parse_from_str("1800.01.01").unwrap()
+    },
+    |query: Query| {
+        assert_eq!(
+            query.save().meta.displayed_country_name.as_bytes(),
+            b"\x10(\xe2\x80\x9e\x10bS\x10PO"
+        );
+    }
+);
