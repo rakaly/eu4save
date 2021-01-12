@@ -2,7 +2,7 @@
 
 use eu4save::models::{GameDifficulty, ProvinceEvent, ProvinceEventValue, TaxManpowerModifier};
 use eu4save::{
-    query::{CountryQuery, Query},
+    query::{CountryPlayed, CountryQuery, PlayerHistory, Query},
     CountryTag, Encoding, Eu4Date, Eu4Extractor, Eu4ExtractorBuilder, FailedResolveStrategy,
     ProvinceId,
 };
@@ -25,7 +25,11 @@ fn test_eu4_bin() {
     let query = Query::from_save(save);
     assert_eq!(query.starting_country(), Some(&CountryTag::from("RAG")));
     assert_eq!(
-        query.players().iter().cloned().collect::<Vec<String>>(),
+        query
+            .player_names()
+            .iter()
+            .cloned()
+            .collect::<Vec<String>>(),
         Vec::<String>::new()
     );
 
@@ -33,6 +37,27 @@ fn test_eu4_bin() {
     players.insert(CountryTag::from("RAG"));
     players.insert(CountryTag::from("CRO"));
     assert_eq!(query.player_countries(), &players);
+
+    let expected_histories = vec![PlayerHistory {
+        tag: CountryTag::from("CRO"),
+        is_human: true,
+        exists: true,
+        player_names: Vec::new(),
+        played_tags: vec![
+            CountryPlayed {
+                tag: CountryTag::from("RAG"),
+                start: Eu4Date::new(1444, 11, 11).unwrap(),
+                end: Eu4Date::new(1769, 1, 2).unwrap(),
+            },
+            CountryPlayed {
+                tag: CountryTag::from("CRO"),
+                start: Eu4Date::new(1769, 1, 2).unwrap(),
+                end: Eu4Date::new(1769, 1, 6).unwrap(),
+            },
+        ],
+    }];
+    let actual_histories = query.player_histories();
+    assert_eq!(expected_histories, actual_histories);
 }
 
 #[test]
@@ -76,7 +101,7 @@ fn test_eu4_kandy_bin() {
 
     assert_eq!(query.starting_country(), Some(&CountryTag::from("KND")));
     assert_eq!(
-        query.players().iter().cloned().collect::<Vec<_>>(),
+        query.player_names().iter().cloned().collect::<Vec<_>>(),
         vec![String::from("comagoosie")]
     );
 
@@ -189,7 +214,7 @@ fn test_eu4_ita1() {
     let query = Query::from_save(save);
     assert_eq!(query.starting_country(), Some(&CountryTag::from("LAN")));
     assert_eq!(
-        query.players().iter().cloned().collect::<Vec<_>>(),
+        query.player_names().iter().cloned().collect::<Vec<_>>(),
         vec![String::from("comagoosie")]
     );
 }
@@ -286,6 +311,72 @@ ironman_test!(
     }
 );
 
+fn trycone_expected_histories() -> Vec<PlayerHistory> {
+    vec![PlayerHistory {
+        tag: CountryTag::from("GBR"),
+        is_human: true,
+        exists: true,
+        player_names: vec![String::from("comagoosie")],
+        played_tags: vec![
+            CountryPlayed {
+                tag: CountryTag::from("TYR"),
+                start: Eu4Date::new(1444, 11, 11).unwrap(),
+                end: Eu4Date::new(1518, 1, 29).unwrap(),
+            },
+            CountryPlayed {
+                tag: CountryTag::from("IRE"),
+                start: Eu4Date::new(1518, 1, 29).unwrap(),
+                end: Eu4Date::new(1606, 8, 4).unwrap(),
+            },
+            CountryPlayed {
+                tag: CountryTag::from("GBR"),
+                start: Eu4Date::new(1606, 8, 4).unwrap(),
+                end: Eu4Date::new(1725, 5, 12).unwrap(),
+            },
+        ],
+    }]
+}
+
+ironman_test!(
+    trycone,
+    "trycone.eu4",
+    IronmanQuery {
+        starting: "TYR",
+        player: "GBR",
+        patch: "1.30.4.0",
+        date: Eu4Date::parse_from_str("1725.05.12").unwrap()
+    },
+    |query: Query| {
+        assert_eq!(query.player_histories(), trycone_expected_histories());
+    }
+);
+
+fn true_heir_expected_histories() -> Vec<PlayerHistory> {
+    vec![PlayerHistory {
+        tag: CountryTag::from("MUG"),
+        is_human: true,
+        exists: true,
+        player_names: vec![String::from("lambdax.x")],
+        played_tags: vec![
+            CountryPlayed {
+                tag: CountryTag::from("SIS"),
+                start: Eu4Date::new(1444, 11, 11).unwrap(),
+                end: Eu4Date::new(1467, 12, 3).unwrap(),
+            },
+            CountryPlayed {
+                tag: CountryTag::from("DLH"),
+                start: Eu4Date::new(1467, 12, 3).unwrap(),
+                end: Eu4Date::new(1467, 12, 3).unwrap(),
+            },
+            CountryPlayed {
+                tag: CountryTag::from("MUG"),
+                start: Eu4Date::new(1467, 12, 3).unwrap(),
+                end: Eu4Date::new(1508, 4, 27).unwrap(),
+            },
+        ],
+    }]
+}
+
 ironman_test!(
     true_heir_of_timur,
     "sis.eu4",
@@ -294,6 +385,9 @@ ironman_test!(
         player: "MUG",
         patch: "1.30.3.0",
         date: Eu4Date::parse_from_str("1508.04.27").unwrap()
+    },
+    |query: Query| {
+        assert_eq!(query.player_histories(), true_heir_expected_histories());
     }
 );
 
@@ -319,7 +413,7 @@ ironman_test!(
     },
     |query: Query| {
         assert_eq!(
-            query.players().iter().cloned().collect::<Vec<_>>(),
+            query.player_names().iter().cloned().collect::<Vec<_>>(),
             vec![String::from("comagoosie")]
         );
     }

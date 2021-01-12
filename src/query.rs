@@ -154,10 +154,35 @@ pub struct BuildingEvent<'a> {
     pub action: BuildingConstruction,
 }
 
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct CountryPlayed {
+    pub tag: CountryTag,
+    pub start: Eu4Date,
+    pub end: Eu4Date,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct PlayerHistory {
+    pub tag: CountryTag,
+
+    /// Whether the player is currently in the session
+    pub is_human: bool,
+
+    /// Names of the players (may be empty)
+    pub player_names: Vec<String>,
+
+    /// Whether the country owns any provinces
+    pub exists: bool,
+
+    /// A history of tag switches for said country
+    pub played_tags: Vec<CountryPlayed>,
+}
+
 #[derive(Debug)]
 pub struct Query {
     save: Eu4Save,
     players: OnceCell<HashSet<String>>,
+    player_histories: OnceCell<Vec<PlayerHistory>>,
     player_countries: OnceCell<HashSet<CountryTag>>,
     starting_country: OnceCell<Option<CountryTag>>,
     buildings: OnceCell<HashSet<String>>,
@@ -168,6 +193,7 @@ impl Query {
         Query {
             save,
             players: OnceCell::default(),
+            player_histories: OnceCell::default(),
             player_countries: OnceCell::default(),
             starting_country: OnceCell::default(),
             buildings: OnceCell::default(),
@@ -178,19 +204,51 @@ impl Query {
         &self.save
     }
 
-    pub fn players(&self) -> &HashSet<String> {
-        self.players.get_or_init(|| calc_players(&self.save))
+    /// Returns a set of the names of the players who participated in a playthrough.
+    /// May be blank for single player run through where the player is detected as
+    /// "Player".
+    pub fn player_names(&self) -> &HashSet<String> {
+        self.players.get_or_init(|| {
+            self.player_histories()
+                .iter()
+                .flat_map(|x| x.player_names.clone().into_iter())
+                .collect()
+        })
     }
 
+    /// Provides a rich structure that contains the following:
+    ///
+    /// - A list countries that had a player at one point or another
+    /// - What country the player is playing
+    /// - Whether that player is currently in the session
+    /// - The names of the players in the session
+    /// - A list of all prior tags that country had been
+    pub fn player_histories(&self) -> &[PlayerHistory] {
+        self.player_histories
+            .get_or_init(|| calc_histories(&self.save))
+    }
+
+    /// Returns all the tags that players touched in a playthrough. Don't rely on this
+    /// for accurate calculations as countries form new countries that may have
+    /// pre-existed (think of a cilli into croatia run) and relying on this would
+    /// meddle up any calculations. Use `player_histories` instead.
     pub fn player_countries(&self) -> &HashSet<CountryTag> {
-        self.player_countries
-            .get_or_init(|| calc_player_countries(&self.save))
+        self.player_countries.get_or_init(|| {
+            self.player_histories()
+                .iter()
+                .filter(|x| x.is_human)
+                .flat_map(|x| x.played_tags.iter().map(|x| x.tag.clone()))
+                .collect()
+        })
     }
 
+    /// Return the starting country in single player playthroughs. If playing in multiplayer or if
+    /// the starting country can't be determined then none is returned.
     pub fn starting_country(&self) -> Option<&CountryTag> {
-        self.starting_country
-            .get_or_init(|| calc_starting_country(&self.save))
-            .as_ref()
+        match self.player_histories() {
+            [player] => player.played_tags.get(0).map(|x| &x.tag),
+            _ => None,
+        }
     }
 
     pub fn country_tag_hex_color(&self, country_tag: &CountryTag) -> Option<String> {
@@ -632,87 +690,104 @@ fn find_index(index: i32, data: &[(i32, i32)]) -> i32 {
         .unwrap_or(0)
 }
 
-fn calc_starting_country(save: &Eu4Save) -> Option<CountryTag> {
-    if save.meta.multiplayer {
-        return None;
-    }
+fn calc_histories(save: &Eu4Save) -> Vec<PlayerHistory> {
+    let mut result = Vec::with_capacity(save.game.players_countries.len());
 
-    let first = save
-        .game
-        .countries
-        .iter()
-        .find(|(_, country)| country.human);
-
-    if let Some((first_tag, _country)) = first {
-        let mut track_date = save.meta.date;
-        let mut tag = first_tag.clone();
-
-        while let Some(country) = save.game.countries.get(first_tag) {
-            let mut country_changes = country
-                .history
-                .events
-                .iter()
-                .rev()
-                .filter(|(date, _events)| date < &track_date)
-                .flat_map(|(date, events)| events.0.iter().map(move |event| (*date, event)))
-                .filter_map(|(date, event)| match event {
-                    CountryEvent::ChangedTagFrom(x) => Some((date, x)),
-                    _ => None,
-                });
-
-            if let Some((date, change_tag)) = country_changes.next() {
-                track_date = date;
-                tag = change_tag.clone();
-            } else {
-                break;
-            }
+    let mut latest_ownership = HashMap::with_capacity(save.game.countries.len());
+    for prov in save.game.provinces.values() {
+        let mut old_owner = None;
+        if let Some(initial) = prov.history.owner.as_ref() {
+            latest_ownership
+                .entry(initial)
+                .and_modify(|d| *d = std::cmp::max(*d, save.game.start_date))
+                .or_insert(save.game.start_date);
+            old_owner = Some(initial);
         }
 
-        Some(tag)
-    } else {
-        None
-    }
-}
-
-fn calc_players(save: &Eu4Save) -> HashSet<String> {
-    save.game
-        .players_countries
-        .iter()
-        .enumerate()
-        .filter_map(|(i, x)| if i % 2 == 0 { Some(x) } else { None })
-        .filter(|x| x.as_str() != "Player")
-        .map(|x| x.to_string())
-        .collect()
-}
-
-fn calc_player_countries(save: &Eu4Save) -> HashSet<CountryTag> {
-    let mut player_countries: HashSet<_> = save
-        .game
-        .players_countries
-        .iter()
-        .enumerate()
-        .filter_map(|(i, x)| if i % 2 == 1 { Some(x) } else { None })
-        .map(|x| CountryTag::from(x.to_string()))
-        .collect();
-
-    loop {
-        let size = player_countries.len();
-        for (tag, country) in &save.game.countries {
-            if country.was_player {
-                player_countries.insert(tag.clone());
-            }
-
-            if player_countries.contains(&tag) {
-                for prev_tag in &country.previous_country_tags {
-                    player_countries.insert(prev_tag.clone());
+        for (date, events) in &prov.history.events {
+            for event in &events.0 {
+                if let ProvinceEvent::Owner(new_owner) = event {
+                    if let Some(old) = old_owner.replace(new_owner) {
+                        latest_ownership
+                            .entry(old)
+                            .and_modify(|d| *d = std::cmp::max(*d, *date))
+                            .or_insert(*date);
+                    }
                 }
             }
         }
+    }
 
-        if size == player_countries.len() {
-            break;
+    for (tag, country) in save.game.countries.iter().filter(|(_, c)| c.was_player) {
+        let exists = country.num_of_cities != 0;
+        let end_date = if exists {
+            &save.meta.date
+        } else {
+            latest_ownership.get(tag).unwrap_or(&save.meta.date)
+        };
+
+        let mut players = Vec::new();
+        for entry in save.game.players_countries.chunks_exact(2) {
+            let player_name = &entry[0];
+            if player_name == "Player" && !save.meta.multiplayer {
+                continue;
+            }
+
+            let country_tag = &entry[1];
+
+            if country_tag == tag.as_str() {
+                players.push(player_name.clone())
+            }
+        }
+
+        let played_tags = trace_country(save, &tag, country, *end_date);
+        result.push(PlayerHistory {
+            tag: tag.clone(),
+            is_human: country.human,
+            player_names: players,
+            exists,
+            played_tags,
+        });
+    }
+
+    result
+}
+
+fn trace_country(
+    save: &Eu4Save,
+    tag: &CountryTag,
+    country: &Country,
+    end: Eu4Date,
+) -> Vec<CountryPlayed> {
+    let mut played = Vec::new();
+    let history = country
+        .history
+        .events
+        .iter()
+        .rev()
+        .skip_while(|(d, _)| d > &end);
+    let mut current_tag = tag;
+    let mut current_date = end;
+    for (date, events) in history {
+        for event in events.0.iter().rev() {
+            if let CountryEvent::ChangedTagFrom(prev) = event {
+                played.push(CountryPlayed {
+                    tag: current_tag.clone(),
+                    start: *date,
+                    end: current_date,
+                });
+                current_date = *date;
+                current_tag = prev;
+            }
         }
     }
 
-    player_countries
+    played.push(CountryPlayed {
+        tag: current_tag.clone(),
+        start: save.game.start_date,
+        end: current_date,
+    });
+
+    played.reverse();
+    played
 }

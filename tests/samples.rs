@@ -1,10 +1,13 @@
-use eu4save::models::CountryEvent;
+use eu4save::{
+    models::CountryEvent,
+    query::{CountryPlayed, PlayerHistory},
+};
 use eu4save::{
     query::{BuildingConstruction, BuildingEvent, Query},
     CountryTag, Encoding, Eu4Date, Eu4Extractor, ProvinceId,
 };
-use std::error::Error;
 use std::io::{Cursor, Read};
+use std::{collections::HashMap, error::Error};
 
 mod utils;
 
@@ -23,7 +26,11 @@ fn test_eu4_text() {
     let query = Query::from_save(save);
     assert_eq!(query.starting_country(), Some(&CountryTag::from("ENG")));
     assert_eq!(
-        query.players().iter().cloned().collect::<Vec<String>>(),
+        query
+            .player_names()
+            .iter()
+            .cloned()
+            .collect::<Vec<String>>(),
         Vec::<String>::new()
     );
 
@@ -39,6 +46,19 @@ fn test_eu4_text() {
         Some(&CountryTag::from("ENG"))
     );
 
+    let histories = vec![PlayerHistory {
+        tag: CountryTag::from("ENG"),
+        is_human: true,
+        exists: true,
+        player_names: Vec::new(),
+        played_tags: vec![CountryPlayed {
+            tag: CountryTag::from("ENG"),
+            start: Eu4Date::new(1444, 11, 11).unwrap(),
+            end: Eu4Date::new(1444, 12, 4).unwrap(),
+        }],
+    }];
+
+    assert_eq!(query.player_histories(), histories);
     let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&buffer)).unwrap();
     assert!(save.game.is_some());
 }
@@ -118,6 +138,86 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let history2 = query.province_building_history(stockholm);
     assert_eq!(history2.iter().find(|x| x.building == "hre"), None);
     assert_eq!(history2.iter().find(|x| x.building == "is_city"), None);
+
+    let histories: HashMap<_, _> = query
+        .player_histories()
+        .iter()
+        .map(|p| (p.tag.clone(), p))
+        .collect();
+
+    assert_eq!(
+        histories.get(&CountryTag::from("SAX")).unwrap(),
+        &&PlayerHistory {
+            tag: CountryTag::from("SAX"),
+            is_human: false,
+            exists: false,
+            player_names: vec![String::from("Hose")],
+            played_tags: vec![CountryPlayed {
+                tag: CountryTag::from("SAX"),
+                start: Eu4Date::new(1444, 11, 11).unwrap(),
+                end: Eu4Date::new(1653, 11, 25).unwrap(),
+            },],
+        }
+    );
+
+    assert_eq!(
+        histories.get(&CountryTag::from("GER")).unwrap(),
+        &&PlayerHistory {
+            tag: CountryTag::from("GER"),
+            is_human: true,
+            exists: true,
+            player_names: vec![String::from("Doge of Venice (Taran)")],
+            played_tags: vec![
+                CountryPlayed {
+                    tag: CountryTag::from("HSA"),
+                    start: Eu4Date::new(1444, 11, 11).unwrap(),
+                    end: Eu4Date::new(1598, 11, 8).unwrap(),
+                },
+                CountryPlayed {
+                    tag: CountryTag::from("WES"),
+                    start: Eu4Date::new(1598, 11, 8).unwrap(),
+                    end: Eu4Date::new(1603, 11, 29).unwrap(),
+                },
+                CountryPlayed {
+                    tag: CountryTag::from("HAN"),
+                    start: Eu4Date::new(1603, 11, 29).unwrap(),
+                    end: Eu4Date::new(1737, 7, 20).unwrap(),
+                },
+                CountryPlayed {
+                    tag: CountryTag::from("GER"),
+                    start: Eu4Date::new(1737, 7, 20).unwrap(),
+                    end: Eu4Date::new(1817, 8, 31).unwrap(),
+                },
+            ],
+        }
+    );
+
+    assert_eq!(
+        histories.get(&CountryTag::from("FRA")).unwrap(),
+        &&PlayerHistory {
+            tag: CountryTag::from("FRA"),
+            is_human: true,
+            exists: true,
+            player_names: vec![String::from("TheOnlySimen"), String::from("Strawman")],
+            played_tags: vec![
+                CountryPlayed {
+                    tag: CountryTag::from("SCO"),
+                    start: Eu4Date::new(1444, 11, 11).unwrap(),
+                    end: Eu4Date::new(1533, 1, 25).unwrap(),
+                },
+                CountryPlayed {
+                    tag: CountryTag::from("IRE"),
+                    start: Eu4Date::new(1533, 1, 25).unwrap(),
+                    end: Eu4Date::new(1644, 1, 11).unwrap(),
+                },
+                CountryPlayed {
+                    tag: CountryTag::from("FRA"),
+                    start: Eu4Date::new(1644, 1, 11).unwrap(),
+                    end: Eu4Date::new(1817, 8, 31).unwrap(),
+                }
+            ]
+        }
+    );
 
     Ok(())
 }
