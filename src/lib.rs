@@ -8,7 +8,7 @@ use std::io::Cursor;
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
 assert_eq!(encoding, Encoding::TextZip);
-assert_eq!(save.meta.player, CountryTag::from("ENG"));
+assert_eq!(save.meta.player, "ENG".parse()?);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -37,7 +37,7 @@ use std::io::Cursor;
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let (save, _encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
 let save_query = Query::from_save(save);
-let trade = save_query.save().game.countries.get(&CountryTag::from("ENG"))
+let trade = save_query.save().game.countries.get(&"ENG".parse()?)
     .map(|country| save_query.country_income_breakdown(country))
     .map(|income| income.trade);
 assert_eq!(Some(17.982), trade);

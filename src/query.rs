@@ -237,7 +237,7 @@ impl Query {
             self.player_histories()
                 .iter()
                 .filter(|x| x.is_human)
-                .flat_map(|x| x.played_tags.iter().map(|x| x.tag.clone()))
+                .flat_map(|x| x.played_tags.iter().map(|x| x.tag))
                 .collect()
         })
     }
@@ -266,18 +266,18 @@ impl Query {
 
     fn add_previous_countries(
         &self,
-        tag: &CountryTag,
+        tag: CountryTag,
         country: &Country,
         mut set: &mut HashSet<CountryTag>,
     ) {
-        set.insert(tag.clone());
-        for prev_tag in &country.previous_country_tags {
+        set.insert(tag);
+        for &prev_tag in &country.previous_country_tags {
             if set.contains(&prev_tag) {
                 continue;
             }
 
             if let Some(prev_country) = self.save.game.countries.get(&prev_tag) {
-                self.add_previous_countries(&prev_tag, prev_country, &mut set);
+                self.add_previous_countries(prev_tag, prev_country, &mut set);
             }
         }
     }
@@ -296,21 +296,29 @@ impl Query {
                     filter_set = filter_set.union(player_countries).cloned().collect();
                 }
                 CountryQuery::Greats => {
-                    for (tag, country) in &self.save.game.countries {
+                    for (&tag, country) in &self.save.game.countries {
                         if country.is_great_power {
-                            self.add_previous_countries(&tag, &country, &mut filter_set);
+                            self.add_previous_countries(tag, &country, &mut filter_set);
                         }
                     }
                 }
             }
         }
 
-        for include in includes {
-            filter_set.insert(CountryTag::from(include.as_ref()));
+        for include in includes
+            .iter()
+            .map(|x| x.as_ref().parse::<CountryTag>())
+            .filter_map(Result::ok)
+        {
+            filter_set.insert(include);
         }
 
-        for exclude in excludes {
-            filter_set.remove(&CountryTag::from(exclude.as_ref()));
+        for exclude in excludes
+            .iter()
+            .map(|x| x.as_ref().parse::<CountryTag>())
+            .filter_map(Result::ok)
+        {
+            filter_set.remove(&exclude);
         }
 
         filter_set
@@ -343,12 +351,7 @@ impl Query {
         // those that report zero inflation, score, etc.
         let income_years: HashMap<CountryTag, HashSet<u16>> = income
             .iter()
-            .map(|ledg| {
-                (
-                    ledg.name.clone(),
-                    ledg.data.iter().map(|(x, _)| *x).collect(),
-                )
-            })
+            .map(|ledg| (ledg.name, ledg.data.iter().map(|(x, _)| *x).collect()))
             .collect();
 
         let mut adjusted_scores: Vec<LedgerDatum> = score.into_iter().cloned().collect();
@@ -479,7 +482,7 @@ impl Query {
             .countries
             .iter()
             .filter(|(_, country)| country.num_of_cities > 0)
-            .map(|(tag, country)| (tag.clone(), self.country_income_breakdown(country)))
+            .map(|(&tag, country)| (tag, self.country_income_breakdown(country)))
             .collect()
     }
 
@@ -489,7 +492,7 @@ impl Query {
             .countries
             .iter()
             .filter(|(_, country)| country.num_of_cities > 0)
-            .map(|(tag, country)| (tag.clone(), self.country_expense_breakdown(country)))
+            .map(|(&tag, country)| (tag, self.country_expense_breakdown(country)))
             .collect()
     }
 
@@ -499,7 +502,7 @@ impl Query {
             .countries
             .iter()
             .filter(|(_, c)| c.ledger.totalexpensetable.iter().any(|&x| x > 0.0))
-            .map(|(tag, country)| (tag.clone(), self.country_total_expense_breakdown(country)))
+            .map(|(&tag, country)| (tag, self.country_total_expense_breakdown(country)))
             .collect()
     }
 
@@ -718,12 +721,12 @@ fn calc_histories(save: &Eu4Save) -> Vec<PlayerHistory> {
         }
     }
 
-    for (tag, country) in save.game.countries.iter().filter(|(_, c)| c.was_player) {
+    for (&tag, country) in save.game.countries.iter().filter(|(_, c)| c.was_player) {
         let exists = country.num_of_cities != 0;
         let end_date = if exists {
             &save.meta.date
         } else {
-            latest_ownership.get(tag).unwrap_or(&save.meta.date)
+            latest_ownership.get(&tag).unwrap_or(&save.meta.date)
         };
 
         let mut players = Vec::new();
@@ -733,16 +736,19 @@ fn calc_histories(save: &Eu4Save) -> Vec<PlayerHistory> {
                 continue;
             }
 
-            let country_tag = &entry[1];
+            let country_tag = match entry[1].parse::<CountryTag>() {
+                Ok(x) => x,
+                _ => continue,
+            };
 
-            if country_tag == tag.as_str() {
+            if country_tag == tag {
                 players.push(player_name.clone())
             }
         }
 
-        let played_tags = trace_country(save, &tag, country, *end_date);
+        let played_tags = trace_country(save, tag, country, *end_date);
         result.push(PlayerHistory {
-            tag: tag.clone(),
+            tag,
             is_human: country.human,
             player_names: players,
             exists,
@@ -755,7 +761,7 @@ fn calc_histories(save: &Eu4Save) -> Vec<PlayerHistory> {
 
 fn trace_country(
     save: &Eu4Save,
-    tag: &CountryTag,
+    tag: CountryTag,
     country: &Country,
     end: Eu4Date,
 ) -> Vec<CountryPlayed> {
@@ -772,18 +778,18 @@ fn trace_country(
         for event in events.0.iter().rev() {
             if let CountryEvent::ChangedTagFrom(prev) = event {
                 played.push(CountryPlayed {
-                    tag: current_tag.clone(),
+                    tag: current_tag,
                     start: *date,
                     end: current_date,
                 });
                 current_date = *date;
-                current_tag = prev;
+                current_tag = *prev;
             }
         }
     }
 
     played.push(CountryPlayed {
-        tag: current_tag.clone(),
+        tag: current_tag,
         start: save.game.start_date,
         end: current_date,
     });

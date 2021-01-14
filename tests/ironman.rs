@@ -17,13 +17,13 @@ fn test_eu4_bin() {
     let data = utils::request("ragusa2.bin.eu4");
     let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert_eq!(encoding, Encoding::BinZip);
-    assert_eq!(save.meta.player, CountryTag::from("CRO"));
+    assert_eq!(save.meta.player, "CRO".parse().unwrap());
 
     let (save2, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&data[..])).unwrap();
     assert!(save2.game.is_none());
 
     let query = Query::from_save(save);
-    assert_eq!(query.starting_country(), Some(&CountryTag::from("RAG")));
+    assert_eq!(query.starting_country(), Some(&"RAG".parse().unwrap()));
     assert_eq!(
         query
             .player_names()
@@ -34,23 +34,23 @@ fn test_eu4_bin() {
     );
 
     let mut players = HashSet::new();
-    players.insert(CountryTag::from("RAG"));
-    players.insert(CountryTag::from("CRO"));
+    players.insert("RAG".parse().unwrap());
+    players.insert("CRO".parse().unwrap());
     assert_eq!(query.player_countries(), &players);
 
     let expected_histories = vec![PlayerHistory {
-        tag: CountryTag::from("CRO"),
+        tag: "CRO".parse().unwrap(),
         is_human: true,
         exists: true,
         player_names: Vec::new(),
         played_tags: vec![
             CountryPlayed {
-                tag: CountryTag::from("RAG"),
+                tag: "RAG".parse().unwrap(),
                 start: Eu4Date::new(1444, 11, 11).unwrap(),
                 end: Eu4Date::new(1769, 1, 2).unwrap(),
             },
             CountryPlayed {
-                tag: CountryTag::from("CRO"),
+                tag: "CRO".parse().unwrap(),
                 start: Eu4Date::new(1769, 1, 2).unwrap(),
                 end: Eu4Date::new(1769, 1, 6).unwrap(),
             },
@@ -65,24 +65,24 @@ fn test_eu4_kandy_bin() {
     let data = utils::request("kandy2.bin.eu4");
     let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert_eq!(encoding, Encoding::BinZip);
-    assert_eq!(save.meta.player, CountryTag::from("BHA"));
+    assert_eq!(save.meta.player, "BHA".parse().unwrap());
 
     let query = Query::from_save(save);
     let mut players = HashSet::new();
-    players.insert(CountryTag::from("KND"));
-    players.insert(CountryTag::from("BHA"));
+    players.insert("KND".parse().unwrap());
+    players.insert("BHA".parse().unwrap());
     assert_eq!(query.player_countries(), &players);
 
     let player = query
         .save()
         .game
         .countries
-        .get(&CountryTag::from("BHA"))
+        .get(&"BHA".parse().unwrap())
         .unwrap();
     assert!(!player.completed_missions.is_empty());
 
     assert_eq!(
-        query.country_tag_hex_color(&CountryTag::from("BHA")),
+        query.country_tag_hex_color(&"BHA".parse().unwrap()),
         Some(String::from("#50a50a"))
     );
 
@@ -96,20 +96,20 @@ fn test_eu4_kandy_bin() {
             .owner
             .as_ref()
             .unwrap(),
-        &CountryTag::from("SCA")
+        &"SCA".parse().unwrap()
     );
 
-    assert_eq!(query.starting_country(), Some(&CountryTag::from("KND")));
+    assert_eq!(query.starting_country(), Some(&"KND".parse().unwrap()));
     assert_eq!(
         query.player_names().iter().cloned().collect::<Vec<_>>(),
         vec![String::from("comagoosie")]
     );
 
     let subjects: Vec<CountryTag> = vec![
-        CountryTag::from("TEO"),
-        CountryTag::from("YOK"),
-        CountryTag::from("C21"),
-        CountryTag::from("C23"),
+        "TEO".parse().unwrap(),
+        "YOK".parse().unwrap(),
+        "C21".parse().unwrap(),
+        "C23".parse().unwrap(),
     ];
 
     assert_eq!(
@@ -117,7 +117,7 @@ fn test_eu4_kandy_bin() {
             .save()
             .game
             .countries
-            .get(&CountryTag::from("BHA"))
+            .get(&"BHA".parse().unwrap())
             .unwrap()
             .subjects,
         subjects
@@ -128,12 +128,16 @@ fn test_eu4_kandy_bin() {
 
     // When querying for great powers in the ledger and a current great power is from a reformed
     // country (like russia or great britain), ensure that their predecessor is included.
-    let mos = ledgers.income.iter().find(|&x| x.name.as_str() == "MOS");
+    let mos = ledgers
+        .income
+        .iter()
+        .find(|&x| x.name == "MOS".parse().unwrap());
     assert!(mos.is_some());
 
     // I had a score of zero in 1450, but the ledger doesn't report zero values
     let knd_score = ledgers.score.iter().find(|&l| {
-        l.name.as_str() == "KND" && l.data.iter().find(|(x, y)| *x == 1450 && *y == 0).is_some()
+        l.name == "KND".parse().unwrap()
+            && l.data.iter().find(|(x, y)| *x == 1450 && *y == 0).is_some()
     });
     assert!(knd_score.is_some());
 
@@ -195,7 +199,7 @@ fn test_eu4_ita1() {
     let data = utils::request("ita1.eu4");
     let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert_eq!(encoding, Encoding::BinZip);
-    assert_eq!(save.meta.player, CountryTag::from("ITA"));
+    assert_eq!(save.meta.player, "ITA".parse().unwrap());
     let settings = &save.game.gameplay_settings.options;
     assert_eq!(settings.difficulty, GameDifficulty::Normal);
     assert_eq!(
@@ -212,7 +216,7 @@ fn test_eu4_ita1() {
     assert!(all_dlc_recognized);
 
     let query = Query::from_save(save);
-    assert_eq!(query.starting_country(), Some(&CountryTag::from("LAN")));
+    assert_eq!(query.starting_country(), Some(&"LAN".parse().unwrap()));
     assert_eq!(
         query.player_names().iter().cloned().collect::<Vec<_>>(),
         vec![String::from("comagoosie")]
@@ -225,7 +229,7 @@ fn test_roundtrip_melt() {
     let out = eu4save::melt(&data[..], eu4save::FailedResolveStrategy::Error).unwrap();
     let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&out[..])).unwrap();
     assert_eq!(encoding, Encoding::Text);
-    assert_eq!(save.meta.player, CountryTag::from("BHA"));
+    assert_eq!(save.meta.player, "BHA".parse().unwrap());
 }
 
 macro_rules! ironman_test {
@@ -247,7 +251,7 @@ macro_rules! ironman_test {
                     .unwrap();
                 assert_eq!(encoding, Encoding::BinZip);
                 let expected = $query;
-                assert_eq!(save.meta.player, CountryTag::from(expected.player));
+                assert_eq!(save.meta.player, expected.player.parse::<CountryTag>().unwrap());
                 assert_eq!(save.meta.date, expected.date);
 
                 let version = &save.meta.savegame_version;
@@ -264,7 +268,7 @@ macro_rules! ironman_test {
 
                 assert_eq!(
                     query.starting_country().unwrap(),
-                    &CountryTag::from(expected.starting)
+                    &expected.starting.parse::<CountryTag>().unwrap(),
                 );
 
                 ($further)(query);
@@ -313,23 +317,23 @@ ironman_test!(
 
 fn trycone_expected_histories() -> Vec<PlayerHistory> {
     vec![PlayerHistory {
-        tag: CountryTag::from("GBR"),
+        tag: "GBR".parse().unwrap(),
         is_human: true,
         exists: true,
         player_names: vec![String::from("comagoosie")],
         played_tags: vec![
             CountryPlayed {
-                tag: CountryTag::from("TYR"),
+                tag: "TYR".parse().unwrap(),
                 start: Eu4Date::new(1444, 11, 11).unwrap(),
                 end: Eu4Date::new(1518, 1, 29).unwrap(),
             },
             CountryPlayed {
-                tag: CountryTag::from("IRE"),
+                tag: "IRE".parse().unwrap(),
                 start: Eu4Date::new(1518, 1, 29).unwrap(),
                 end: Eu4Date::new(1606, 8, 4).unwrap(),
             },
             CountryPlayed {
-                tag: CountryTag::from("GBR"),
+                tag: "GBR".parse().unwrap(),
                 start: Eu4Date::new(1606, 8, 4).unwrap(),
                 end: Eu4Date::new(1725, 5, 12).unwrap(),
             },
@@ -353,23 +357,23 @@ ironman_test!(
 
 fn true_heir_expected_histories() -> Vec<PlayerHistory> {
     vec![PlayerHistory {
-        tag: CountryTag::from("MUG"),
+        tag: "MUG".parse().unwrap(),
         is_human: true,
         exists: true,
         player_names: vec![String::from("lambdax.x")],
         played_tags: vec![
             CountryPlayed {
-                tag: CountryTag::from("SIS"),
+                tag: "SIS".parse().unwrap(),
                 start: Eu4Date::new(1444, 11, 11).unwrap(),
                 end: Eu4Date::new(1467, 12, 3).unwrap(),
             },
             CountryPlayed {
-                tag: CountryTag::from("DLH"),
+                tag: "DLH".parse().unwrap(),
                 start: Eu4Date::new(1467, 12, 3).unwrap(),
                 end: Eu4Date::new(1467, 12, 3).unwrap(),
             },
             CountryPlayed {
-                tag: CountryTag::from("MUG"),
+                tag: "MUG".parse().unwrap(),
                 start: Eu4Date::new(1467, 12, 3).unwrap(),
                 end: Eu4Date::new(1508, 4, 27).unwrap(),
             },

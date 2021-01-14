@@ -4,7 +4,7 @@ use eu4save::{
 };
 use eu4save::{
     query::{BuildingConstruction, BuildingEvent, Query},
-    CountryTag, Encoding, Eu4Date, Eu4Extractor, ProvinceId,
+    Encoding, Eu4Date, Eu4Extractor, ProvinceId,
 };
 use std::io::{Cursor, Read};
 use std::{collections::HashMap, error::Error};
@@ -12,19 +12,19 @@ use std::{collections::HashMap, error::Error};
 mod utils;
 
 #[test]
-fn test_eu4_text() {
+fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     let data = utils::request("eng.txt.eu4.zip");
     let reader = Cursor::new(&data[..]);
-    let mut zip = zip::ZipArchive::new(reader).unwrap();
-    let mut zip_file = zip.by_index(0).unwrap();
+    let mut zip = zip::ZipArchive::new(reader)?;
+    let mut zip_file = zip.by_index(0)?;
     let mut buffer = Vec::with_capacity(0);
-    zip_file.read_to_end(&mut buffer).unwrap();
-    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer)).unwrap();
+    zip_file.read_to_end(&mut buffer)?;
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer))?;
     assert_eq!(encoding, Encoding::Text);
-    assert_eq!(save.meta.player, CountryTag::from("ENG"));
+    assert_eq!(save.meta.player, "ENG".parse()?);
 
     let query = Query::from_save(save);
-    assert_eq!(query.starting_country(), Some(&CountryTag::from("ENG")));
+    assert_eq!(query.starting_country(), Some(&"ENG".parse()?));
     assert_eq!(
         query
             .player_names()
@@ -43,48 +43,52 @@ fn test_eu4_text() {
     assert_eq!(london.buildings.get("fort_15th"), Some(&true));
     assert_eq!(
         london.building_builders.get("fort_15th"),
-        Some(&CountryTag::from("ENG"))
+        Some(&"ENG".parse()?)
     );
 
     let histories = vec![PlayerHistory {
-        tag: CountryTag::from("ENG"),
+        tag: "ENG".parse()?,
         is_human: true,
         exists: true,
         player_names: Vec::new(),
         played_tags: vec![CountryPlayed {
-            tag: CountryTag::from("ENG"),
+            tag: "ENG".parse()?,
             start: Eu4Date::new(1444, 11, 11).unwrap(),
             end: Eu4Date::new(1444, 12, 4).unwrap(),
         }],
     }];
 
     assert_eq!(query.player_histories(), histories);
-    let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&buffer)).unwrap();
+    let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&buffer))?;
     assert!(save.game.is_some());
+
+    Ok(())
 }
 
 #[test]
-fn test_eu4_compressed_text() {
+fn test_eu4_compressed_text() -> Result<(), Box<dyn Error>> {
     let data = utils::request("eng.txt.compressed.eu4");
-    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
     assert_eq!(encoding, Encoding::TextZip);
-    assert_eq!(save.meta.player, CountryTag::from("ENG"));
+    assert_eq!(save.meta.player, "ENG".parse()?);
 
-    let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&data[..])).unwrap();
+    let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&data[..]))?;
     assert!(save.game.is_none());
+    Ok(())
 }
 
 #[cfg(feature = "mmap")]
 #[test]
-fn test_eu4_compressed_text_mmap() {
+fn test_eu4_compressed_text_mmap() -> Result<(), Box<dyn Error>> {
     use eu4save::Extraction;
     let data = utils::request("eng.txt.compressed.eu4");
     let (save, encoding) = Eu4Extractor::builder()
         .with_extraction(Extraction::MmapTemporaries)
-        .extract_save(Cursor::new(&data[..]))
-        .unwrap();
+        .extract_save(Cursor::new(&data[..]))?;
     assert_eq!(encoding, Encoding::TextZip);
-    assert_eq!(save.meta.player, CountryTag::from("ENG"));
+    assert_eq!(save.meta.player, "ENG".parse()?);
+
+    Ok(())
 }
 
 #[test]
@@ -146,14 +150,14 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
         .collect();
 
     assert_eq!(
-        histories.get(&CountryTag::from("SAX")).unwrap(),
+        histories.get(&"SAX".parse()?).unwrap(),
         &&PlayerHistory {
-            tag: CountryTag::from("SAX"),
+            tag: "SAX".parse()?,
             is_human: false,
             exists: false,
             player_names: vec![String::from("Hose")],
             played_tags: vec![CountryPlayed {
-                tag: CountryTag::from("SAX"),
+                tag: "SAX".parse()?,
                 start: Eu4Date::new(1444, 11, 11).unwrap(),
                 end: Eu4Date::new(1653, 11, 25).unwrap(),
             },],
@@ -161,30 +165,30 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     );
 
     assert_eq!(
-        histories.get(&CountryTag::from("GER")).unwrap(),
+        histories.get(&"GER".parse()?).unwrap(),
         &&PlayerHistory {
-            tag: CountryTag::from("GER"),
+            tag: "GER".parse()?,
             is_human: true,
             exists: true,
             player_names: vec![String::from("Doge of Venice (Taran)")],
             played_tags: vec![
                 CountryPlayed {
-                    tag: CountryTag::from("HSA"),
+                    tag: "HSA".parse()?,
                     start: Eu4Date::new(1444, 11, 11).unwrap(),
                     end: Eu4Date::new(1598, 11, 8).unwrap(),
                 },
                 CountryPlayed {
-                    tag: CountryTag::from("WES"),
+                    tag: "WES".parse()?,
                     start: Eu4Date::new(1598, 11, 8).unwrap(),
                     end: Eu4Date::new(1603, 11, 29).unwrap(),
                 },
                 CountryPlayed {
-                    tag: CountryTag::from("HAN"),
+                    tag: "HAN".parse()?,
                     start: Eu4Date::new(1603, 11, 29).unwrap(),
                     end: Eu4Date::new(1737, 7, 20).unwrap(),
                 },
                 CountryPlayed {
-                    tag: CountryTag::from("GER"),
+                    tag: "GER".parse()?,
                     start: Eu4Date::new(1737, 7, 20).unwrap(),
                     end: Eu4Date::new(1817, 8, 31).unwrap(),
                 },
@@ -193,25 +197,25 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     );
 
     assert_eq!(
-        histories.get(&CountryTag::from("FRA")).unwrap(),
+        histories.get(&"FRA".parse()?).unwrap(),
         &&PlayerHistory {
-            tag: CountryTag::from("FRA"),
+            tag: "FRA".parse()?,
             is_human: true,
             exists: true,
             player_names: vec![String::from("TheOnlySimen"), String::from("Strawman")],
             played_tags: vec![
                 CountryPlayed {
-                    tag: CountryTag::from("SCO"),
+                    tag: "SCO".parse()?,
                     start: Eu4Date::new(1444, 11, 11).unwrap(),
                     end: Eu4Date::new(1533, 1, 25).unwrap(),
                 },
                 CountryPlayed {
-                    tag: CountryTag::from("IRE"),
+                    tag: "IRE".parse()?,
                     start: Eu4Date::new(1533, 1, 25).unwrap(),
                     end: Eu4Date::new(1644, 1, 11).unwrap(),
                 },
                 CountryPlayed {
-                    tag: CountryTag::from("FRA"),
+                    tag: "FRA".parse()?,
                     start: Eu4Date::new(1644, 1, 11).unwrap(),
                     end: Eu4Date::new(1817, 8, 31).unwrap(),
                 }
@@ -223,17 +227,17 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn test_missing_leader_activation_save() {
+fn test_missing_leader_activation_save() -> Result<(), Box<dyn Error>> {
     let data = utils::request("skan-cb25b0.eu4.zip");
     let reader = Cursor::new(&data[..]);
-    let mut zip = zip::ZipArchive::new(reader).unwrap();
-    let mut zip_file = zip.by_index(0).unwrap();
+    let mut zip = zip::ZipArchive::new(reader)?;
+    let mut zip_file = zip.by_index(0)?;
     let mut buffer = Vec::with_capacity(0);
-    zip_file.read_to_end(&mut buffer).unwrap();
+    zip_file.read_to_end(&mut buffer)?;
 
-    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer[..])).unwrap();
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer[..]))?;
     assert_eq!(encoding, Encoding::Text);
-    assert_eq!(save.meta.player, CountryTag::from("NED"));
+    assert_eq!(save.meta.player, "NED".parse()?);
 
     let none_activation: Vec<_> = save
         .game
@@ -252,6 +256,7 @@ fn test_missing_leader_activation_save() {
         .collect();
 
     assert_eq!(none_activation.len(), 8);
+    Ok(())
 }
 
 #[test]
