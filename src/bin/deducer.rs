@@ -1,16 +1,16 @@
-use eu4save::Eu4Extractor;
+use eu4save::{CountryTag, Eu4Extractor};
 use std::env;
 use std::io::Cursor;
 use std::{collections::HashSet, fmt::Display};
 
 #[derive(Debug)]
 struct Deduce<N> {
-    country: String,
+    country: CountryTag,
     index: usize,
     value: N,
 }
 
-fn deduce_vec<'a, N>(iter: impl Iterator<Item = (&'a str, &'a [N])>)
+fn deduce_vec<'a, N>(iter: impl Iterator<Item = (CountryTag, &'a [N])>)
 where
     N: 'a + PartialEq + Default + Display,
 {
@@ -27,7 +27,7 @@ where
                 ded.push(Deduce {
                     index: i,
                     value,
-                    country: tag.to_string(),
+                    country: tag,
                 });
             }
         }
@@ -55,20 +55,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         save.game
             .countries
             .iter()
-            .map(|(tag, c)| (tag.as_str(), c.ledger.income.as_slice())),
+            .map(|(&tag, c)| (tag, c.ledger.income.as_slice())),
     );
     deduce_vec(
         save.game
             .countries
             .iter()
-            .map(|(tag, c)| (tag.as_str(), c.ledger.expense.as_slice())),
+            .map(|(&tag, c)| (tag, c.ledger.expense.as_slice())),
     );
     deduce_vec(
         save.game
             .countries
             .iter()
             .filter(|(_tag, c)| c.num_of_cities > 0)
-            .map(|(tag, c)| (tag.as_str(), c.losses.members.as_slice())),
+            .map(|(&tag, c)| (tag, c.losses.members.as_slice())),
     );
 
     Ok(())

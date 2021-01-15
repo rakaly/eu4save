@@ -33,6 +33,8 @@ pub enum Eu4ErrorKind {
         part: Option<String>,
         err: jomini::Error,
     },
+    CountryTagIncorrectSize,
+    CountryTagInvalidCharacters,
 }
 
 impl fmt::Display for Eu4Error {
@@ -53,6 +55,12 @@ impl fmt::Display for Eu4Error {
                 Some(p) => write!(f, "error deserializing: {}: {}", p, err),
                 None => err.fmt(f),
             },
+            Eu4ErrorKind::CountryTagIncorrectSize => {
+                write!(f, "input is incorrect size to be a country tag")
+            }
+            Eu4ErrorKind::CountryTagInvalidCharacters => {
+                write!(f, "input contains invalid characters for a country tag")
+            }
         }
     }
 }
