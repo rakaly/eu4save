@@ -2,12 +2,11 @@
 
 use eu4save::models::{GameDifficulty, ProvinceEvent, ProvinceEventValue, TaxManpowerModifier};
 use eu4save::{
-    query::{CountryPlayed, CountryQuery, PlayerHistory, Query},
+    query::{LedgerPoint, NationEvent, NationEventKind, NationEvents, PlayerHistory, Query},
     CountryTag, Encoding, Eu4Date, Eu4Extractor, Eu4ExtractorBuilder, FailedResolveStrategy,
     ProvinceId,
 };
 use paste::paste;
-use std::collections::HashSet;
 use std::io::Cursor;
 
 mod utils;
@@ -23,41 +22,29 @@ fn test_eu4_bin() {
     assert!(save2.game.is_none());
 
     let query = Query::from_save(save);
-    assert_eq!(query.starting_country(), Some(&"RAG".parse().unwrap()));
+    let province_owners = query.province_owners();
+    let nation_events = query.nation_events(&province_owners);
+    let histories = query.player_histories(&nation_events);
     assert_eq!(
-        query
-            .player_names()
-            .iter()
-            .cloned()
-            .collect::<Vec<String>>(),
-        Vec::<String>::new()
+        query.starting_country(&histories),
+        Some("RAG".parse().unwrap())
     );
-
-    let mut players = HashSet::new();
-    players.insert("RAG".parse().unwrap());
-    players.insert("CRO".parse().unwrap());
-    assert_eq!(query.player_countries(), &players);
+    assert_eq!(query.players(), vec![]);
 
     let expected_histories = vec![PlayerHistory {
-        tag: "CRO".parse().unwrap(),
+        history: NationEvents {
+            initial: "RAG".parse().unwrap(),
+            latest: "CRO".parse().unwrap(),
+            stored: "CRO".parse().unwrap(),
+            events: vec![NationEvent {
+                date: Eu4Date::new(1769, 1, 2).unwrap(),
+                kind: NationEventKind::TagSwitch("CRO".parse().unwrap()),
+            }],
+        },
         is_human: true,
-        exists: true,
         player_names: Vec::new(),
-        played_tags: vec![
-            CountryPlayed {
-                tag: "RAG".parse().unwrap(),
-                start: Eu4Date::new(1444, 11, 11).unwrap(),
-                end: Eu4Date::new(1769, 1, 2).unwrap(),
-            },
-            CountryPlayed {
-                tag: "CRO".parse().unwrap(),
-                start: Eu4Date::new(1769, 1, 2).unwrap(),
-                end: Eu4Date::new(1769, 1, 6).unwrap(),
-            },
-        ],
     }];
-    let actual_histories = query.player_histories();
-    assert_eq!(expected_histories, actual_histories);
+    assert_eq!(expected_histories, histories);
 }
 
 #[test]
@@ -68,10 +55,9 @@ fn test_eu4_kandy_bin() {
     assert_eq!(save.meta.player, "BHA".parse().unwrap());
 
     let query = Query::from_save(save);
-    let mut players = HashSet::new();
-    players.insert("KND".parse().unwrap());
-    players.insert("BHA".parse().unwrap());
-    assert_eq!(query.player_countries(), &players);
+    let province_owners = query.province_owners();
+    let nation_events = query.nation_events(&province_owners);
+    let histories = query.player_histories(&nation_events);
 
     let player = query
         .save()
@@ -99,10 +85,17 @@ fn test_eu4_kandy_bin() {
         &"SCA".parse().unwrap()
     );
 
-    assert_eq!(query.starting_country(), Some(&"KND".parse().unwrap()));
     assert_eq!(
-        query.player_names().iter().cloned().collect::<Vec<_>>(),
-        vec![String::from("comagoosie")]
+        query.starting_country(&histories),
+        Some("KND".parse().unwrap())
+    );
+    assert_eq!(
+        query
+            .players()
+            .iter()
+            .map(|x| x.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["comagoosie"]
     );
 
     let subjects: Vec<CountryTag> = vec![
@@ -122,24 +115,6 @@ fn test_eu4_kandy_bin() {
             .subjects,
         subjects
     );
-
-    let blank: Vec<String> = Vec::new();
-    let ledgers = query.annual_ledgers(&[CountryQuery::Greats], &blank, &blank);
-
-    // When querying for great powers in the ledger and a current great power is from a reformed
-    // country (like russia or great britain), ensure that their predecessor is included.
-    let mos = ledgers
-        .income
-        .iter()
-        .find(|&x| x.name == "MOS".parse().unwrap());
-    assert!(mos.is_some());
-
-    // I had a score of zero in 1450, but the ledger doesn't report zero values
-    let knd_score = ledgers.score.iter().find(|&l| {
-        l.name == "KND".parse().unwrap()
-            && l.data.iter().find(|(x, y)| *x == 1450 && *y == 0).is_some()
-    });
-    assert!(knd_score.is_some());
 
     // Testing binary encoded saves can extract province building history perfectly fine
     let london = query
@@ -216,10 +191,20 @@ fn test_eu4_ita1() {
     assert!(all_dlc_recognized);
 
     let query = Query::from_save(save);
-    assert_eq!(query.starting_country(), Some(&"LAN".parse().unwrap()));
+    let province_owners = query.province_owners();
+    let nation_events = query.nation_events(&province_owners);
+    let histories = query.player_histories(&nation_events);
     assert_eq!(
-        query.player_names().iter().cloned().collect::<Vec<_>>(),
-        vec![String::from("comagoosie")]
+        query.starting_country(&histories),
+        Some("LAN".parse().unwrap())
+    );
+    assert_eq!(
+        query
+            .players()
+            .iter()
+            .map(|x| x.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["comagoosie"]
     );
 }
 
@@ -265,10 +250,13 @@ macro_rules! ironman_test {
                 assert_eq!(patch.as_str(), expected.patch);
 
                 let query = Query::from_save(save);
+                let province_owners = query.province_owners();
+                let nation_events = query.nation_events(&province_owners);
+                let histories = query.player_histories(&nation_events);
 
                 assert_eq!(
-                    query.starting_country().unwrap(),
-                    &expected.starting.parse::<CountryTag>().unwrap(),
+                    query.starting_country(&histories).unwrap(),
+                    expected.starting.parse::<CountryTag>().unwrap(),
                 );
 
                 ($further)(query);
@@ -317,28 +305,50 @@ ironman_test!(
 
 fn trycone_expected_histories() -> Vec<PlayerHistory> {
     vec![PlayerHistory {
-        tag: "GBR".parse().unwrap(),
+        history: NationEvents {
+            initial: "TYR".parse().unwrap(),
+            latest: "GBR".parse().unwrap(),
+            stored: "GBR".parse().unwrap(),
+            events: vec![
+                NationEvent {
+                    date: Eu4Date::new(1518, 1, 29).unwrap(),
+                    kind: NationEventKind::TagSwitch("IRE".parse().unwrap()),
+                },
+                NationEvent {
+                    date: Eu4Date::new(1606, 8, 4).unwrap(),
+                    kind: NationEventKind::TagSwitch("GBR".parse().unwrap()),
+                },
+            ],
+        },
         is_human: true,
-        exists: true,
         player_names: vec![String::from("comagoosie")],
-        played_tags: vec![
-            CountryPlayed {
-                tag: "TYR".parse().unwrap(),
-                start: Eu4Date::new(1444, 11, 11).unwrap(),
-                end: Eu4Date::new(1518, 1, 29).unwrap(),
+    }]
+}
+
+fn leinster_history() -> NationEvents {
+    NationEvents {
+        initial: "LEI".parse().unwrap(),
+        latest: "LEI".parse().unwrap(),
+        stored: "LEI".parse().unwrap(),
+        events: vec![
+            NationEvent {
+                date: Eu4Date::new(1451, 8, 2).unwrap(),
+                kind: NationEventKind::Annexed,
             },
-            CountryPlayed {
-                tag: "IRE".parse().unwrap(),
-                start: Eu4Date::new(1518, 1, 29).unwrap(),
-                end: Eu4Date::new(1606, 8, 4).unwrap(),
+            NationEvent {
+                date: Eu4Date::new(1588, 6, 15).unwrap(),
+                kind: NationEventKind::Appeared,
             },
-            CountryPlayed {
-                tag: "GBR".parse().unwrap(),
-                start: Eu4Date::new(1606, 8, 4).unwrap(),
-                end: Eu4Date::new(1725, 5, 12).unwrap(),
+            NationEvent {
+                date: Eu4Date::new(1605, 2, 15).unwrap(),
+                kind: NationEventKind::Annexed,
+            },
+            NationEvent {
+                date: Eu4Date::new(1716, 2, 9).unwrap(),
+                kind: NationEventKind::Appeared,
             },
         ],
-    }]
+    }
 }
 
 ironman_test!(
@@ -351,33 +361,250 @@ ironman_test!(
         date: Eu4Date::parse_from_str("1725.05.12").unwrap()
     },
     |query: Query| {
-        assert_eq!(query.player_histories(), trycone_expected_histories());
+        let province_owners = query.province_owners();
+        let nation_events = query.nation_events(&province_owners);
+        let lei = "LEI".parse().unwrap();
+        let lei_events = nation_events.iter().find(|x| x.initial == lei).unwrap();
+        assert_eq!(lei_events, &leinster_history());
+        let histories = query.player_histories(&nation_events);
+        assert_eq!(&histories, &trycone_expected_histories());
+        let tag_resolver = query.tag_resolver(&nation_events);
+        assert_eq!(
+            tag_resolver.resolve("IRE".parse().unwrap(), Eu4Date::new(1529, 3, 1).unwrap()),
+            "GBR".parse().unwrap()
+        );
+
+        let lei_income = query.income_statistics_ledger(&lei_events);
+        assert_eq!(
+            lei_income,
+            vec![
+                LedgerPoint {
+                    tag: lei,
+                    year: 1445,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1446,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1447,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1448,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1449,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1450,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1451,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1589,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1590,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1591,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1592,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1593,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1594,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1595,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1596,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1597,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1598,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1599,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1600,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1601,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1602,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1603,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1604,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1605,
+                    value: 1
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1717,
+                    value: 3
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1718,
+                    value: 3
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1719,
+                    value: 3
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1720,
+                    value: 3
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1721,
+                    value: 3
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1722,
+                    value: 3
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1723,
+                    value: 3
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1724,
+                    value: 3
+                },
+                LedgerPoint {
+                    tag: lei,
+                    year: 1725,
+                    value: 3
+                },
+            ]
+        );
+
+        let income = query.income_statistics_ledger(&histories[0].history);
+        assert_eq!(
+            income[0],
+            LedgerPoint {
+                tag: "TYR".parse().unwrap(),
+                year: 1445,
+                value: 1
+            }
+        );
+        assert!(income.contains(&LedgerPoint {
+            tag: "TYR".parse().unwrap(),
+            year: 1518,
+            value: 8
+        }));
+        assert!(income.contains(&LedgerPoint {
+            tag: "IRE".parse().unwrap(),
+            year: 1519,
+            value: 9
+        }));
+        assert!(income.contains(&LedgerPoint {
+            tag: "IRE".parse().unwrap(),
+            year: 1606,
+            value: 70
+        }));
+        assert!(income.contains(&LedgerPoint {
+            tag: "GBR".parse().unwrap(),
+            year: 1607,
+            value: 69
+        }));
+        assert_eq!(
+            income.last().unwrap(),
+            &LedgerPoint {
+                tag: "GBR".parse().unwrap(),
+                year: 1725,
+                value: 717
+            }
+        );
     }
 );
 
 fn true_heir_expected_histories() -> Vec<PlayerHistory> {
     vec![PlayerHistory {
-        tag: "MUG".parse().unwrap(),
+        history: NationEvents {
+            initial: "SIS".parse().unwrap(),
+            latest: "MUG".parse().unwrap(),
+            stored: "MUG".parse().unwrap(),
+            events: vec![
+                NationEvent {
+                    date: Eu4Date::new(1467, 12, 3).unwrap(),
+                    kind: NationEventKind::TagSwitch("DLH".parse().unwrap()),
+                },
+                NationEvent {
+                    date: Eu4Date::new(1467, 12, 3).unwrap(),
+                    kind: NationEventKind::TagSwitch("MUG".parse().unwrap()),
+                },
+            ],
+        },
         is_human: true,
-        exists: true,
         player_names: vec![String::from("lambdax.x")],
-        played_tags: vec![
-            CountryPlayed {
-                tag: "SIS".parse().unwrap(),
-                start: Eu4Date::new(1444, 11, 11).unwrap(),
-                end: Eu4Date::new(1467, 12, 3).unwrap(),
-            },
-            CountryPlayed {
-                tag: "DLH".parse().unwrap(),
-                start: Eu4Date::new(1467, 12, 3).unwrap(),
-                end: Eu4Date::new(1467, 12, 3).unwrap(),
-            },
-            CountryPlayed {
-                tag: "MUG".parse().unwrap(),
-                start: Eu4Date::new(1467, 12, 3).unwrap(),
-                end: Eu4Date::new(1508, 4, 27).unwrap(),
-            },
-        ],
     }]
 }
 
@@ -391,7 +618,10 @@ ironman_test!(
         date: Eu4Date::parse_from_str("1508.04.27").unwrap()
     },
     |query: Query| {
-        assert_eq!(query.player_histories(), true_heir_expected_histories());
+        let province_owners = query.province_owners();
+        let nation_events = query.nation_events(&province_owners);
+        let histories = query.player_histories(&nation_events);
+        assert_eq!(histories, true_heir_expected_histories());
     }
 );
 
@@ -417,8 +647,12 @@ ironman_test!(
     },
     |query: Query| {
         assert_eq!(
-            query.player_names().iter().cloned().collect::<Vec<_>>(),
-            vec![String::from("comagoosie")]
+            query
+                .players()
+                .iter()
+                .map(|x| x.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["comagoosie"]
         );
     }
 );
@@ -459,5 +693,165 @@ ironman_test!(
             query.save().meta.displayed_country_name.as_bytes(),
             b"\x10(\xe2\x80\x9e\x10bS\x10PO"
         );
+    }
+);
+
+fn cilli_history() -> NationEvents {
+    NationEvents {
+        initial: "CLI".parse().unwrap(),
+        latest: "CRO".parse().unwrap(),
+        stored: "CRO".parse().unwrap(),
+        events: vec![NationEvent {
+            date: Eu4Date::new(1509, 6, 6).unwrap(),
+            kind: NationEventKind::TagSwitch("CRO".parse().unwrap()),
+        }],
+    }
+}
+
+ironman_test!(
+    dont_be,
+    "dont_be.eu4",
+    IronmanQuery {
+        starting: "CLI",
+        player: "CRO",
+        patch: "1.30.1.0",
+        date: Eu4Date::parse_from_str("1509.06.10").unwrap()
+    },
+    |query: Query| {
+        let province_owners = query.province_owners();
+        let nation_events = query.nation_events(&province_owners);
+        let histories = query.player_histories(&nation_events);
+        assert_eq!(&histories[0].history, &cilli_history());
+        let cli = "CLI".parse().unwrap();
+
+        let my_score = query.score_statistics_ledger(&histories[0].history);
+        let mut expected_score = Vec::new();
+        for i in 1445..1510 {
+            expected_score.push(LedgerPoint {
+                tag: cli,
+                year: i,
+                value: 0,
+            });
+        }
+        assert_eq!(my_score, expected_score);
+
+        let my_inflation = query.inflation_statistics_ledger(&histories[0].history);
+        let mut expected_inflation = Vec::new();
+        for i in 1445..1479 {
+            expected_inflation.push(LedgerPoint {
+                tag: cli,
+                year: i,
+                value: 0,
+            });
+        }
+
+        #[rustfmt::skip]
+        expected_inflation.extend_from_slice(&[
+            LedgerPoint { tag: cli, year: 1479, value: 1 },
+            LedgerPoint { tag: cli, year: 1480, value: 1 },
+            LedgerPoint { tag: cli, year: 1481, value: 1 },
+            LedgerPoint { tag: cli, year: 1482, value: 1 },
+            LedgerPoint { tag: cli, year: 1483, value: 1 },
+            LedgerPoint { tag: cli, year: 1484, value: 1 },
+            LedgerPoint { tag: cli, year: 1485, value: 1 },
+            LedgerPoint { tag: cli, year: 1486, value: 1 },
+            LedgerPoint { tag: cli, year: 1487, value: 1 },
+            LedgerPoint { tag: cli, year: 1488, value: 1 },
+            LedgerPoint { tag: cli, year: 1489, value: 2 },
+            LedgerPoint { tag: cli, year: 1490, value: 2 },
+            LedgerPoint { tag: cli, year: 1491, value: 2 },
+            LedgerPoint { tag: cli, year: 1492, value: 2 },
+            LedgerPoint { tag: cli, year: 1493, value: 2 },
+            LedgerPoint { tag: cli, year: 1494, value: 2 },
+            LedgerPoint { tag: cli, year: 1495, value: 2 },
+            LedgerPoint { tag: cli, year: 1496, value: 2 },
+            LedgerPoint { tag: cli, year: 1497, value: 3 },
+            LedgerPoint { tag: cli, year: 1498, value: 3 },
+            LedgerPoint { tag: cli, year: 1499, value: 3 },
+            LedgerPoint { tag: cli, year: 1500, value: 3 },
+            LedgerPoint { tag: cli, year: 1501, value: 3 },
+            LedgerPoint { tag: cli, year: 1502, value: 3 },
+            LedgerPoint { tag: cli, year: 1503, value: 3 },
+            LedgerPoint { tag: cli, year: 1504, value: 3 },
+            LedgerPoint { tag: cli, year: 1505, value: 3 },
+            LedgerPoint { tag: cli, year: 1506, value: 3 },
+            LedgerPoint { tag: cli, year: 1507, value: 3 },
+            LedgerPoint { tag: cli, year: 1508, value: 3 },
+            LedgerPoint { tag: cli, year: 1509, value: 3 },
+        ]);
+        assert_eq!(my_inflation, expected_inflation);
+
+        let my_income = query.income_statistics_ledger(&histories[0].history);
+
+        #[rustfmt::skip]
+        let expected_income = vec![
+            LedgerPoint { tag: cli, year: 1445, value: 1 },
+            LedgerPoint { tag: cli, year: 1446, value: 1 },
+            LedgerPoint { tag: cli, year: 1447, value: 1 },
+            LedgerPoint { tag: cli, year: 1448, value: 1 },
+            LedgerPoint { tag: cli, year: 1449, value: 1 },
+            LedgerPoint { tag: cli, year: 1450, value: 2 },
+            LedgerPoint { tag: cli, year: 1451, value: 2 },
+            LedgerPoint { tag: cli, year: 1452, value: 3 },
+            LedgerPoint { tag: cli, year: 1453, value: 3 },
+            LedgerPoint { tag: cli, year: 1454, value: 3 },
+            LedgerPoint { tag: cli, year: 1455, value: 3 },
+            LedgerPoint { tag: cli, year: 1456, value: 5 },
+            LedgerPoint { tag: cli, year: 1457, value: 5 },
+            LedgerPoint { tag: cli, year: 1458, value: 5 },
+            LedgerPoint { tag: cli, year: 1459, value: 5 },
+            LedgerPoint { tag: cli, year: 1460, value: 4 },
+            LedgerPoint { tag: cli, year: 1461, value: 5 },
+            LedgerPoint { tag: cli, year: 1462, value: 5 },
+            LedgerPoint { tag: cli, year: 1463, value: 5 },
+            LedgerPoint { tag: cli, year: 1464, value: 5 },
+            LedgerPoint { tag: cli, year: 1465, value: 4 },
+            LedgerPoint { tag: cli, year: 1466, value: 4 },
+            LedgerPoint { tag: cli, year: 1467, value: 4 },
+            LedgerPoint { tag: cli, year: 1468, value: 4 },
+            LedgerPoint { tag: cli, year: 1469, value: 4 },
+            LedgerPoint { tag: cli, year: 1470, value: 4 },
+            LedgerPoint { tag: cli, year: 1471, value: 4 },
+            LedgerPoint { tag: cli, year: 1472, value: 4 },
+            LedgerPoint { tag: cli, year: 1473, value: 4 },
+            LedgerPoint { tag: cli, year: 1474, value: 4 },
+            LedgerPoint { tag: cli, year: 1475, value: 4 },
+            LedgerPoint { tag: cli, year: 1476, value: 4 },
+            LedgerPoint { tag: cli, year: 1477, value: 4 },
+            LedgerPoint { tag: cli, year: 1478, value: 4 },
+            LedgerPoint { tag: cli, year: 1479, value: 4 },
+            LedgerPoint { tag: cli, year: 1480, value: 5 },
+            LedgerPoint { tag: cli, year: 1481, value: 5 },
+            LedgerPoint { tag: cli, year: 1482, value: 5 },
+            LedgerPoint { tag: cli, year: 1483, value: 5 },
+            LedgerPoint { tag: cli, year: 1484, value: 5 },
+            LedgerPoint { tag: cli, year: 1485, value: 5 },
+            LedgerPoint { tag: cli, year: 1486, value: 5 },
+            LedgerPoint { tag: cli, year: 1487, value: 5 },
+            LedgerPoint { tag: cli, year: 1488, value: 5 },
+            LedgerPoint { tag: cli, year: 1489, value: 5 },
+            LedgerPoint { tag: cli, year: 1490, value: 5 },
+            LedgerPoint { tag: cli, year: 1491, value: 5 },
+            LedgerPoint { tag: cli, year: 1492, value: 5 },
+            LedgerPoint { tag: cli, year: 1493, value: 5 },
+            LedgerPoint { tag: cli, year: 1494, value: 5 },
+            LedgerPoint { tag: cli, year: 1495, value: 6 },
+            LedgerPoint { tag: cli, year: 1496, value: 6 },
+            LedgerPoint { tag: cli, year: 1497, value: 5 },
+            LedgerPoint { tag: cli, year: 1498, value: 6 },
+            LedgerPoint { tag: cli, year: 1499, value: 5 },
+            LedgerPoint { tag: cli, year: 1500, value: 5 },
+            LedgerPoint { tag: cli, year: 1501, value: 5 },
+            LedgerPoint { tag: cli, year: 1502, value: 6 },
+            LedgerPoint { tag: cli, year: 1503, value: 6 },
+            LedgerPoint { tag: cli, year: 1504, value: 6 },
+            LedgerPoint { tag: cli, year: 1505, value: 6 },
+            LedgerPoint { tag: cli, year: 1506, value: 6 },
+            LedgerPoint { tag: cli, year: 1507, value: 6 },
+            LedgerPoint { tag: cli, year: 1508, value: 6 },
+            LedgerPoint { tag: cli, year: 1509, value: 6 },
+        ];
+
+        assert_eq!(my_income, expected_income);
     }
 );

@@ -77,6 +77,7 @@ pub mod models;
 mod province_id;
 /// Ergonomic module for querying info from a save file
 pub mod query;
+mod tag_resolver;
 mod tokens;
 
 pub use country_tag::*;
@@ -87,3 +88,4 @@ pub use extraction::*;
 pub use jomini::FailedResolveStrategy;
 pub use melt::*;
 pub use province_id::*;
+pub use tag_resolver::*;

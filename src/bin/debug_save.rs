@@ -8,6 +8,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open(&args[1])?;
     let reader = BufReader::new(file);
     let (save, _encoding) = Eu4Extractor::extract_save(reader)?;
-    print!("{:#?}", save.meta.date);
+
+    let query = eu4save::query::Query::from_save(save);
+    let owners = query.province_owners();
+    let nation_events = query.nation_events(&owners);
+    let player = query.player_histories(&nation_events);
+    let ledger = query.nation_size_statistics_ledger(&player[0].history);
+    println!("{}", ledger.len());
     Ok(())
 }

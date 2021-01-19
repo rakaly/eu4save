@@ -1,6 +1,6 @@
 use eu4save::{
     models::CountryEvent,
-    query::{CountryPlayed, PlayerHistory},
+    query::{NationEvent, NationEventKind, NationEvents, PlayerHistory},
 };
 use eu4save::{
     query::{BuildingConstruction, BuildingEvent, Query},
@@ -24,16 +24,12 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     assert_eq!(save.meta.player, "ENG".parse()?);
 
     let query = Query::from_save(save);
-    assert_eq!(query.starting_country(), Some(&"ENG".parse()?));
-    assert_eq!(
-        query
-            .player_names()
-            .iter()
-            .cloned()
-            .collect::<Vec<String>>(),
-        Vec::<String>::new()
-    );
+    let province_owners = query.province_owners();
+    let nation_events = query.nation_events(&province_owners);
+    let histories = query.player_histories(&nation_events);
 
+    assert_eq!(query.starting_country(&histories), Some("ENG".parse()?));
+    assert_eq!(query.players(), vec![]);
     let london = query
         .save()
         .game
@@ -46,19 +42,18 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
         Some(&"ENG".parse()?)
     );
 
-    let histories = vec![PlayerHistory {
-        tag: "ENG".parse()?,
+    let expected_histories = vec![PlayerHistory {
+        history: NationEvents {
+            initial: "ENG".parse().unwrap(),
+            latest: "ENG".parse().unwrap(),
+            stored: "ENG".parse().unwrap(),
+            events: vec![],
+        },
         is_human: true,
-        exists: true,
         player_names: Vec::new(),
-        played_tags: vec![CountryPlayed {
-            tag: "ENG".parse()?,
-            start: Eu4Date::new(1444, 11, 11).unwrap(),
-            end: Eu4Date::new(1444, 12, 4).unwrap(),
-        }],
     }];
 
-    assert_eq!(query.player_histories(), histories);
+    assert_eq!(histories, expected_histories);
     let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&buffer))?;
     assert!(save.game.is_some());
 
@@ -143,83 +138,147 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     assert_eq!(history2.iter().find(|x| x.building == "hre"), None);
     assert_eq!(history2.iter().find(|x| x.building == "is_city"), None);
 
-    let histories: HashMap<_, _> = query
-        .player_histories()
+    let province_owners = query.province_owners();
+    let nation_events = query.nation_events(&province_owners);
+
+    let byz = nation_events
         .iter()
-        .map(|p| (p.tag.clone(), p))
+        .find(|x| x.initial.as_str() == "BYZ")
+        .unwrap();
+    assert_eq!(
+        byz,
+        &NationEvents {
+            initial: "BYZ".parse().unwrap(),
+            latest: "BYZ".parse().unwrap(),
+            stored: "NPL".parse().unwrap(),
+            events: vec![NationEvent {
+                date: Eu4Date::new(1540, 9, 15).unwrap(),
+                kind: NationEventKind::Annexed
+            }],
+        }
+    );
+
+    let hsn = nation_events
+        .iter()
+        .find(|x| x.initial.as_str() == "HSN")
+        .unwrap();
+    assert_eq!(
+        hsn,
+        &NationEvents {
+            initial: "HSN".parse().unwrap(),
+            latest: "BYZ".parse().unwrap(),
+            stored: "BYZ".parse().unwrap(),
+            events: vec![
+                NationEvent {
+                    date: Eu4Date::new(1701, 7, 11).unwrap(),
+                    kind: NationEventKind::TagSwitch("NPL".parse().unwrap()),
+                },
+                NationEvent {
+                    date: Eu4Date::new(1706, 10, 20).unwrap(),
+                    kind: NationEventKind::TagSwitch("BYZ".parse().unwrap()),
+                }
+            ],
+        }
+    );
+
+    let qom = nation_events
+        .iter()
+        .find(|x| x.initial.as_str() == "QOM")
+        .unwrap();
+    assert_eq!(
+        qom,
+        &NationEvents {
+            initial: "QOM".parse().unwrap(),
+            latest: "PER".parse().unwrap(),
+            stored: "PER".parse().unwrap(),
+            events: vec![
+                NationEvent {
+                    date: Eu4Date::new(1480, 1, 20).unwrap(),
+                    kind: NationEventKind::TagSwitch("PER".parse().unwrap()),
+                },
+                NationEvent {
+                    date: Eu4Date::new(1577, 4, 20).unwrap(),
+                    kind: NationEventKind::Annexed,
+                }
+            ],
+        }
+    );
+
+    let npl = nation_events.iter().find(|x| x.initial.as_str() == "NPL");
+    assert_eq!(None, npl);
+
+    let player_histories = query.player_histories(&nation_events);
+    let histories: HashMap<_, _> = player_histories
+        .iter()
+        .map(|p| (p.history.latest, p))
         .collect();
+
+    assert_eq!(histories.get(&"NPL".parse()?), None);
 
     assert_eq!(
         histories.get(&"SAX".parse()?).unwrap(),
         &&PlayerHistory {
-            tag: "SAX".parse()?,
+            history: NationEvents {
+                initial: "SAX".parse().unwrap(),
+                latest: "SAX".parse().unwrap(),
+                stored: "SAX".parse().unwrap(),
+                events: vec![NationEvent {
+                    date: Eu4Date::new(1653, 11, 25).unwrap(),
+                    kind: NationEventKind::Annexed,
+                }],
+            },
             is_human: false,
-            exists: false,
             player_names: vec![String::from("Hose")],
-            played_tags: vec![CountryPlayed {
-                tag: "SAX".parse()?,
-                start: Eu4Date::new(1444, 11, 11).unwrap(),
-                end: Eu4Date::new(1653, 11, 25).unwrap(),
-            },],
         }
     );
 
     assert_eq!(
         histories.get(&"GER".parse()?).unwrap(),
         &&PlayerHistory {
-            tag: "GER".parse()?,
+            history: NationEvents {
+                initial: "HSA".parse().unwrap(),
+                latest: "GER".parse().unwrap(),
+                stored: "GER".parse().unwrap(),
+                events: vec![
+                    NationEvent {
+                        date: Eu4Date::new(1598, 11, 8).unwrap(),
+                        kind: NationEventKind::TagSwitch("WES".parse().unwrap()),
+                    },
+                    NationEvent {
+                        date: Eu4Date::new(1603, 11, 29).unwrap(),
+                        kind: NationEventKind::TagSwitch("HAN".parse().unwrap()),
+                    },
+                    NationEvent {
+                        date: Eu4Date::new(1737, 7, 20).unwrap(),
+                        kind: NationEventKind::TagSwitch("GER".parse().unwrap()),
+                    }
+                ],
+            },
             is_human: true,
-            exists: true,
             player_names: vec![String::from("Doge of Venice (Taran)")],
-            played_tags: vec![
-                CountryPlayed {
-                    tag: "HSA".parse()?,
-                    start: Eu4Date::new(1444, 11, 11).unwrap(),
-                    end: Eu4Date::new(1598, 11, 8).unwrap(),
-                },
-                CountryPlayed {
-                    tag: "WES".parse()?,
-                    start: Eu4Date::new(1598, 11, 8).unwrap(),
-                    end: Eu4Date::new(1603, 11, 29).unwrap(),
-                },
-                CountryPlayed {
-                    tag: "HAN".parse()?,
-                    start: Eu4Date::new(1603, 11, 29).unwrap(),
-                    end: Eu4Date::new(1737, 7, 20).unwrap(),
-                },
-                CountryPlayed {
-                    tag: "GER".parse()?,
-                    start: Eu4Date::new(1737, 7, 20).unwrap(),
-                    end: Eu4Date::new(1817, 8, 31).unwrap(),
-                },
-            ],
         }
     );
 
     assert_eq!(
         histories.get(&"FRA".parse()?).unwrap(),
         &&PlayerHistory {
-            tag: "FRA".parse()?,
+            history: NationEvents {
+                initial: "SCO".parse().unwrap(),
+                latest: "FRA".parse().unwrap(),
+                stored: "FRA".parse().unwrap(),
+                events: vec![
+                    NationEvent {
+                        date: Eu4Date::new(1533, 1, 25).unwrap(),
+                        kind: NationEventKind::TagSwitch("IRE".parse().unwrap()),
+                    },
+                    NationEvent {
+                        date: Eu4Date::new(1644, 1, 11).unwrap(),
+                        kind: NationEventKind::TagSwitch("FRA".parse().unwrap()),
+                    }
+                ]
+            },
             is_human: true,
-            exists: true,
             player_names: vec![String::from("TheOnlySimen"), String::from("Strawman")],
-            played_tags: vec![
-                CountryPlayed {
-                    tag: "SCO".parse()?,
-                    start: Eu4Date::new(1444, 11, 11).unwrap(),
-                    end: Eu4Date::new(1533, 1, 25).unwrap(),
-                },
-                CountryPlayed {
-                    tag: "IRE".parse()?,
-                    start: Eu4Date::new(1533, 1, 25).unwrap(),
-                    end: Eu4Date::new(1644, 1, 11).unwrap(),
-                },
-                CountryPlayed {
-                    tag: "FRA".parse()?,
-                    start: Eu4Date::new(1644, 1, 11).unwrap(),
-                    end: Eu4Date::new(1817, 8, 31).unwrap(),
-                }
-            ]
         }
     );
 
