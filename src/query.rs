@@ -1,21 +1,14 @@
-use crate::models::{
-    Country, CountryEvent, Eu4Save, LedgerData, LedgerDatum, Province, ProvinceEvent,
-    ProvinceEventValue,
+use crate::{
+    models::{
+        Country, CountryEvent, Eu4Save, LedgerData, LedgerDatum, Province, ProvinceEvent,
+        ProvinceEventValue, WarEvent,
+    },
+    ProvinceId, TagResolver,
 };
 use crate::{CountryTag, Eu4Date};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-
-#[derive(Debug, Clone, Copy)]
-pub enum CountryQuery {
-    Players,
-    Greats,
-    //    PastGreat
-    //    GreatPowersAndPlayers,
-    //    AllGreatPowersAndPlayers,
-    //    All,
-}
 
 #[derive(Debug)]
 pub struct AnnualLedgers {
@@ -154,37 +147,98 @@ pub struct BuildingEvent<'a> {
     pub action: BuildingConstruction,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct CountryPlayed {
-    pub tag: CountryTag,
-    pub start: Eu4Date,
-    pub end: Eu4Date,
-}
-
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct PlayerHistory {
-    pub tag: CountryTag,
+    pub history: NationEvents,
 
     /// Whether the player is currently in the session
     pub is_human: bool,
 
     /// Names of the players (may be empty)
     pub player_names: Vec<String>,
+}
 
-    /// Whether the country owns any provinces
-    pub exists: bool,
+pub struct ProvinceOwners {
+    /// Initial owners of provinces, index using province id
+    pub initial: Vec<Option<CountryTag>>,
 
-    /// A history of tag switches for said country
-    pub played_tags: Vec<CountryPlayed>,
+    /// Sorted by date and then province id    
+    pub changes: Vec<ProvinceOwnerChange>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct ProvinceOwnerChange {
+    pub province: ProvinceId,
+    pub tag: CountryTag,
+    pub date: Eu4Date,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct Player {
+    pub name: String,
+    pub tag: CountryTag,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct NationEvents {
+    /// The initial starting tag for a country. In a TYR -> IRE -> GBR run,
+    /// this would be TYR
+    pub initial: CountryTag,
+
+    /// The latest tag that a country achieved. If DMS -> IRE but then
+    // IRE is annexed by SCO which culture shifts to form IRE then both
+    // initial tags of SCO and DMS will report a latest tag of IRE
+    pub latest: CountryTag,
+
+    /// The tag which the history of this country is stored under. For
+    /// instance if ULM forms byzantium then the initial byzantium operator's
+    /// history is stored under ULM
+    pub stored: CountryTag,
+
+    /// An ordered (by date) recounting of how the initial tag became the
+    /// the latest tag. May be empty for nations that did not tag switch,
+    /// get annexed, etc.
+    pub events: Vec<NationEvent>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct NationEvent {
+    pub date: Eu4Date,
+    pub kind: NationEventKind,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub enum NationEventKind {
+    TagSwitch(CountryTag),
+    Appeared,
+    Annexed,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct LedgerPoint {
+    pub tag: CountryTag,
+    pub year: u16,
+    pub value: i32,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct ResolvedWarParticipant {
+    /// The tag as it appears in the war history
+    pub tag: CountryTag,
+
+    /// The actual location of the tag in country history
+    pub stored: CountryTag,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize)]
+pub struct ResolvedWarParticipants {
+    pub war: String,
+    pub participants: Vec<ResolvedWarParticipant>,
 }
 
 #[derive(Debug)]
 pub struct Query {
     save: Eu4Save,
-    players: OnceCell<HashSet<String>>,
-    player_histories: OnceCell<Vec<PlayerHistory>>,
-    player_countries: OnceCell<HashSet<CountryTag>>,
-    starting_country: OnceCell<Option<CountryTag>>,
     buildings: OnceCell<HashSet<String>>,
 }
 
@@ -192,10 +246,6 @@ impl Query {
     pub fn from_save(save: Eu4Save) -> Self {
         Query {
             save,
-            players: OnceCell::default(),
-            player_histories: OnceCell::default(),
-            player_countries: OnceCell::default(),
-            starting_country: OnceCell::default(),
             buildings: OnceCell::default(),
         }
     }
@@ -206,14 +256,12 @@ impl Query {
 
     /// Returns a set of the names of the players who participated in a playthrough.
     /// May be blank for single player run through where the player is detected as
-    /// "Player".
-    pub fn player_names(&self) -> &HashSet<String> {
-        self.players.get_or_init(|| {
-            self.player_histories()
-                .iter()
-                .flat_map(|x| x.player_names.clone().into_iter())
-                .collect()
-        })
+    /// "Player". No guarantees are given as to the state of each player's country.
+    /// Annexed countries may still show the original player. It is undefined what
+    /// happens to players when a formable nation is annexed and then reformed by
+    /// another player.
+    pub fn players(&self) -> Vec<Player> {
+        players(&self.save)
     }
 
     /// Provides a rich structure that contains the following:
@@ -223,32 +271,154 @@ impl Query {
     /// - Whether that player is currently in the session
     /// - The names of the players in the session
     /// - A list of all prior tags that country had been
-    pub fn player_histories(&self) -> &[PlayerHistory] {
-        self.player_histories
-            .get_or_init(|| calc_histories(&self.save))
+    pub fn player_histories(&self, nation_events: &[NationEvents]) -> Vec<PlayerHistory> {
+        calc_histories(&self.save, nation_events)
     }
 
-    /// Returns all the tags that players touched in a playthrough. Don't rely on this
-    /// for accurate calculations as countries form new countries that may have
-    /// pre-existed (think of a cilli into croatia run) and relying on this would
-    /// meddle up any calculations. Use `player_histories` instead.
-    pub fn player_countries(&self) -> &HashSet<CountryTag> {
-        self.player_countries.get_or_init(|| {
-            self.player_histories()
-                .iter()
-                .filter(|x| x.is_human)
-                .flat_map(|x| x.played_tags.iter().map(|x| x.tag))
-                .collect()
-        })
+    /// Calculates the major events that befell countries (annexations, appearances, and tag switches)
+    pub fn nation_events(&self, province_owners: &ProvinceOwners) -> Vec<NationEvents> {
+        nation_events(&self.save, province_owners)
+    }
+
+    /// Aggregate when lands changed hands
+    pub fn province_owners(&self) -> ProvinceOwners {
+        province_owners(&self.save)
     }
 
     /// Return the starting country in single player playthroughs. If playing in multiplayer or if
     /// the starting country can't be determined then none is returned.
-    pub fn starting_country(&self) -> Option<&CountryTag> {
-        match self.player_histories() {
-            [player] => player.played_tags.get(0).map(|x| &x.tag),
+    pub fn starting_country(&self, histories: &[PlayerHistory]) -> Option<CountryTag> {
+        match histories {
+            [player] => Some(player.history.initial),
             _ => None,
         }
+    }
+
+    pub fn tag_resolver(&self, nation_events: &[NationEvents]) -> TagResolver {
+        TagResolver::create(nation_events)
+    }
+
+    pub fn resolved_war_participants(
+        &self,
+        tag_resolver: &TagResolver,
+    ) -> Vec<ResolvedWarParticipants> {
+        war_participants(&self.save, tag_resolver)
+    }
+
+    pub fn income_statistics_ledger(&self, nation: &NationEvents) -> Vec<LedgerPoint> {
+        self.nation_ledger(nation, &self.save.game.income_statistics, |x| x / 12)
+    }
+
+    pub fn inflation_statistics_ledger(&self, nation: &NationEvents) -> Vec<LedgerPoint> {
+        self.nation_ledger(nation, &self.save.game.inflation_statistics, |x| x)
+    }
+
+    pub fn score_statistics_ledger(&self, nation: &NationEvents) -> Vec<LedgerPoint> {
+        self.nation_ledger(nation, &self.save.game.score_statistics, |x| x)
+    }
+
+    pub fn nation_size_statistics_ledger(&self, nation: &NationEvents) -> Vec<LedgerPoint> {
+        self.nation_ledger(nation, &self.save.game.nation_size_statistics, |x| x)
+    }
+
+    fn nation_ledger<F: Fn(i32) -> i32>(
+        &self,
+        nation: &NationEvents,
+        ledger: &LedgerData,
+        f: F,
+    ) -> Vec<LedgerPoint> {
+        let time_range = self.save.game.start_date.days_until(&self.save.meta.date) / 365 + 1;
+        let mut result = Vec::with_capacity(time_range as usize);
+
+        #[derive(Debug)]
+        struct NationChain {
+            tag: CountryTag,
+            start: Eu4Date,
+            end: Eu4Date,
+        }
+
+        let mut chains: Vec<NationChain> = Vec::new();
+        let mut current_tag = nation.initial;
+        let mut start = self.save.game.start_date;
+        let mut annexed = false;
+        for event in &nation.events {
+            match event.kind {
+                NationEventKind::Annexed => {
+                    chains.push(NationChain {
+                        tag: current_tag,
+                        start,
+                        end: event.date,
+                    });
+                    annexed = true;
+                }
+                NationEventKind::Appeared => {
+                    start = event.date;
+                    annexed = false;
+                }
+                NationEventKind::TagSwitch(c) => {
+                    chains.push(NationChain {
+                        tag: current_tag,
+                        start,
+                        end: event.date,
+                    });
+                    annexed = false;
+                    start = event.date;
+                    current_tag = c;
+                }
+            }
+        }
+
+        if !annexed {
+            chains.push(NationChain {
+                tag: current_tag,
+                start,
+                end: self.save.meta.date,
+            })
+        }
+
+        let ledger_chain = chains.iter().filter_map(|chain| {
+            ledger
+                .ledger
+                .iter()
+                .find(|datum| datum.name == chain.tag)
+                .map(|ledger| (chain, ledger))
+        });
+
+        for (chain, ledger) in ledger_chain {
+            let data = ledger
+                .data
+                .iter()
+                .skip_while(|(year, _)| (*year as i16) < chain.start.year())
+                .take_while(|(year, _)| (*year as i16) <= chain.end.year());
+
+            let mut current = (chain.start.year() + 1) as u16;
+            for &(x, y) in data {
+                for year in current..x {
+                    result.push(LedgerPoint {
+                        tag: chain.tag,
+                        year,
+                        value: 0,
+                    });
+                }
+
+                result.push(LedgerPoint {
+                    tag: chain.tag,
+                    year: x,
+                    value: f(y),
+                });
+                current = x + 1;
+            }
+
+            for year in current..(chain.end.year() as u16) + 1 {
+                result.push(LedgerPoint {
+                    tag: chain.tag,
+                    year,
+                    value: 0,
+                });
+            }
+        }
+
+        result
     }
 
     pub fn country_tag_hex_color(&self, country_tag: &CountryTag) -> Option<String> {
@@ -263,192 +433,6 @@ impl Query {
         let colors = &country.colors.country_color;
         format!("#{:02x}{:02x}{:02x}", colors[0], colors[1], colors[2])
     }
-
-    fn add_previous_countries(
-        &self,
-        tag: CountryTag,
-        country: &Country,
-        mut set: &mut HashSet<CountryTag>,
-    ) {
-        set.insert(tag);
-        for &prev_tag in &country.previous_country_tags {
-            if set.contains(&prev_tag) {
-                continue;
-            }
-
-            if let Some(prev_country) = self.save.game.countries.get(&prev_tag) {
-                self.add_previous_countries(prev_tag, prev_country, &mut set);
-            }
-        }
-    }
-
-    pub fn filter_countries<P: AsRef<str>>(
-        &self,
-        query: &[CountryQuery],
-        includes: &[P],
-        excludes: &[P],
-    ) -> HashSet<CountryTag> {
-        let mut filter_set = HashSet::new();
-        let player_countries = self.player_countries();
-        for q in query {
-            match q {
-                CountryQuery::Players => {
-                    filter_set = filter_set.union(player_countries).cloned().collect();
-                }
-                CountryQuery::Greats => {
-                    for (&tag, country) in &self.save.game.countries {
-                        if country.is_great_power {
-                            self.add_previous_countries(tag, &country, &mut filter_set);
-                        }
-                    }
-                }
-            }
-        }
-
-        for include in includes
-            .iter()
-            .map(|x| x.as_ref().parse::<CountryTag>())
-            .filter_map(Result::ok)
-        {
-            filter_set.insert(include);
-        }
-
-        for exclude in excludes
-            .iter()
-            .map(|x| x.as_ref().parse::<CountryTag>())
-            .filter_map(Result::ok)
-        {
-            filter_set.remove(&exclude);
-        }
-
-        filter_set
-    }
-
-    fn ledger_statistics<'a>(
-        &self,
-        filter_set: &HashSet<CountryTag>,
-        data: &'a LedgerData,
-    ) -> Vec<&'a LedgerDatum> {
-        data.ledger
-            .iter()
-            .filter(|x| filter_set.contains(&x.name))
-            .collect()
-    }
-
-    pub fn annual_ledgers<P: AsRef<str>>(
-        &self,
-        query: &[CountryQuery],
-        includes: &[P],
-        excludes: &[P],
-    ) -> AnnualLedgers {
-        let filter_set = self.filter_countries(&query, includes, excludes);
-        let size = self.ledger_statistics(&filter_set, &self.save.game.nation_size_statistics);
-        let score = self.ledger_statistics(&filter_set, &self.save.game.score_statistics);
-        let inflation = self.ledger_statistics(&filter_set, &self.save.game.inflation_statistics);
-        let income = self.ledger_statistics(&filter_set, &self.save.game.income_statistics);
-
-        // Figure out the timeline of countries as the game doesn't write out ledger statistics for
-        // those that report zero inflation, score, etc.
-        let income_years: HashMap<CountryTag, HashSet<u16>> = income
-            .iter()
-            .map(|ledg| (ledg.name, ledg.data.iter().map(|(x, _)| *x).collect()))
-            .collect();
-
-        let mut adjusted_scores: Vec<LedgerDatum> = score.into_iter().cloned().collect();
-        for entry in &mut adjusted_scores {
-            if let Some(years) = income_years.get(&entry.name) {
-                let score_years: HashSet<u16> = entry.data.iter().map(|(x, _)| *x).collect();
-                let diff = years - &score_years;
-                entry.data.extend(diff.iter().map(|x| (*x, 0)));
-            }
-        }
-
-        let mut adjusted_inflation: Vec<LedgerDatum> = inflation.into_iter().cloned().collect();
-        for entry in &mut adjusted_inflation {
-            if let Some(years) = income_years.get(&entry.name) {
-                let inflation_years: HashSet<u16> = entry.data.iter().map(|(x, _)| *x).collect();
-                let diff = years - &inflation_years;
-                entry.data.extend(diff.iter().map(|x| (*x, 0)));
-            }
-        }
-
-        AnnualLedgers {
-            size: size.into_iter().cloned().collect(),
-            income: income.into_iter().cloned().collect(),
-            inflation: adjusted_inflation,
-            score: adjusted_scores,
-        }
-    }
-
-    /*        match query {
-        CountryQuery::Players => self
-            .save
-            .game
-            .income_statistics
-            .ledger
-            .iter()
-            .filter(|x| self.player_countries.contains(x.name.as_str()))
-            .collect(),
-        CountryQuery::All => self.save.game.income_statistics.ledger.iter().collect(),
-        CountryQuery::GreatPowersAndPlayers => {
-            let great_tags: HashSet<_> = self
-                .save
-                .game
-                .countries
-                .iter()
-                .filter_map(|(tag, country)| {
-                    if country.is_great_power {
-                        Some(tag.as_str())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            self.save
-                .game
-                .income_statistics
-                .ledger
-                .iter()
-                .filter(|x| {
-                    self.player_countries.contains(x.name.as_str())
-                        || great_tags.contains(x.name.as_str())
-                })
-                .collect()
-        }
-        CountryQuery::AllGreatPowersAndPlayers => {
-            let great_tags: HashSet<_> = self
-                .save
-                .game
-                .countries
-                .iter()
-                .filter_map(|(tag, country)| {
-                    if country.is_great_power
-                        || country
-                            .flags
-                            .iter()
-                            .find(|&(flag, _)| flag == "became_great_power_flag")
-                            .is_some()
-                    {
-                        Some(tag.as_str())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            self.save
-                .game
-                .income_statistics
-                .ledger
-                .iter()
-                .filter(|x| {
-                    self.player_countries.contains(x.name.as_str())
-                        || great_tags.contains(x.name.as_str())
-                })
-                .collect()
-        }
-    }*/
 
     pub fn country_income_breakdown(&self, country: &Country) -> CountryIncomeLedger {
         let ledger = &country.ledger.lastmonthincometable;
@@ -693,107 +677,292 @@ fn find_index(index: i32, data: &[(i32, i32)]) -> i32 {
         .unwrap_or(0)
 }
 
-fn calc_histories(save: &Eu4Save) -> Vec<PlayerHistory> {
-    let mut result = Vec::with_capacity(save.game.players_countries.len());
+fn nation_events(save: &Eu4Save, province_owners: &ProvinceOwners) -> Vec<NationEvents> {
+    struct CountryTagSwitchFrom {
+        date: Eu4Date,
+        from: CountryTag,
+    }
 
-    let mut latest_ownership = HashMap::with_capacity(save.game.countries.len());
-    for prov in save.game.provinces.values() {
-        let mut old_owner = None;
-        if let Some(initial) = prov.history.owner.as_ref() {
-            latest_ownership
-                .entry(initial)
-                .and_modify(|d| *d = std::cmp::max(*d, save.game.start_date))
-                .or_insert(save.game.start_date);
-            old_owner = Some(initial);
+    #[derive(Debug, PartialEq, Clone, Serialize)]
+    struct CountryTagSwitch {
+        date: Eu4Date,
+        from: CountryTag,
+        to: CountryTag,
+        stored: CountryTag,
+    }
+
+    let mut nation_events = HashMap::with_capacity(save.game.countries.len());
+    let mut all_switches = Vec::with_capacity(save.game.countries.len());
+    let mut initial_to_stored = HashMap::with_capacity(save.game.countries.len());
+    for (&tag, country) in &save.game.countries {
+        let mut country_tag_switches = Vec::new();
+
+        for (date, events) in &country.history.events {
+            for event in &events.0 {
+                if let CountryEvent::ChangedTagFrom(from) = *event {
+                    country_tag_switches.push(CountryTagSwitchFrom { date: *date, from });
+                }
+            }
         }
 
-        for (date, events) in &prov.history.events {
+        let initial_tag = country_tag_switches
+            .first()
+            .map(|x| x.from)
+            .or_else(|| country.previous_country_tags.first().cloned())
+            .unwrap_or(tag);
+
+        let latest = country
+            .previous_country_tags
+            .get(country_tag_switches.len())
+            .cloned()
+            .unwrap_or(tag);
+
+        let tos = country_tag_switches
+            .iter()
+            .map(|x| x.from)
+            .skip(1)
+            .chain(std::iter::once(latest));
+
+        let switches = country_tag_switches
+            .iter()
+            .zip(tos)
+            .map(|(from, to)| CountryTagSwitch {
+                date: from.date,
+                stored: tag,
+                from: from.from,
+                to,
+            })
+            .collect::<Vec<_>>();
+
+        all_switches.extend(switches.clone());
+
+        if !switches.is_empty() || tag != latest || latest != initial_tag {
+            let sws = nation_events.entry(tag).or_insert_with(Vec::new);
+            let a = switches.iter().map(|x| NationEvent {
+                date: x.date,
+                kind: NationEventKind::TagSwitch(x.to),
+            });
+            sws.extend(a);
+        }
+
+        initial_to_stored.insert(initial_tag, tag);
+    }
+
+    let mut counts: HashMap<CountryTag, i32> = HashMap::with_capacity(save.game.countries.len());
+    let mut owners: Vec<Option<CountryTag>> = vec![None; save.game.provinces.len() + 1];
+    let initial_owners = province_owners
+        .initial
+        .iter()
+        .enumerate()
+        .filter_map(|(i, x)| x.map(|y| (i, y)));
+
+    for (id, tag) in initial_owners {
+        if let Some(&stored) = initial_to_stored.get(&tag) {
+            owners[id] = Some(stored);
+            *counts.entry(stored).or_insert(0) += 1;
+        } else {
+            debug_assert!(false)
+        }
+    }
+
+    let mut tag_dater: HashMap<_, Vec<_>> = HashMap::new();
+    for x in all_switches {
+        tag_dater.entry(x.from).or_insert_with(Vec::new).push(x);
+    }
+    for x in tag_dater.values_mut() {
+        x.sort_by_key(|x| x.date);
+    }
+
+    for change in &province_owners.changes {
+        let store = tag_dater
+            .get(&change.tag)
+            .and_then(|x| x.iter().find(|x| x.date >= change.date))
+            .map(|x| x.stored)
+            .unwrap_or(change.tag);
+
+        let prov_id = usize::from(change.province.as_u16());
+        if let Some(old) = owners[prov_id].replace(store) {
+            if let Some(count) = counts.get_mut(&old) {
+                // There is a mod where the count dips below 0. I haven't seen it
+                // dip below zero for a vanilla save, but we don't want to underflow
+                // on any input so we bottom it out at zero.
+                *count = std::cmp::max(0, *count - 1);
+                if *count == 0 {
+                    nation_events
+                        .entry(old)
+                        .or_insert_with(Vec::new)
+                        .push(NationEvent {
+                            date: change.date,
+                            kind: NationEventKind::Annexed,
+                        })
+                }
+            } else {
+                debug_assert!(false, "tag of {} is not counted for", old);
+            }
+        }
+
+        let new_count = counts.entry(store).or_insert(0);
+        if *new_count == 0 && change.date > save.game.start_date {
+            nation_events
+                .entry(store)
+                .or_insert_with(Vec::new)
+                .push(NationEvent {
+                    date: change.date,
+                    kind: NationEventKind::Appeared,
+                })
+        }
+        *new_count += 1;
+    }
+
+    for events in nation_events.values_mut() {
+        events.sort_by_key(|x| x.date);
+    }
+
+    let mut result = Vec::with_capacity(save.game.countries.len());
+    for (initial, stored) in initial_to_stored {
+        let events = nation_events.remove(&stored).unwrap_or_else(Vec::new);
+        let latest = events
+            .iter()
+            .filter_map(|x| match x.kind {
+                NationEventKind::TagSwitch(t) => Some(t),
+                _ => None,
+            })
+            .last()
+            .unwrap_or(initial);
+
+        // If a stored tag never owned a province in the entire playthrough, exclude it
+        if counts.contains_key(&stored) {
+            result.push(NationEvents {
+                initial,
+                latest,
+                stored,
+                events,
+            });
+        }
+    }
+
+    result
+}
+
+fn war_participants(save: &Eu4Save, tag_resolver: &TagResolver) -> Vec<ResolvedWarParticipants> {
+    let active = save.game.active_wars.iter().map(|x| (&x.name, &x.history));
+    let previous = save
+        .game
+        .previous_wars
+        .iter()
+        .map(|x| (&x.name, &x.history));
+    let wars = active.chain(previous);
+
+    let mut war_participants =
+        Vec::with_capacity(save.game.active_wars.len() + save.game.previous_wars.len());
+    for (name, war) in wars {
+        let mut tags = Vec::new();
+        for (date, events) in &war.events {
             for event in &events.0 {
-                if let ProvinceEvent::Owner(new_owner) = event {
-                    if let Some(old) = old_owner.replace(new_owner) {
-                        latest_ownership
-                            .entry(old)
-                            .and_modify(|d| *d = std::cmp::max(*d, *date))
-                            .or_insert(*date);
+                match event {
+                    WarEvent::AddAttacker(x) | WarEvent::AddDefender(x) => {
+                        let stored_tag = tag_resolver.resolve(*x, *date);
+                        tags.push(ResolvedWarParticipant {
+                            tag: *x,
+                            stored: stored_tag,
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        war_participants.push(ResolvedWarParticipants {
+            war: name.clone(),
+            participants: tags,
+        })
+    }
+
+    war_participants
+}
+
+fn province_owners(save: &Eu4Save) -> ProvinceOwners {
+    let mut initial = vec![None; save.game.provinces.len() + 1];
+    let mut owners = vec![None; save.game.provinces.len() + 1];
+    let mut changes = Vec::with_capacity(save.game.provinces.len() * 2);
+    for (&id, province) in &save.game.provinces {
+        initial[usize::from(id.as_u16())] = province.history.owner;
+        owners[usize::from(id.as_u16())] = province.history.owner;
+
+        for (date, events) in &province.history.events {
+            for event in &events.0 {
+                if let ProvinceEvent::Owner(new_owner) = *event {
+                    // Check to make sure the province really changed hands. Exclude
+                    // change owner events if the owner didn't change hands.
+                    // In the trycone save, Leinster is listed as the new owner of
+                    // Laighin in 1444.11.12 even though they already owned it
+                    let prov_id = usize::from(id.as_u16());
+                    let old_owner = owners[prov_id].replace(new_owner);
+                    if old_owner.map_or(true, |x| new_owner != x) {
+                        changes.push(ProvinceOwnerChange {
+                            date: *date,
+                            province: id,
+                            tag: new_owner,
+                        });
                     }
                 }
             }
         }
     }
 
+    changes.sort_unstable_by_key(|x| (x.date, x.province));
+
+    ProvinceOwners { initial, changes }
+}
+
+fn calc_histories(save: &Eu4Save, nation_events: &[NationEvents]) -> Vec<PlayerHistory> {
+    let mut result = Vec::with_capacity(save.game.players_countries.len());
+    let players = players(save);
     for (&tag, country) in save.game.countries.iter().filter(|(_, c)| c.was_player) {
-        let exists = country.num_of_cities != 0;
-        let end_date = if exists {
-            &save.meta.date
-        } else {
-            latest_ownership.get(&tag).unwrap_or(&save.meta.date)
-        };
+        let tag_players: Vec<_> = players
+            .iter()
+            .filter(|x| x.tag == tag)
+            .map(|x| x.name.clone())
+            .collect();
+        let history = nation_events
+            .iter()
+            .find(|x| x.stored == tag)
+            .cloned()
+            .unwrap_or_else(|| NationEvents {
+                initial: tag,
+                latest: tag,
+                stored: tag,
+                events: Vec::new(),
+            });
 
-        let mut players = Vec::new();
-        for entry in save.game.players_countries.chunks_exact(2) {
-            let player_name = &entry[0];
-            if player_name == "Player" && !save.meta.multiplayer {
-                continue;
-            }
-
-            let country_tag = match entry[1].parse::<CountryTag>() {
-                Ok(x) => x,
-                _ => continue,
-            };
-
-            if country_tag == tag {
-                players.push(player_name.clone())
-            }
-        }
-
-        let played_tags = trace_country(save, tag, country, *end_date);
         result.push(PlayerHistory {
-            tag,
+            history,
             is_human: country.human,
-            player_names: players,
-            exists,
-            played_tags,
-        });
+            player_names: tag_players,
+        })
     }
 
     result
 }
 
-fn trace_country(
-    save: &Eu4Save,
-    tag: CountryTag,
-    country: &Country,
-    end: Eu4Date,
-) -> Vec<CountryPlayed> {
-    let mut played = Vec::new();
-    let history = country
-        .history
-        .events
-        .iter()
-        .rev()
-        .skip_while(|(d, _)| d > &end);
-    let mut current_tag = tag;
-    let mut current_date = end;
-    for (date, events) in history {
-        for event in events.0.iter().rev() {
-            if let CountryEvent::ChangedTagFrom(prev) = event {
-                played.push(CountryPlayed {
-                    tag: current_tag,
-                    start: *date,
-                    end: current_date,
-                });
-                current_date = *date;
-                current_tag = *prev;
-            }
+fn players(save: &Eu4Save) -> Vec<Player> {
+    let mut players = Vec::new();
+    for entry in save.game.players_countries.chunks_exact(2) {
+        let player_name = &entry[0];
+        if player_name == "Player" && !save.meta.multiplayer {
+            continue;
         }
+
+        let country_tag = match entry[1].parse::<CountryTag>() {
+            Ok(x) => x,
+            _ => continue,
+        };
+
+        players.push(Player {
+            name: player_name.clone(),
+            tag: country_tag,
+        })
     }
 
-    played.push(CountryPlayed {
-        tag: current_tag,
-        start: save.game.start_date,
-        end: current_date,
-    });
-
-    played.reverse();
-    played
+    players
 }
