@@ -1,3 +1,14 @@
+## v0.4.0 - 2021-01-25
+
+Expect significant breaking changes to query API. Additionally,
+
+- Expose country ideas
+- Expose war info
+- Expose additional monarch, heir and queen fields
+- Rework `CountryTag` to require a parsing step before creation
+- Correctly deserialize and melt seeds
+- Return unknown tokens when melting
+
 ## v0.3.3 - 2020-11-09
 
 - `ProvinceId` implements `Ord` and `PartialOrd`
