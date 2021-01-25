@@ -53,6 +53,15 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
         player_names: Vec::new(),
     }];
 
+    let reb_decision = query
+        .save()
+        .game
+        .countries
+        .get(&("REB".parse().unwrap()))
+        .unwrap()
+        .decision_seed;
+    assert_eq!(reb_decision, 684859145);
+
     assert_eq!(histories, expected_histories);
     let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&buffer))?;
     assert!(save.game.is_some());

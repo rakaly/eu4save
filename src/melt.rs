@@ -12,6 +12,7 @@ fn melter(
     let mut in_objects = Vec::new();
     let mut in_object = 1;
     let mut token_idx = 0;
+    let mut known_number = false;
     let tokens = tape.tokens();
 
     while let Some(token) = tokens.get(token_idx) {
@@ -68,7 +69,10 @@ fn melter(
             BinaryToken::U32(x) => writer.extend_from_slice(format!("{}", x).as_bytes()),
             BinaryToken::U64(x) => writer.extend_from_slice(format!("{}", x).as_bytes()),
             BinaryToken::I32(x) => {
-                if let Some(date) = Eu4Date::from_binary(*x) {
+                if known_number {
+                    writer.extend_from_slice(format!("{}", x).as_bytes());
+                    known_number = false;
+                } else if let Some(date) = Eu4Date::from_binary(*x) {
                     writer.extend_from_slice(date.game_fmt().as_bytes());
                 } else {
                     writer.extend_from_slice(format!("{}", x).as_bytes());
@@ -113,7 +117,11 @@ fn melter(
                     token_idx = skip;
                     continue;
                 }
-                Some(id) => writer.extend_from_slice(&id.as_bytes()),
+                Some(id) => {
+                    // There are certain tokens that we know are integers and will dupe the date heuristic
+                    known_number = in_object == 1 && (id == "random" || id.ends_with("seed"));
+                    writer.extend_from_slice(&id.as_bytes())
+                }
                 None => match failed_resolver {
                     FailedResolveStrategy::Error => {
                         return Err(Eu4ErrorKind::UnknownToken { token_id: *x }.into());

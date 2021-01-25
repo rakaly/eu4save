@@ -336,6 +336,7 @@ pub struct Country {
     pub mil_spent_indexed: Vec<(i32, i32)>,
     #[jomini(default)]
     pub losses: WarParticipantLosses,
+    pub decision_seed: i32,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
