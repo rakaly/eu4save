@@ -1,9 +1,13 @@
 use crate::{tokens::TokenLookup, Eu4Date, Eu4Error, Eu4ErrorKind};
 use jomini::{BinaryTape, BinaryToken, FailedResolveStrategy, TokenResolver};
-use std::io::{Cursor, Read, Write};
+use std::{
+    collections::HashSet,
+    io::{Cursor, Read, Write},
+};
 
 fn melter(
     writer: &mut Vec<u8>,
+    unknown_tokens: &mut HashSet<u16>,
     tape: &BinaryTape,
     failed_resolver: FailedResolveStrategy,
     write_checksum: bool,
@@ -122,28 +126,31 @@ fn melter(
                     known_number = in_object == 1 && (id == "random" || id.ends_with("seed"));
                     writer.extend_from_slice(&id.as_bytes())
                 }
-                None => match failed_resolver {
-                    FailedResolveStrategy::Error => {
-                        return Err(Eu4ErrorKind::UnknownToken { token_id: *x }.into());
-                    }
-                    FailedResolveStrategy::Ignore if in_object == 1 => {
-                        let skip = tokens
-                            .get(token_idx + 1)
-                            .map(|next_token| match next_token {
-                                BinaryToken::Object(end) => end + 1,
-                                BinaryToken::Array(end) => end + 1,
-                                _ => token_idx + 2,
-                            })
-                            .unwrap_or(token_idx + 1);
+                None => {
+                    unknown_tokens.insert(*x);
+                    match failed_resolver {
+                        FailedResolveStrategy::Error => {
+                            return Err(Eu4ErrorKind::UnknownToken { token_id: *x }.into());
+                        }
+                        FailedResolveStrategy::Ignore if in_object == 1 => {
+                            let skip = tokens
+                                .get(token_idx + 1)
+                                .map(|next_token| match next_token {
+                                    BinaryToken::Object(end) => end + 1,
+                                    BinaryToken::Array(end) => end + 1,
+                                    _ => token_idx + 2,
+                                })
+                                .unwrap_or(token_idx + 1);
 
-                        token_idx = skip;
-                        continue;
+                            token_idx = skip;
+                            continue;
+                        }
+                        _ => {
+                            let unknown = format!("__unknown_0x{:x}", x);
+                            writer.extend_from_slice(unknown.as_bytes());
+                        }
                     }
-                    _ => {
-                        let unknown = format!("__unknown_0x{:x}", x);
-                        writer.extend_from_slice(unknown.as_bytes());
-                    }
-                },
+                }
             },
             BinaryToken::Rgb(color) => {
                 writer.extend_from_slice(b"rgb {");
@@ -173,6 +180,7 @@ fn melter(
 
 fn melt_zip(
     mut out: &mut Vec<u8>,
+    unknown_tokens: &mut HashSet<u16>,
     zip_data: &[u8],
     failed_resolver: FailedResolveStrategy,
 ) -> Result<(), Eu4Error> {
@@ -207,22 +215,32 @@ fn melt_zip(
         })?;
 
         let write_checksum = file == &"ai";
-        melter(&mut out, &tape, failed_resolver, write_checksum)?;
+        melter(
+            &mut out,
+            unknown_tokens,
+            &tape,
+            failed_resolver,
+            write_checksum,
+        )?;
     }
 
     Ok(())
 }
 
 /// Convert ironman data to plaintext
-pub fn melt(data: &[u8], failed_resolver: FailedResolveStrategy) -> Result<Vec<u8>, Eu4Error> {
+pub fn melt(
+    data: &[u8],
+    failed_resolver: FailedResolveStrategy,
+) -> Result<(Vec<u8>, HashSet<u16>), Eu4Error> {
     let mut out: Vec<u8> = b"EU4txt\r\n".to_vec();
+    let mut unknown_tokens = HashSet::new();
 
     let is_zip = data
         .get(..4)
         .map_or(false, |x| x == &[0x50, 0x4b, 0x03, 0x04][..]);
 
     if is_zip {
-        melt_zip(&mut out, &data, failed_resolver)?;
+        melt_zip(&mut out, &mut unknown_tokens, &data, failed_resolver)?;
     } else {
         out.reserve(data.len() * 2);
         let cut_header_len = if data
@@ -234,10 +252,10 @@ pub fn melt(data: &[u8], failed_resolver: FailedResolveStrategy) -> Result<Vec<u
             0
         };
         let tape = BinaryTape::from_eu4(&data[cut_header_len..])?;
-        melter(&mut out, &tape, failed_resolver, true)?;
+        melter(&mut out, &mut unknown_tokens, &tape, failed_resolver, true)?;
     }
 
-    Ok(out)
+    Ok((out, unknown_tokens))
 }
 
 #[cfg(all(test, ironman_tokens))]

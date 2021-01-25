@@ -211,7 +211,7 @@ fn test_eu4_ita1() {
 #[test]
 fn test_roundtrip_melt() {
     let data = utils::request("kandy2.bin.eu4");
-    let out = eu4save::melt(&data[..], eu4save::FailedResolveStrategy::Error).unwrap();
+    let (out, _unknown) = eu4save::melt(&data[..], eu4save::FailedResolveStrategy::Error).unwrap();
     let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&out[..])).unwrap();
     assert_eq!(encoding, Encoding::Text);
     assert_eq!(save.meta.player, "BHA".parse().unwrap());
@@ -227,7 +227,7 @@ macro_rules! ironman_test {
                 // Ensure that every ironman can be melted with all tokens resolvable.
                 // Deserialization will not try and resolve tokens that aren't used. Melting
                 // ensures that every token is seen
-                let melted = eu4save::melt(&data[..], FailedResolveStrategy::Error).unwrap();
+                let (melted, _) = eu4save::melt(&data[..], FailedResolveStrategy::Error).unwrap();
                 assert!(!melted.is_empty());
 
                 let (save, encoding) = Eu4ExtractorBuilder::new()
