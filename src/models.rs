@@ -337,6 +337,8 @@ pub struct Country {
     #[jomini(default)]
     pub losses: WarParticipantLosses,
     pub decision_seed: i32,
+    #[jomini(duplicated, alias = "mercenary_company")]
+    pub mercenary_companries: Vec<MercenaryCompany>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -439,6 +441,19 @@ pub struct Leader {
     // prevent regression.
     pub activation: Option<Eu4Date>,
     pub id: ObjId,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MercenaryCompany {
+    pub id: ObjId,
+    pub tag: String,
+    pub progress: bool,
+    pub manpower: f32,
+    pub starting_manpower: f32,
+    pub leader: Option<Leader>,
+    pub unit: ObjId,
+    pub hiring_date: Eu4Date,
+    pub disband_date: Eu4Date,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
