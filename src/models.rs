@@ -367,6 +367,7 @@ pub struct CountryHistory {
     pub government: Option<String>,
     pub technology_group: Option<String>,
     pub primary_culture: Option<String>,
+    pub add_government_reform: Vec<String>,
     pub events: Vec<(Eu4Date, CountryEvents)>,
 }
 

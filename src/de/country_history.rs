@@ -36,6 +36,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                 let mut government = None;
                 let mut technology_group = None;
                 let mut primary_culture = None;
+                let mut add_government_reform = Vec::new();
                 let mut events = Vec::new();
 
                 while let Some(key) = map.next_key::<&str>()? {
@@ -43,6 +44,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                         "government" => government = map.next_value()?,
                         "technology_group" => technology_group = map.next_value()?,
                         "primary_culture" => primary_culture = map.next_value()?,
+                        "add_government_reform" => add_government_reform.push(map.next_value()?),
                         x => {
                             if let Some(date) = Eu4Date::parse_from_str(x) {
                                 let event = map.next_value()?;
@@ -56,6 +58,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                     government,
                     technology_group,
                     primary_culture,
+                    add_government_reform,
                     events,
                 })
             }
