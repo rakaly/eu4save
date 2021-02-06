@@ -1,3 +1,7 @@
+## v0.4.2 - 2021-02-05
+
+- Fix to melter to keep quoted binary keys as unquoted in plaintext
+
 ## v0.4.1 - 2021-02-05
 
 - Fix tech being corrupted on loading melted save by updating melter to better know if a value should be quoted
