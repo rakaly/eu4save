@@ -90,9 +90,14 @@ fn melter(
                     None => data.len(),
                 };
 
-                writer.push(b'"');
-                writer.extend_from_slice(&data[..end_idx]);
-                writer.push(b'"');
+                // quoted fields occuring as keys should remain unquoted
+                if in_object == 1 {
+                    writer.extend_from_slice(&data[..end_idx]);
+                } else {
+                    writer.push(b'"');
+                    writer.extend_from_slice(&data[..end_idx]);
+                    writer.push(b'"');
+                }
             }
             BinaryToken::Unquoted(x) => {
                 let data = x.view_data();
