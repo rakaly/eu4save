@@ -1,3 +1,8 @@
+## v0.4.1 - 2021-02-05
+
+- Fix tech being corrupted on loading melted save by updating melter to better know if a value should be quoted
+- Deserialize mercenary companies
+
 ## v0.4.0 - 2021-01-25
 
 Expect significant breaking changes to query API. Additionally,
