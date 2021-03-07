@@ -8,8 +8,7 @@ use eu4save::{
 };
 use paste::paste;
 use std::io::Cursor;
-
-mod utils;
+use crate::utils;
 
 #[test]
 fn test_eu4_bin() {

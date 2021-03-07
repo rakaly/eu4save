@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use eu4save::Eu4Date;
 
-const METADATA_BIN: &'static [u8] = include_bytes!("../tests/fixtures/meta.bin");
+const METADATA_BIN: &'static [u8] = include_bytes!("../tests/it/fixtures/meta.bin");
 
 pub fn melt_benchmark(c: &mut Criterion) {
     let data = &METADATA_BIN[..];
