@@ -8,8 +8,7 @@ use eu4save::{
 };
 use std::io::{Cursor, Read};
 use std::{collections::HashMap, error::Error};
-
-mod utils;
+use crate::utils;
 
 #[test]
 fn test_eu4_text() -> Result<(), Box<dyn Error>> {
