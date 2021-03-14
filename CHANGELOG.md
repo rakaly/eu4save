@@ -1,3 +1,7 @@
+## v0.4.3 - 2021-03-14
+
+- Bump internal parser to latest
+
 ## v0.4.2 - 2021-02-05
 
 - Fix to melter to keep quoted binary keys as unquoted in plaintext
