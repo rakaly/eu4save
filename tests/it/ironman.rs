@@ -1,5 +1,6 @@
 #![cfg(ironman)]
 
+use crate::utils;
 use eu4save::models::{GameDifficulty, ProvinceEvent, ProvinceEventValue, TaxManpowerModifier};
 use eu4save::{
     query::{LedgerPoint, NationEvent, NationEventKind, NationEvents, PlayerHistory, Query},
@@ -8,7 +9,6 @@ use eu4save::{
 };
 use paste::paste;
 use std::io::Cursor;
-use crate::utils;
 
 #[test]
 fn test_eu4_bin() {

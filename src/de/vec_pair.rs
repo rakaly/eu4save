@@ -10,7 +10,7 @@ where
 {
     struct VecPairVisitor<K1, V1> {
         marker: PhantomData<Vec<(K1, V1)>>,
-    };
+    }
 
     impl<'de, K1, V1> de::Visitor<'de> for VecPairVisitor<K1, V1>
     where
