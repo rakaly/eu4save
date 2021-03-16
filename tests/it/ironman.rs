@@ -302,6 +302,17 @@ ironman_test!(
     }
 );
 
+ironman_test!(
+    modded,
+    "modded.eu4",
+    IronmanQuery {
+        starting: "MOS",
+        player: "MOS",
+        patch: "1.30.4.0",
+        date: Eu4Date::parse_from_str("1446.03.16").unwrap()
+    }
+);
+
 fn trycone_expected_histories() -> Vec<PlayerHistory> {
     vec![PlayerHistory {
         history: NationEvents {
