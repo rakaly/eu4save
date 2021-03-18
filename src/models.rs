@@ -174,10 +174,15 @@ pub struct Province {
     pub culture: Option<String>,
     pub religion: Option<String>,
     pub original_religion: Option<String>,
-    pub base_tax: Option<f32>,
-    pub base_production: Option<f32>,
-    pub base_manpower: Option<f32>,
+    #[serde(default)]
+    pub base_tax: f32,
+    #[serde(default)]
+    pub base_production: f32,
+    #[serde(default)]
+    pub base_manpower: f32,
     pub capital: Option<String>,
+    #[serde(default)]
+    pub local_autonomy: f32,
     #[serde(default)]
     pub is_city: bool,
     #[serde(default, deserialize_with = "deserialize_token_bool")]
