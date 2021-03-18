@@ -52,6 +52,7 @@ pub struct GameState {
     pub players_countries: Vec<String>,
     pub current_age: String,
     pub start_date: Eu4Date,
+    pub map_area_data: HashMap<String, MapAreaDatum>,
     pub military_hegemon: Option<Hegemon>,
     pub naval_hegemon: Option<Hegemon>,
     pub economic_hegemon: Option<Hegemon>,
@@ -91,6 +92,37 @@ pub struct SavegameVersion {
 pub struct GameplaySettings {
     #[serde(alias = "setgameplayoptions")]
     pub options: GameplayOptions,
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct MapAreaDatum {
+    pub state: Option<MapAreaState>,
+    #[jomini(default, duplicated, alias = "investments")]
+    pub investments: Vec<TradeCompanyInvestment>
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct MapAreaState {
+    pub area: String,
+    #[jomini(duplicated, alias = "country_state")]
+    pub country_states: Vec<CountryState>,
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct TradeCompanyInvestment {
+    pub tag: CountryTag,
+    #[jomini(default)]
+    pub investments: Vec<String>,
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct CountryState {
+    pub prosperity: f32,
+    pub country: CountryTag,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -185,6 +217,8 @@ pub struct Province {
     pub local_autonomy: f32,
     #[serde(default)]
     pub is_city: bool,
+    #[serde(default)]
+    pub active_trade_company: bool,
     #[serde(default, deserialize_with = "deserialize_token_bool")]
     pub hre: bool,
     #[serde(default, deserialize_with = "deserialize_yes_map")]
