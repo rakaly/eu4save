@@ -200,6 +200,8 @@ pub struct Province {
     pub previous_controller: Option<CountryTag>,
     #[serde(default)]
     pub cores: Vec<CountryTag>,
+    #[serde(default)]
+    pub claims: Vec<CountryTag>,
     pub institutions: Vec<f32>,
     pub trade: Option<String>,
     pub original_culture: Option<String>,
