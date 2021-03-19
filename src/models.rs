@@ -208,6 +208,11 @@ pub struct Province {
     pub culture: Option<String>,
     pub religion: Option<String>,
     pub original_religion: Option<String>,
+    pub trade_goods: Option<String>,
+    #[serde(default)]
+    pub latent_trade_goods: Vec<String>,
+    #[serde(default)]
+    pub devastation: f32,
     #[serde(default)]
     pub base_tax: f32,
     #[serde(default)]
