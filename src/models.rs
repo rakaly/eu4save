@@ -217,7 +217,7 @@ pub struct Province {
     pub local_autonomy: f32,
     #[serde(default)]
     pub is_city: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_token_bool")]
     pub active_trade_company: bool,
     #[serde(default, deserialize_with = "deserialize_token_bool")]
     pub hre: bool,
