@@ -99,7 +99,7 @@ pub struct GameplaySettings {
 pub struct MapAreaDatum {
     pub state: Option<MapAreaState>,
     #[jomini(default, duplicated, alias = "investments")]
-    pub investments: Vec<TradeCompanyInvestment>
+    pub investments: Vec<TradeCompanyInvestment>,
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
@@ -191,16 +191,18 @@ pub struct LedgerDatum {
     pub data: Vec<(u16, i32)>,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, JominiDeserialize, Default)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Province {
+    #[jomini(default, deserialize_with = "deserialize_vec_pair")]
+    pub flags: Vec<(String, Eu4Date)>,
     pub name: String,
     pub owner: Option<CountryTag>,
     pub controller: Option<CountryTag>,
     pub previous_controller: Option<CountryTag>,
-    #[serde(default)]
+    #[jomini(default)]
     pub cores: Vec<CountryTag>,
-    #[serde(default)]
+    #[jomini(default)]
     pub claims: Vec<CountryTag>,
     pub institutions: Vec<f32>,
     pub trade: Option<String>,
@@ -209,31 +211,47 @@ pub struct Province {
     pub religion: Option<String>,
     pub original_religion: Option<String>,
     pub trade_goods: Option<String>,
-    #[serde(default)]
+    #[jomini(default, deserialize_with = "deserialize_alternating_key_values")]
+    pub country_improve_count: HashMap<CountryTag, u16>,
+    #[jomini(default)]
     pub latent_trade_goods: Vec<String>,
-    #[serde(default)]
+    #[jomini(default)]
     pub devastation: f32,
-    #[serde(default)]
+    #[jomini(default)]
     pub base_tax: f32,
-    #[serde(default)]
+    #[jomini(default)]
     pub base_production: f32,
-    #[serde(default)]
+    #[jomini(default)]
     pub base_manpower: f32,
     pub capital: Option<String>,
-    #[serde(default)]
+    #[jomini(default)]
     pub local_autonomy: f32,
-    #[serde(default)]
+    #[jomini(default)]
     pub is_city: bool,
-    #[serde(default, deserialize_with = "deserialize_token_bool")]
+    #[jomini(default, deserialize_with = "deserialize_token_bool")]
     pub active_trade_company: bool,
-    #[serde(default, deserialize_with = "deserialize_token_bool")]
+    #[jomini(default)]
+    pub center_of_trade: u8,
+    #[jomini(default)]
+    pub trade_power: f32,
+    #[jomini(default, deserialize_with = "deserialize_token_bool")]
     pub hre: bool,
-    #[serde(default, deserialize_with = "deserialize_yes_map")]
+    #[jomini(default, deserialize_with = "deserialize_yes_map")]
     pub buildings: HashMap<String, bool>,
-    #[serde(default)]
+    #[jomini(default)]
     pub building_builders: HashMap<String, CountryTag>,
-    #[serde(default)]
+    #[jomini(default, duplicated, alias = "modifier")]
+    pub modifiers: Vec<Modifier>,
+    #[jomini(default)]
     pub history: ProvinceHistory,
+}
+
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct Modifier {
+    pub modifier: String,
+    pub date: Eu4Date,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -255,7 +273,14 @@ pub struct ProvinceEvents(pub Vec<ProvinceEvent>);
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub enum ProvinceEvent {
     Owner(CountryTag),
+    Controller(ControllerEvent),
     KV((String, ProvinceEventValue)),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct ControllerEvent {
+    tag: CountryTag,
 }
 
 #[derive(Debug, Clone)]

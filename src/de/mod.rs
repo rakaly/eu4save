@@ -1,3 +1,4 @@
+mod alternating_key_values;
 mod country_events;
 mod country_history;
 mod gameplay_settings;
@@ -12,6 +13,7 @@ mod war_events;
 mod war_history;
 mod yes_map;
 
+pub(crate) use alternating_key_values::*;
 pub(crate) use token_bool::*;
 pub(crate) use vec_overflow_byte::*;
 pub(crate) use vec_pair::*;
