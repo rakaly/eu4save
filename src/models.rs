@@ -246,7 +246,6 @@ pub struct Province {
     pub history: ProvinceHistory,
 }
 
-
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Modifier {

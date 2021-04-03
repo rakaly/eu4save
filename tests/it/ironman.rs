@@ -865,3 +865,17 @@ ironman_test!(
         assert_eq!(my_income, expected_income);
     }
 );
+
+ironman_test!(
+    non_ironman_binary,
+    "non-ironman-binary.eu4",
+    IronmanQuery {
+        starting: "CAS",
+        player: "CAS",
+        patch: "1.30.6.0",
+        date: Eu4Date::parse_from_str("1505.11.25").unwrap()
+    },
+    |query: Query| {
+        assert!(!query.save().meta.is_ironman);
+    }
+);
