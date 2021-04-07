@@ -454,6 +454,7 @@ pub struct CountryEvents(pub Vec<CountryEvent>);
 pub enum CountryEvent {
     Monarch(Monarch),
     Heir(Monarch),
+    MonarchHeir(Monarch),
     Queen(Monarch),
     Union(u32),
     Capital(u32),
