@@ -409,6 +409,10 @@ pub struct Country {
     pub decision_seed: i32,
     #[jomini(duplicated, alias = "mercenary_company")]
     pub mercenary_companries: Vec<MercenaryCompany>,
+    pub monarch: Option<ObjId>,
+    pub heir: Option<ObjId>,
+    #[jomini(duplicated, alias = "previous_monarch")]
+    pub previous_monarchs: Vec<ObjId>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
