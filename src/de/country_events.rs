@@ -43,6 +43,7 @@ impl<'de> Deserialize<'de> for CountryEvents {
                     let val = match key {
                         "monarch" => CountryEvent::Monarch(map.next_value()?),
                         "monarch_heir" => CountryEvent::MonarchHeir(map.next_value()?),
+                        "monarch_consort" => CountryEvent::MonarchConsort(map.next_value()?),
                         "heir" => CountryEvent::Heir(map.next_value()?),
                         "queen" => CountryEvent::Queen(map.next_value()?),
                         "union" => CountryEvent::Union(map.next_value()?),

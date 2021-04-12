@@ -455,6 +455,7 @@ pub enum CountryEvent {
     Monarch(Monarch),
     Heir(Monarch),
     MonarchHeir(Monarch),
+    MonarchConsort(Monarch),
     Queen(Monarch),
     Union(u32),
     Capital(u32),
@@ -464,6 +465,19 @@ pub enum CountryEvent {
     ChangedTagFrom(CountryTag),
     Leader(Leader),
     RemoveAcceptedCulture(String),
+}
+
+impl CountryEvent {
+    pub fn as_monarch(&self) -> Option<&Monarch> {
+        match &self {
+            CountryEvent::Monarch(x)
+            | CountryEvent::Heir(x)
+            | CountryEvent::MonarchHeir(x)
+            | CountryEvent::MonarchConsort(x)
+            | CountryEvent::Queen(x) => Some(x),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
