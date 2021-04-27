@@ -258,14 +258,14 @@ macro_rules! ironman_test {
                     expected.starting.parse::<CountryTag>().unwrap(),
                 );
 
-                ($further)(query);
+                ($further)(query, melted.as_slice());
             }
         }
     };
 
     ($name:ident, $fp:expr, $query:expr) => {
         paste! {
-            fn [<test_ $name _cb>](_q: Query) {
+            fn [<test_ $name _cb>](_q: Query, _data: &[u8]) {
             }
 
             ironman_test!($name, $fp, $query,  [<test_ $name _cb>]);
@@ -370,7 +370,7 @@ ironman_test!(
         patch: "1.30.4.0",
         date: Eu4Date::parse_from_str("1725.05.12").unwrap()
     },
-    |query: Query| {
+    |query: Query, _melted_data: &[u8]| {
         let province_owners = query.province_owners();
         let nation_events = query.nation_events(&province_owners);
         let lei = "LEI".parse().unwrap();
@@ -627,7 +627,7 @@ ironman_test!(
         patch: "1.30.3.0",
         date: Eu4Date::parse_from_str("1508.04.27").unwrap()
     },
-    |query: Query| {
+    |query: Query, _melted_data: &[u8]| {
         let province_owners = query.province_owners();
         let nation_events = query.nation_events(&province_owners);
         let histories = query.player_histories(&nation_events);
@@ -655,7 +655,7 @@ ironman_test!(
         patch: "1.29.6.0",
         date: Eu4Date::parse_from_str("1547.03.05").unwrap()
     },
-    |query: Query| {
+    |query: Query, _melted_data: &[u8]| {
         assert_eq!(
             query
                 .players()
@@ -698,7 +698,7 @@ ironman_test!(
         patch: "1.30.4.0",
         date: Eu4Date::parse_from_str("1800.01.01").unwrap()
     },
-    |query: Query| {
+    |query: Query, _melted_data: &[u8]| {
         assert_eq!(
             query.save().meta.displayed_country_name.as_bytes(),
             b"\x10(\xe2\x80\x9e\x10bS\x10PO"
@@ -727,7 +727,7 @@ ironman_test!(
         patch: "1.30.1.0",
         date: Eu4Date::parse_from_str("1509.06.10").unwrap()
     },
-    |query: Query| {
+    |query: Query, _melted_data: &[u8]| {
         let province_owners = query.province_owners();
         let nation_events = query.nation_events(&province_owners);
         let histories = query.player_histories(&nation_events);
@@ -875,7 +875,7 @@ ironman_test!(
         patch: "1.30.6.0",
         date: Eu4Date::parse_from_str("1505.11.25").unwrap()
     },
-    |query: Query| {
+    |query: Query, _melted_data: &[u8]| {
         assert!(!query.save().meta.is_ironman);
     }
 );
@@ -888,5 +888,9 @@ ironman_test!(
         player: "ENG",
         patch: "1.31.0.0",
         date: Eu4Date::parse_from_str("1444.11.11").unwrap()
+    },
+    |_query: Query, melted_data: &[u8]| {
+        // Find inukshuk
+        twoway::find_bytes(melted_data, b"date_built=-2000.1.1").unwrap();
     }
 );

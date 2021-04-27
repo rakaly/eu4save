@@ -17,6 +17,7 @@ fn melter(
     let mut in_object = 1;
     let mut token_idx = 0;
     let mut known_number = false;
+    let mut known_date = false;
     let tokens = tape.tokens();
 
     while let Some(token) = tokens.get(token_idx) {
@@ -76,7 +77,14 @@ fn melter(
                 if known_number {
                     writer.extend_from_slice(format!("{}", x).as_bytes());
                     known_number = false;
-                } else if let Some(date) = Eu4Date::from_binary(*x) {
+                } else if known_date {
+                    if let Some(date) = Eu4Date::from_binary(*x) {
+                        writer.extend_from_slice(date.game_fmt().as_bytes());
+                    } else {
+                        return Err(Eu4Error::new(Eu4ErrorKind::InvalidDate(*x)));
+                    }
+                    known_date = false;
+                } else if let Some(date) = Eu4Date::from_binary_heuristic(*x) {
                     writer.extend_from_slice(date.game_fmt().as_bytes());
                 } else {
                     writer.extend_from_slice(format!("{}", x).as_bytes());
@@ -125,6 +133,7 @@ fn melter(
                 Some(id) => {
                     // There are certain tokens that we know are integers and will dupe the date heuristic
                     known_number = in_object == 1 && (id == "random" || id.ends_with("seed"));
+                    known_date = in_object == 1 && id == "date_built";
                     writer.extend_from_slice(&id.as_bytes())
                 }
                 None => {

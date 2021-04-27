@@ -35,6 +35,7 @@ pub enum Eu4ErrorKind {
     },
     CountryTagIncorrectSize,
     CountryTagInvalidCharacters,
+    InvalidDate(i32),
 }
 
 impl fmt::Display for Eu4Error {
@@ -61,6 +62,7 @@ impl fmt::Display for Eu4Error {
             Eu4ErrorKind::CountryTagInvalidCharacters => {
                 write!(f, "input contains invalid characters for a country tag")
             }
+            Eu4ErrorKind::InvalidDate(x) => write!(f, "expected {} to be parsed as a date", x),
         }
     }
 }
