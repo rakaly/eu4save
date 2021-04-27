@@ -1,3 +1,7 @@
+## v0.4.5 - 2021-04-27
+
+- Support melting prehistoric dates correctly
+
 ## v0.4.4 - 2021-04-27
 
 - Additional fields deserialized
