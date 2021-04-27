@@ -879,3 +879,14 @@ ironman_test!(
         assert!(!query.save().meta.is_ironman);
     }
 );
+
+ironman_test!(
+    patch_131,
+    "1.31.0.eu4",
+    IronmanQuery {
+        starting: "ENG",
+        player: "ENG",
+        patch: "1.31.0.0",
+        date: Eu4Date::parse_from_str("1444.11.11").unwrap()
+    }
+);

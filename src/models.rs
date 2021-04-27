@@ -541,7 +541,7 @@ pub struct MercenaryCompany {
     pub manpower: f32,
     pub starting_manpower: f32,
     pub leader: Option<Leader>,
-    pub unit: ObjId,
+    pub unit: Option<ObjId>,
     pub hiring_date: Eu4Date,
     pub disband_date: Eu4Date,
 }
