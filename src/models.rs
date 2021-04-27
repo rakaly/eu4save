@@ -212,7 +212,7 @@ pub struct Province {
     pub original_religion: Option<String>,
     pub trade_goods: Option<String>,
     #[jomini(default, deserialize_with = "deserialize_alternating_key_values")]
-    pub country_improve_count: HashMap<CountryTag, u16>,
+    pub country_improve_count: HashMap<CountryTag, i32>,
     #[jomini(default)]
     pub latent_trade_goods: Vec<String>,
     #[jomini(default)]
