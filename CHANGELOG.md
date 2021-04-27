@@ -1,3 +1,9 @@
+## v0.4.4 - 2021-04-27
+
+- Additional fields deserialized
+- Fix to melting large 64bit floating point values
+- Leviathan support
+
 ## v0.4.3 - 2021-03-14
 
 - Bump internal parser to latest
