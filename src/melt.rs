@@ -132,7 +132,8 @@ fn melter(
                 }
                 Some(id) => {
                     // There are certain tokens that we know are integers and will dupe the date heuristic
-                    known_number = in_object == 1 && (id == "random" || id.ends_with("seed"));
+                    known_number =
+                        in_object == 1 && (id == "random" || id.ends_with("seed") || id == "id");
                     known_date = in_object == 1 && id == "date_built";
                     writer.extend_from_slice(&id.as_bytes())
                 }
