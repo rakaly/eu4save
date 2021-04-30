@@ -892,5 +892,6 @@ ironman_test!(
     |_query: Query, melted_data: &[u8]| {
         // Find inukshuk
         twoway::find_bytes(melted_data, b"date_built=-2000.1.1").unwrap();
+        twoway::find_bytes(melted_data, b"navy_strength=0.00000").unwrap();
     }
 );

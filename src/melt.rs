@@ -111,8 +111,8 @@ fn melter(
                 let data = x.view_data();
                 writer.extend_from_slice(&data);
             }
-            BinaryToken::F32(x) => write!(writer, "{}", x).map_err(Eu4ErrorKind::IoErr)?,
-            BinaryToken::F64(x) => write!(writer, "{}", x).map_err(Eu4ErrorKind::IoErr)?,
+            BinaryToken::F32(x) => write!(writer, "{:.3}", x).map_err(Eu4ErrorKind::IoErr)?,
+            BinaryToken::F64(x) => write!(writer, "{:.5}", x).map_err(Eu4ErrorKind::IoErr)?,
             BinaryToken::Token(x) => match TokenLookup.resolve(*x) {
                 Some(id)
                     if (id == "is_ironman" || (id == "checksum" && !write_checksum))
