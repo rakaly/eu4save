@@ -43,6 +43,9 @@ impl<'de> Deserialize<'de> for ProvinceEvents {
                     let val = match key {
                         "owner" => ProvinceEvent::Owner(map.next_value()?),
                         "controller" => ProvinceEvent::Controller(map.next_value()?),
+                        "base_tax" => ProvinceEvent::BaseTax(map.next_value()?),
+                        "base_manpower" => ProvinceEvent::BaseManpower(map.next_value()?),
+                        "base_production" => ProvinceEvent::BaseProduction(map.next_value()?),
                         _ => ProvinceEvent::KV((key.to_string(), map.next_value()?)),
                     };
 
