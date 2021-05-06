@@ -70,7 +70,7 @@ where
         let _ = write!(writer, "{}", key.read_str());
         let _ = writer.write(b"=");
         format_value(value, depth, writer);
-        let _ = writer.write(b"\r\n");
+        let _ = writer.write(b"\n");
     }
 }
 
@@ -79,7 +79,7 @@ where
     E: Encoding + Clone,
     W: Write,
 {
-    let _ = writer.write(b"{\r\n");
+    let _ = writer.write(b"{\n");
 
     format_object_core(reader, depth, writer);
 
@@ -95,14 +95,14 @@ where
     E: Encoding + Clone,
     W: Write,
 {
-    let _ = writer.write(b"{\r\n");
+    let _ = writer.write(b"{\n");
 
     while let Some(value) = reader.next_value() {
         for _ in 0..depth {
             let _ = writer.write(b" ");
         }
         format_value(value, depth, writer);
-        let _ = writer.write(b"\r\n");
+        let _ = writer.write(b"\n");
     }
 
     for _ in 0..depth - 1 {

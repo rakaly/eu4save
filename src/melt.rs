@@ -36,7 +36,7 @@ fn melter(
         match token {
             BinaryToken::Object(_) => {
                 did_change = true;
-                writer.extend_from_slice(b"{\r\n");
+                writer.extend_from_slice(b"{\n");
                 depth += 1;
                 in_objects.push(in_object);
                 in_object = 1;
@@ -177,7 +177,6 @@ fn melter(
             in_object = 2;
         } else if in_object == 2 {
             in_object = 1;
-            writer.push(b'\r');
             writer.push(b'\n');
         } else if in_object != 1 {
             writer.push(b' ');
@@ -243,7 +242,7 @@ pub fn melt(
     data: &[u8],
     failed_resolver: FailedResolveStrategy,
 ) -> Result<(Vec<u8>, HashSet<u16>), Eu4Error> {
-    let mut out: Vec<u8> = b"EU4txt\r\n".to_vec();
+    let mut out: Vec<u8> = b"EU4txt\n".to_vec();
     let mut unknown_tokens = HashSet::new();
 
     let is_zip = data
@@ -291,7 +290,7 @@ mod tests {
     #[test]
     fn test_ironman_nonscalar() {
         let data = [137, 53, 3, 0, 4, 0];
-        let expected = b"EU4txt\r\n";
+        let expected = b"EU4txt\n";
         let out = melt(&data[..], FailedResolveStrategy::Error).unwrap();
         assert_eq!(out, &expected[..]);
     }
@@ -312,7 +311,7 @@ mod tests {
             0x00, 0x03, 0x00, 0x42, 0x48, 0x41,
         ];
 
-        let expected = b"EU4txt\r\ndate=1804.12.09\r\nplayer=\"BHA\"\r\n";
+        let expected = b"EU4txt\ndate=1804.12.09\nplayer=\"BHA\"\n";
         let out = melt(&data[..], FailedResolveStrategy::Error).unwrap();
         assert_eq!(out, &expected[..]);
     }
@@ -327,7 +326,7 @@ mod tests {
         data.extend_from_slice(b"1444.11.11\n");
         data.extend_from_slice(&0x0004u16.to_le_bytes());
 
-        let expected = b"EU4txt\r\nflags={\r\n schools_initiated=\"1444.11.11\"\r\n}\r\n";
+        let expected = b"EU4txt\nflags={\n schools_initiated=\"1444.11.11\"\n}\n";
         let out = melt(&data[..], FailedResolveStrategy::Error).unwrap();
         assert_eq!(out, &expected[..]);
     }
@@ -340,7 +339,7 @@ mod tests {
             0x00, 0x03, 0x00, 0x42, 0x48, 0x41,
         ];
 
-        let expected = b"EU4txt\r\nplayer=\"BHA\"\r\n";
+        let expected = b"EU4txt\nplayer=\"BHA\"\n";
         let out = melt(&data[..], FailedResolveStrategy::Ignore).unwrap();
         assert_eq!(out, &expected[..]);
     }
@@ -353,7 +352,7 @@ mod tests {
             0x48, 0x41,
         ];
 
-        let expected = b"EU4txt\r\ndate=__unknown_0xffff\r\nplayer=\"BHA\"\r\n";
+        let expected = b"EU4txt\ndate=__unknown_0xffff\nplayer=\"BHA\"\n";
         let out = melt(&data[..], FailedResolveStrategy::Ignore).unwrap();
         assert_eq!(out, &expected[..]);
     }
