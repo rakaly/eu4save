@@ -273,6 +273,9 @@ pub struct ProvinceEvents(pub Vec<ProvinceEvent>);
 pub enum ProvinceEvent {
     Owner(CountryTag),
     Controller(ControllerEvent),
+    BaseTax(f32),
+    BaseProduction(f32),
+    BaseManpower(f32),
     KV((String, ProvinceEventValue)),
 }
 
