@@ -74,6 +74,9 @@ pub struct CountryExpenseLedger {
     pub other: f32,
     pub ports_blockaded: f32,
     pub cities_looted: f32,
+    pub monuments: f32,
+    pub cot_upgrades: f32,
+    pub colony_changes: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -521,13 +524,16 @@ impl Query {
             trade_company_investments: *ledger.get(31).unwrap_or(&0.0),
             ports_blockaded: *ledger.get(33).unwrap_or(&0.0),
             cities_looted: *ledger.get(34).unwrap_or(&0.0),
+            monuments: *ledger.get(35).unwrap_or(&0.0),
+            cot_upgrades: *ledger.get(36).unwrap_or(&0.0),
+            colony_changes: *ledger.get(37).unwrap_or(&0.0),
             other: *ledger.get(3).unwrap_or(&0.0)
                 + *ledger.get(15).unwrap_or(&0.0)
                 + *ledger.get(24).unwrap_or(&0.0)
                 + *ledger.get(25).unwrap_or(&0.0)
                 + *ledger.get(29).unwrap_or(&0.0)
                 + *ledger.get(32).unwrap_or(&0.0)
-                + ledger.get(35..).iter().flat_map(|x| x.iter()).sum::<f32>(),
+                + ledger.get(38..).iter().flat_map(|x| x.iter()).sum::<f32>(),
         }
     }
 
