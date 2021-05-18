@@ -8,7 +8,12 @@ pub fn melt_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("melt");
     group.throughput(Throughput::Bytes(data.len() as u64));
     group.bench_function("metadata", |b| {
-        b.iter(|| eu4save::melt(data, eu4save::FailedResolveStrategy::Ignore).unwrap())
+        b.iter(|| {
+            eu4save::Melter::new()
+                .with_on_failed_resolve(eu4save::FailedResolveStrategy::Ignore)
+                .melt(data)
+                .unwrap()
+        })
     });
     group.finish();
 }
