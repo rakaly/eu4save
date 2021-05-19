@@ -1,5 +1,5 @@
 EU4txt
-date=1597.01.15
+date=1597.1.15
 save_game="ragusa2.eu4"
 player="RAG"
 displayed_country_name="Ragusa"
@@ -27,12 +27,12 @@ campaign_stats={ {
   comparison=2
   key="longest_reign"
   localization="Isidoro Vucic"
-  value=12
+  value=12.000
  } {
   id=2
   comparison=2
   key="wars_won"
-  value=12
+  value=12.000
  } {
   id=3
   comparison=2
@@ -41,36 +41,36 @@ campaign_stats={ {
   id=4
   comparison=2
   key="army_kills"
-  value=187848.98
+  value=187848.984
   sample_count=153
  } {
   id=5
   comparison=2
   key="army_losses"
-  value=105943
+  value=105943.000
   sample_count=153
  } {
   id=6
   comparison=2
   key="navy_kills"
-  value=12
+  value=12.000
   sample_count=153
  } {
   id=7
   comparison=2
   key="navy_losses"
-  value=1
+  value=1.000
   sample_count=153
  } {
   id=8
   comparison=2
   key="countries_removed"
-  value=2
+  value=2.000
  } {
   id=9
   comparison=2
   key="provs_taken"
-  value=19
+  value=19.000
  } {
   id=10
   comparison=2
@@ -79,13 +79,13 @@ campaign_stats={ {
   id=11
   comparison=0
   key="leader_count"
-  value=36
+  value=36.000
  } {
   id=12
   comparison=0
   key="best_leader"
   localization="§GGiulio Vucic§! ( 4 / 3 / 3 / 2 )"
-  value=19
+  value=19.000
  } {
   id=13
   comparison=1
@@ -97,7 +97,7 @@ campaign_stats={ {
   comparison=2
   key="best_prov"
   localization="Dubrovnik"
-  value=21
+  value=21.000
  } {
   id=15
   comparison=2
