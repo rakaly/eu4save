@@ -1,3 +1,11 @@
+## v0.5.0 - 2021-05-18
+
+- Melt output with same precision as game, so 32 bit numbers are written out with 3 decimal points and 64 bit numbers are written out with 5 decimal points
+- Fix some id tokens being accidentally interpretted as dates in the melted output
+- Additional fields from leviathan are deserialized
+- Omit carriage return when writing melted output
+- Rework melter api to match that of the other repos
+
 ## v0.4.5 - 2021-04-27
 
 - Support melting prehistoric dates correctly
