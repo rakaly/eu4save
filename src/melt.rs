@@ -368,7 +368,6 @@ mod tests {
             .with_on_failed_resolve(FailedResolveStrategy::Error)
             .melt(&meta[..])
             .unwrap();
-        std::fs::write("/tmp/abcout", &out).unwrap();
         assert_eq!(out, &expected[..]);
     }
 
