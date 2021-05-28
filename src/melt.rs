@@ -1,9 +1,28 @@
 use crate::{tokens::TokenLookup, Eu4Date, Eu4Error, Eu4ErrorKind, Extraction};
-use jomini::{BinaryTape, BinaryToken, FailedResolveStrategy, TokenResolver};
+use jomini::{
+    BinaryTape, BinaryToken, FailedResolveStrategy, TextWriterBuilder, TokenResolver, WriteVisitor,
+};
 use std::{
     collections::HashSet,
     io::{Cursor, Read, Write},
 };
+
+struct Eu4Visitor;
+impl WriteVisitor for Eu4Visitor {
+    fn visit_f32<W>(&self, mut writer: W, data: f32) -> Result<(), jomini::Error>
+    where
+        W: Write,
+    {
+        write!(writer, "{:.3}", data).map_err(|e| e.into())
+    }
+
+    fn visit_f64<W>(&self, mut writer: W, data: f64) -> Result<(), jomini::Error>
+    where
+        W: Write,
+    {
+        write!(writer, "{:.5}", data).map_err(|e| e.into())
+    }
+}
 
 /// Convert ironman data to plaintext
 #[derive(Debug)]
@@ -85,112 +104,59 @@ impl Melter {
         tape: &BinaryTape,
         write_checksum: bool,
     ) -> Result<(), Eu4Error> {
-        let mut depth = 0;
-        let mut in_objects = Vec::new();
-        let mut in_object = 1;
+        let mut wtr = TextWriterBuilder::new().from_writer_visitor(writer, Eu4Visitor);
         let mut token_idx = 0;
         let mut known_number = false;
         let mut known_date = false;
         let tokens = tape.tokens();
 
         while let Some(token) = tokens.get(token_idx) {
-            let mut did_change = false;
-            if in_object == 1 {
-                let depth = match token {
-                    BinaryToken::End(_) => depth - 1,
-                    _ => depth,
-                };
-
-                for _ in 0..depth {
-                    writer.push(b' ');
-                }
-            }
-
             match token {
                 BinaryToken::Object(_) => {
-                    did_change = true;
-                    writer.extend_from_slice(b"{\n");
-                    depth += 1;
-                    in_objects.push(in_object);
-                    in_object = 1;
+                    wtr.write_object_start()?;
                 }
                 BinaryToken::HiddenObject(_) => {
-                    did_change = true;
-                    depth += 1;
-                    in_objects.push(in_object);
-                    in_object = 1;
+                    wtr.write_object_start()?;
                 }
                 BinaryToken::Array(_) => {
-                    did_change = true;
-                    writer.push(b'{');
-                    depth += 1;
-                    in_objects.push(in_object);
-                    in_object = 0;
+                    wtr.write_array_start()?;
                 }
-                BinaryToken::End(x) => {
-                    if !matches!(tokens.get(*x), Some(BinaryToken::HiddenObject(_))) {
-                        writer.push(b'}');
-                    }
-
-                    let obj = in_objects.pop();
-
-                    // The binary parser should already ensure that this will be something, but this is
-                    // just a sanity check
-                    debug_assert!(obj.is_some());
-                    in_object = obj.unwrap_or(1);
-                    depth -= 1;
+                BinaryToken::End(_x) => {
+                    wtr.write_end()?;
                 }
-                BinaryToken::Bool(x) => match x {
-                    true => writer.extend_from_slice(b"yes"),
-                    false => writer.extend_from_slice(b"no"),
-                },
-                BinaryToken::U32(x) => writer.extend_from_slice(format!("{}", x).as_bytes()),
-                BinaryToken::U64(x) => writer.extend_from_slice(format!("{}", x).as_bytes()),
+                BinaryToken::Bool(x) => wtr.write_bool(*x)?,
+                BinaryToken::U32(x) => wtr.write_u32(*x)?,
+                BinaryToken::U64(x) => wtr.write_u64(*x)?,
                 BinaryToken::I32(x) => {
                     if known_number {
-                        writer.extend_from_slice(format!("{}", x).as_bytes());
+                        wtr.write_i32(*x)?;
                         known_number = false;
                     } else if known_date {
                         if let Some(date) = Eu4Date::from_binary(*x) {
-                            writer.extend_from_slice(date.game_fmt().as_bytes());
+                            wtr.write_date(date)?;
                         } else {
                             return Err(Eu4Error::new(Eu4ErrorKind::InvalidDate(*x)));
                         }
                         known_date = false;
                     } else if let Some(date) = Eu4Date::from_binary_heuristic(*x) {
-                        writer.extend_from_slice(date.game_fmt().as_bytes());
+                        wtr.write_date(date)?;
                     } else {
-                        writer.extend_from_slice(format!("{}", x).as_bytes());
+                        wtr.write_i32(*x)?;
                     }
                 }
                 BinaryToken::Quoted(x) => {
-                    let data = x.view_data();
-                    let end_idx = match data.last() {
-                        Some(x) if *x == b'\n' => data.len() - 1,
-                        Some(_x) => data.len(),
-                        None => data.len(),
-                    };
-
-                    // quoted fields occuring as keys should remain unquoted
-                    if in_object == 1 {
-                        writer.extend_from_slice(&data[..end_idx]);
-                    } else {
-                        writer.push(b'"');
-                        writer.extend_from_slice(&data[..end_idx]);
-                        writer.push(b'"');
-                    }
+                    wtr.write_quoted(x.view_data())?;
                 }
                 BinaryToken::Unquoted(x) => {
-                    let data = x.view_data();
-                    writer.extend_from_slice(&data);
+                    wtr.write_unquoted(x.view_data())?;
                 }
-                BinaryToken::F32(x) => write!(writer, "{:.3}", x).map_err(Eu4ErrorKind::IoErr)?,
-                BinaryToken::F64(x) => write!(writer, "{:.5}", x).map_err(Eu4ErrorKind::IoErr)?,
+                BinaryToken::F32(x) => wtr.write_f32(*x)?,
+                BinaryToken::F64(x) => wtr.write_f64(*x)?,
                 BinaryToken::Token(x) => match TokenLookup.resolve(*x) {
                     Some(id)
                         if ((self.rewrite && id == "is_ironman")
                             || (id == "checksum" && !write_checksum))
-                            && in_object == 1 =>
+                            && wtr.expecting_key() =>
                     {
                         let skip = tokens
                             .get(token_idx + 1)
@@ -206,10 +172,9 @@ impl Melter {
                     }
                     Some(id) => {
                         // There are certain tokens that we know are integers and will dupe the date heuristic
-                        known_number = in_object == 1
-                            && (id == "random" || id.ends_with("seed") || id == "id");
-                        known_date = in_object == 1 && id == "date_built";
-                        writer.extend_from_slice(&id.as_bytes())
+                        known_number = id == "random" || id.ends_with("seed") || id == "id";
+                        known_date = id == "date_built";
+                        wtr.write_unquoted(id.as_bytes())?;
                     }
                     None => {
                         unknown_tokens.insert(*x);
@@ -217,7 +182,7 @@ impl Melter {
                             FailedResolveStrategy::Error => {
                                 return Err(Eu4ErrorKind::UnknownToken { token_id: *x }.into());
                             }
-                            FailedResolveStrategy::Ignore if in_object == 1 => {
+                            FailedResolveStrategy::Ignore if wtr.expecting_key() => {
                                 let skip = tokens
                                     .get(token_idx + 1)
                                     .map(|next_token| match next_token {
@@ -231,29 +196,19 @@ impl Melter {
                                 continue;
                             }
                             _ => {
-                                let unknown = format!("__unknown_0x{:x}", x);
-                                writer.extend_from_slice(unknown.as_bytes());
+                                write!(wtr, "__unknown_0x{:x}", x)?;
                             }
                         }
                     }
                 },
                 BinaryToken::Rgb(color) => {
-                    writer.extend_from_slice(b"rgb {");
-                    writer.extend_from_slice(format!("{} ", color.r).as_bytes());
-                    writer.extend_from_slice(format!("{} ", color.g).as_bytes());
-                    writer.extend_from_slice(format!("{}", color.b).as_bytes());
-                    writer.push(b'}');
+                    wtr.write_header(b"rgb")?;
+                    wtr.write_array_start()?;
+                    wtr.write_u32(color.r)?;
+                    wtr.write_u32(color.g)?;
+                    wtr.write_u32(color.b)?;
+                    wtr.write_end()?;
                 }
-            }
-
-            if !did_change && in_object == 1 {
-                writer.push(b'=');
-                in_object = 2;
-            } else if in_object == 2 {
-                in_object = 1;
-                writer.push(b'\n');
-            } else if in_object != 1 {
-                writer.push(b' ');
             }
 
             token_idx += 1;
@@ -391,17 +346,16 @@ mod tests {
     fn test_melt_skip_ironman_in_object() {
         let data = [
             0x45, 0x55, 0x34, 0x62, 0x69, 0x6e, 0x4d, 0x28, 0x01, 0x00, 0x0c, 0x00, 0x70, 0x98,
-            0x8d, 0x03, 0x23, 0x2d, 0x01, 0x00, 0x03, 0x00, 0x89, 0x35, 0x01, 0x00, 0x0e, 0x00, 0x01, 0x04, 0x00, 0x38, 0x2a, 0x01, 0x00, 0x0f,
-            0x00, 0x03, 0x00, 0x42, 0x48, 0x41,
+            0x8d, 0x03, 0x23, 0x2d, 0x01, 0x00, 0x03, 0x00, 0x89, 0x35, 0x01, 0x00, 0x0e, 0x00,
+            0x01, 0x04, 0x00, 0x38, 0x2a, 0x01, 0x00, 0x0f, 0x00, 0x03, 0x00, 0x42, 0x48, 0x41,
         ];
 
-        // a future todo is to remove the one leading space before the end bracket
-        let expected = b"EU4txt\ndate=1804.12.9\nimpassable={\n }\nplayer=\"BHA\"\n";
+        let expected = "EU4txt\ndate=1804.12.9\nimpassable={ }\nplayer=\"BHA\"\n";
         let (out, _unknown) = Melter::new()
             .with_on_failed_resolve(FailedResolveStrategy::Error)
             .melt(&data)
             .unwrap();
-        assert_eq!(out, &expected[..]);
+        assert_eq!(std::str::from_utf8(&out).unwrap(), &expected[..]);
     }
 
     #[test]
@@ -414,7 +368,7 @@ mod tests {
         data.extend_from_slice(b"1444.11.11\n");
         data.extend_from_slice(&0x0004u16.to_le_bytes());
 
-        let expected = b"EU4txt\nflags={\n schools_initiated=\"1444.11.11\"\n}\n";
+        let expected = b"EU4txt\nflags={\n  schools_initiated=\"1444.11.11\"\n}\n";
         let (out, _unknown) = Melter::new()
             .with_on_failed_resolve(FailedResolveStrategy::Error)
             .melt(&data)
@@ -430,12 +384,12 @@ mod tests {
             0x00, 0x03, 0x00, 0x42, 0x48, 0x41,
         ];
 
-        let expected = b"EU4txt\nplayer=\"BHA\"\n";
+        let expected = "EU4txt\nplayer=\"BHA\"\n";
         let (out, _unknown) = Melter::new()
             .with_on_failed_resolve(FailedResolveStrategy::Ignore)
             .melt(&data)
             .unwrap();
-        assert_eq!(out, &expected[..]);
+        assert_eq!(std::str::from_utf8(&out).unwrap(), &expected[..]);
     }
 
     #[test]
@@ -446,11 +400,11 @@ mod tests {
             0x48, 0x41,
         ];
 
-        let expected = b"EU4txt\ndate=__unknown_0xffff\nplayer=\"BHA\"\n";
+        let expected = "EU4txt\ndate=__unknown_0xffff\nplayer=\"BHA\"\n";
         let (out, _unknown) = Melter::new()
             .with_on_failed_resolve(FailedResolveStrategy::Ignore)
             .melt(&data)
             .unwrap();
-        assert_eq!(out, &expected[..]);
+        assert_eq!(std::str::from_utf8(&out).unwrap(), &expected[..]);
     }
 }
