@@ -104,7 +104,10 @@ impl Melter {
         tape: &BinaryTape,
         write_checksum: bool,
     ) -> Result<(), Eu4Error> {
-        let mut wtr = TextWriterBuilder::new().from_writer_visitor(writer, Eu4Visitor);
+        let mut wtr = TextWriterBuilder::new()
+            .indent_char(b'\t')
+            .indent_factor(1)
+            .from_writer_visitor(writer, Eu4Visitor);
         let mut token_idx = 0;
         let mut known_number = false;
         let mut known_date = false;
@@ -368,7 +371,7 @@ mod tests {
         data.extend_from_slice(b"1444.11.11\n");
         data.extend_from_slice(&0x0004u16.to_le_bytes());
 
-        let expected = b"EU4txt\nflags={\n  schools_initiated=\"1444.11.11\"\n}\n";
+        let expected = b"EU4txt\nflags={\n\tschools_initiated=\"1444.11.11\"\n}\n";
         let (out, _unknown) = Melter::new()
             .with_on_failed_resolve(FailedResolveStrategy::Error)
             .melt(&data)
