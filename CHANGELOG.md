@@ -1,3 +1,8 @@
+## v0.5.1 - 2021-05-28
+
+- Melt with tabs instead of spaces
+- Melted quoted values are now escaped as needed
+
 ## v0.5.0 - 2021-05-18
 
 - Melt output with same precision as game, so 32 bit numbers are written out with 3 decimal points and 64 bit numbers are written out with 5 decimal points
