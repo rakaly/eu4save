@@ -119,7 +119,7 @@ impl Melter {
                     wtr.write_object_start()?;
                 }
                 BinaryToken::HiddenObject(_) => {
-                    wtr.write_object_start()?;
+                    wtr.write_hidden_object_start()?;
                 }
                 BinaryToken::Array(_) => {
                     wtr.write_array_start()?;
