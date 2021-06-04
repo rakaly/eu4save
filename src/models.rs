@@ -530,10 +530,10 @@ pub struct Leader {
     pub siege: u16,
     pub monarch_id: Option<ObjId>,
 
-    // While activation can be none, it is so extremely rare that there is a test case for it to
-    // prevent regression.
+    // While activation and id can be none, it is so rare that there
+    // is a test case for it to prevent regression.
     pub activation: Option<Eu4Date>,
-    pub id: ObjId,
+    pub id: Option<ObjId>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

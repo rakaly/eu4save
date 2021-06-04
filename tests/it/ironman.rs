@@ -903,3 +903,14 @@ ironman_test!(
         twoway::find_bytes(melted_data, b"navy_strength=0.00000").unwrap();
     }
 );
+
+ironman_test!(
+    nor_lev,
+    "nor_lev.eu4",
+    IronmanQuery {
+        starting: "NOR",
+        player: "NOR",
+        patch: "1.31.4.0",
+        date: Eu4Date::parse_from_str("1676.6.7").unwrap()
+    }
+);
