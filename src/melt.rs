@@ -137,6 +137,8 @@ impl Melter {
                     } else if known_date {
                         if let Some(date) = Eu4Date::from_binary(*x) {
                             wtr.write_date(date)?;
+                        } else if self.on_failed_resolve != FailedResolveStrategy::Error {
+                            wtr.write_i32(*x)?;
                         } else {
                             return Err(Eu4Error::new(Eu4ErrorKind::InvalidDate(*x)));
                         }
