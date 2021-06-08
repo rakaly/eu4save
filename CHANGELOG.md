@@ -1,3 +1,7 @@
+## v0.5.2 - 2021-06-08
+
+- Allow invalid dates to be melted except in error mode
+
 ## v0.5.1 - 2021-05-28
 
 - Melt with tabs instead of spaces
