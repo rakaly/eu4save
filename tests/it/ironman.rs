@@ -912,5 +912,10 @@ ironman_test!(
         player: "NOR",
         patch: "1.31.4.0",
         date: Eu4Date::parse("1676.6.7").unwrap()
+    },
+    |query: Query, _melted_data: &[u8]| {
+        let mod1 = &query.save().meta.mods_enabled_names[0];
+        assert_eq!(mod1.filename.as_str(), "mod/ugc_2146396184.mod");
+        assert_eq!(mod1.name.as_str(), "Bigger Stellaris");
     }
 );

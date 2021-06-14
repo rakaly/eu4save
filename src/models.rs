@@ -29,10 +29,20 @@ pub struct Meta {
     pub not_observer: bool,
     #[serde(default)]
     pub dlc_enabled: Vec<String>,
+    #[serde(default)]
+    pub mod_enabled: Vec<String>,
+    #[serde(default)]
+    pub mods_enabled_names: Vec<ModName>,
     pub checksum: String,
     pub savegame_version: SavegameVersion,
     #[serde(default)]
     pub is_random_new_world: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModName {
+    pub filename: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
