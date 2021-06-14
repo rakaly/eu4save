@@ -1,11 +1,11 @@
 use crate::utils;
 use eu4save::{
     models::CountryEvent,
-    query::{NationEvent, NationEventKind, NationEvents, PlayerHistory},
-};
-use eu4save::{
-    query::{BuildingConstruction, BuildingEvent, Query},
-    Encoding, Eu4Date, Eu4Extractor, ProvinceId,
+    query::{
+        BuildingConstruction, BuildingEvent, NationEvent, NationEventKind, NationEvents,
+        PlayerHistory, Query,
+    },
+    Encoding, Eu4Date, Eu4Extractor, PdsDate, ProvinceId,
 };
 use std::io::{Cursor, Read};
 use std::{collections::HashMap, error::Error};
@@ -113,7 +113,7 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let marketplace_date = history
         .iter()
         .find(|x| x.building == "marketplace")
-        .map(|x| x.date.game_fmt());
+        .map(|x| x.date.game_fmt().to_string());
     assert_eq!(marketplace_date, Some(String::from("1506.5.25")));
 
     let fort_history: Vec<BuildingEvent> = history
@@ -124,12 +124,12 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let expected = vec![
         BuildingEvent {
             building: "fort_15th",
-            date: Eu4Date::new(1444, 11, 11).unwrap(),
+            date: Eu4Date::from_ymd(1444, 11, 11),
             action: BuildingConstruction::Constructed,
         },
         BuildingEvent {
             building: "fort_15th",
-            date: Eu4Date::new(1476, 11, 2).unwrap(),
+            date: Eu4Date::from_ymd(1476, 11, 2),
             action: BuildingConstruction::Destroyed,
         },
     ];
@@ -160,7 +160,7 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
             latest: "BYZ".parse().unwrap(),
             stored: "NPL".parse().unwrap(),
             events: vec![NationEvent {
-                date: Eu4Date::new(1540, 9, 15).unwrap(),
+                date: Eu4Date::from_ymd(1540, 9, 15),
                 kind: NationEventKind::Annexed
             }],
         }
@@ -178,11 +178,11 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
             stored: "BYZ".parse().unwrap(),
             events: vec![
                 NationEvent {
-                    date: Eu4Date::new(1701, 7, 11).unwrap(),
+                    date: Eu4Date::from_ymd(1701, 7, 11),
                     kind: NationEventKind::TagSwitch("NPL".parse().unwrap()),
                 },
                 NationEvent {
-                    date: Eu4Date::new(1706, 10, 20).unwrap(),
+                    date: Eu4Date::from_ymd(1706, 10, 20),
                     kind: NationEventKind::TagSwitch("BYZ".parse().unwrap()),
                 }
             ],
@@ -201,11 +201,11 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
             stored: "PER".parse().unwrap(),
             events: vec![
                 NationEvent {
-                    date: Eu4Date::new(1480, 1, 20).unwrap(),
+                    date: Eu4Date::from_ymd(1480, 1, 20),
                     kind: NationEventKind::TagSwitch("PER".parse().unwrap()),
                 },
                 NationEvent {
-                    date: Eu4Date::new(1577, 4, 20).unwrap(),
+                    date: Eu4Date::from_ymd(1577, 4, 20),
                     kind: NationEventKind::Annexed,
                 }
             ],
@@ -231,7 +231,7 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
                 latest: "SAX".parse().unwrap(),
                 stored: "SAX".parse().unwrap(),
                 events: vec![NationEvent {
-                    date: Eu4Date::new(1653, 11, 25).unwrap(),
+                    date: Eu4Date::from_ymd(1653, 11, 25),
                     kind: NationEventKind::Annexed,
                 }],
             },
@@ -249,15 +249,15 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
                 stored: "GER".parse().unwrap(),
                 events: vec![
                     NationEvent {
-                        date: Eu4Date::new(1598, 11, 8).unwrap(),
+                        date: Eu4Date::from_ymd(1598, 11, 8),
                         kind: NationEventKind::TagSwitch("WES".parse().unwrap()),
                     },
                     NationEvent {
-                        date: Eu4Date::new(1603, 11, 29).unwrap(),
+                        date: Eu4Date::from_ymd(1603, 11, 29),
                         kind: NationEventKind::TagSwitch("HAN".parse().unwrap()),
                     },
                     NationEvent {
-                        date: Eu4Date::new(1737, 7, 20).unwrap(),
+                        date: Eu4Date::from_ymd(1737, 7, 20),
                         kind: NationEventKind::TagSwitch("GER".parse().unwrap()),
                     }
                 ],
@@ -276,11 +276,11 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
                 stored: "FRA".parse().unwrap(),
                 events: vec![
                     NationEvent {
-                        date: Eu4Date::new(1533, 1, 25).unwrap(),
+                        date: Eu4Date::from_ymd(1533, 1, 25),
                         kind: NationEventKind::TagSwitch("IRE".parse().unwrap()),
                     },
                     NationEvent {
-                        date: Eu4Date::new(1644, 1, 11).unwrap(),
+                        date: Eu4Date::from_ymd(1644, 1, 11),
                         kind: NationEventKind::TagSwitch("FRA".parse().unwrap()),
                     }
                 ]

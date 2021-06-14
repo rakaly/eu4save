@@ -48,7 +48,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                         "base_production" => base_production = map.next_value()?,
                         "base_manpower" => base_manpower = map.next_value()?,
                         x => {
-                            if let Some(date) = Eu4Date::parse_from_str(x) {
+                            if let Ok(date) = Eu4Date::parse(x) {
                                 let event = map.next_value()?;
                                 events.push((date, event));
                             } else {

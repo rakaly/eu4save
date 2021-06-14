@@ -1,5 +1,8 @@
 use crate::{models::WarHistory, Eu4Date};
-use serde::{de, Deserialize, Deserializer};
+use serde::{
+    de::{self, Error},
+    Deserialize, Deserializer,
+};
 use std::fmt;
 
 impl<'de> Deserialize<'de> for WarHistory {
@@ -44,8 +47,7 @@ impl<'de> Deserialize<'de> for WarHistory {
                         "war_goal" => war_goal = map.next_value()?,
                         "succession" => succession = map.next_value()?,
                         x => {
-                            let date = Eu4Date::parse_from_str(x)
-                                .ok_or_else(|| de::Error::custom(format!("invalid date: {}", x)))?;
+                            let date = Eu4Date::parse(x).map_err(A::Error::custom)?;
                             let event = map.next_value()?;
                             events.push((date, event));
                         }

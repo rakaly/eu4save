@@ -1,6 +1,7 @@
 use crate::{tokens::TokenLookup, Eu4Date, Eu4Error, Eu4ErrorKind, Extraction};
 use jomini::{
-    BinaryTape, BinaryToken, FailedResolveStrategy, TextWriterBuilder, TokenResolver, WriteVisitor,
+    common::PdsDate, BinaryTape, BinaryToken, FailedResolveStrategy, TextWriterBuilder,
+    TokenResolver, WriteVisitor,
 };
 use std::{
     collections::HashSet,
@@ -136,7 +137,7 @@ impl Melter {
                         known_number = false;
                     } else if known_date {
                         if let Some(date) = Eu4Date::from_binary(*x) {
-                            wtr.write_date(date)?;
+                            wtr.write_date(date.game_fmt())?;
                         } else if self.on_failed_resolve != FailedResolveStrategy::Error {
                             wtr.write_i32(*x)?;
                         } else {
@@ -144,7 +145,7 @@ impl Melter {
                         }
                         known_date = false;
                     } else if let Some(date) = Eu4Date::from_binary_heuristic(*x) {
-                        wtr.write_date(date)?;
+                        wtr.write_date(date.game_fmt())?;
                     } else {
                         wtr.write_i32(*x)?;
                     }

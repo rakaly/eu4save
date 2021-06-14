@@ -1,11 +1,11 @@
 #![cfg(ironman)]
 
 use crate::utils;
-use eu4save::models::{GameDifficulty, ProvinceEvent, ProvinceEventValue, TaxManpowerModifier};
 use eu4save::{
+    models::{GameDifficulty, ProvinceEvent, ProvinceEventValue, TaxManpowerModifier},
     query::{LedgerPoint, NationEvent, NationEventKind, NationEvents, PlayerHistory, Query},
     CountryTag, Encoding, Eu4Date, Eu4Extractor, Eu4ExtractorBuilder, FailedResolveStrategy,
-    ProvinceId,
+    PdsDate, ProvinceId,
 };
 use paste::paste;
 use std::io::Cursor;
@@ -36,7 +36,7 @@ fn test_eu4_bin() {
             latest: "CRO".parse().unwrap(),
             stored: "CRO".parse().unwrap(),
             events: vec![NationEvent {
-                date: Eu4Date::new(1769, 1, 2).unwrap(),
+                date: Eu4Date::from_ymd(1769, 1, 2),
                 kind: NationEventKind::TagSwitch("CRO".parse().unwrap()),
             }],
         },
@@ -135,13 +135,13 @@ fn test_eu4_kandy_bin() {
         .find(|(_date, key, _value)| key.as_str() == "marketplace")
         .unwrap();
     assert!(matches!(val, ProvinceEventValue::Bool(v) if v == &true));
-    assert_eq!(date.game_fmt().as_str(), "1486.6.3");
+    assert_eq!(date.game_fmt().to_string(), String::from("1486.6.3"));
 
     let building_date = query
         .province_building_history(london)
         .iter()
         .find(|x| x.building == "marketplace")
-        .map(|x| x.date.game_fmt());
+        .map(|x| x.date.game_fmt().to_string());
     assert_eq!(building_date, Some(String::from("1486.6.3")));
 
     let building_date = query
@@ -295,7 +295,7 @@ ironman_test!(
         starting: "KND",
         player: "BHA",
         patch: "1.29.5.0",
-        date: Eu4Date::parse_from_str("1804.12.09").unwrap()
+        date: Eu4Date::parse("1804.12.09").unwrap()
     }
 );
 
@@ -306,7 +306,7 @@ ironman_test!(
         starting: "TYR",
         player: "TYR",
         patch: "1.30.3.0",
-        date: Eu4Date::parse_from_str("1581.03.01").unwrap()
+        date: Eu4Date::parse("1581.03.01").unwrap()
     }
 );
 
@@ -317,7 +317,7 @@ ironman_test!(
         starting: "MOS",
         player: "MOS",
         patch: "1.30.4.0",
-        date: Eu4Date::parse_from_str("1446.03.16").unwrap()
+        date: Eu4Date::parse("1446.03.16").unwrap()
     }
 );
 
@@ -329,11 +329,11 @@ fn trycone_expected_histories() -> Vec<PlayerHistory> {
             stored: "GBR".parse().unwrap(),
             events: vec![
                 NationEvent {
-                    date: Eu4Date::new(1518, 1, 29).unwrap(),
+                    date: Eu4Date::from_ymd(1518, 1, 29),
                     kind: NationEventKind::TagSwitch("IRE".parse().unwrap()),
                 },
                 NationEvent {
-                    date: Eu4Date::new(1606, 8, 4).unwrap(),
+                    date: Eu4Date::from_ymd(1606, 8, 4),
                     kind: NationEventKind::TagSwitch("GBR".parse().unwrap()),
                 },
             ],
@@ -350,19 +350,19 @@ fn leinster_history() -> NationEvents {
         stored: "LEI".parse().unwrap(),
         events: vec![
             NationEvent {
-                date: Eu4Date::new(1451, 8, 2).unwrap(),
+                date: Eu4Date::from_ymd(1451, 8, 2),
                 kind: NationEventKind::Annexed,
             },
             NationEvent {
-                date: Eu4Date::new(1588, 6, 15).unwrap(),
+                date: Eu4Date::from_ymd(1588, 6, 15),
                 kind: NationEventKind::Appeared,
             },
             NationEvent {
-                date: Eu4Date::new(1605, 2, 15).unwrap(),
+                date: Eu4Date::from_ymd(1605, 2, 15),
                 kind: NationEventKind::Annexed,
             },
             NationEvent {
-                date: Eu4Date::new(1716, 2, 9).unwrap(),
+                date: Eu4Date::from_ymd(1716, 2, 9),
                 kind: NationEventKind::Appeared,
             },
         ],
@@ -376,7 +376,7 @@ ironman_test!(
         starting: "TYR",
         player: "GBR",
         patch: "1.30.4.0",
-        date: Eu4Date::parse_from_str("1725.05.12").unwrap()
+        date: Eu4Date::parse("1725.05.12").unwrap()
     },
     |query: Query, _melted_data: &[u8]| {
         let province_owners = query.province_owners();
@@ -388,7 +388,7 @@ ironman_test!(
         assert_eq!(&histories, &trycone_expected_histories());
         let tag_resolver = query.tag_resolver(&nation_events);
         assert_eq!(
-            tag_resolver.resolve("IRE".parse().unwrap(), Eu4Date::new(1529, 3, 1).unwrap()),
+            tag_resolver.resolve("IRE".parse().unwrap(), Eu4Date::from_ymd(1529, 3, 1)),
             "GBR".parse().unwrap()
         );
 
@@ -612,11 +612,11 @@ fn true_heir_expected_histories() -> Vec<PlayerHistory> {
             stored: "MUG".parse().unwrap(),
             events: vec![
                 NationEvent {
-                    date: Eu4Date::new(1467, 12, 3).unwrap(),
+                    date: Eu4Date::from_ymd(1467, 12, 3),
                     kind: NationEventKind::TagSwitch("DLH".parse().unwrap()),
                 },
                 NationEvent {
-                    date: Eu4Date::new(1467, 12, 3).unwrap(),
+                    date: Eu4Date::from_ymd(1467, 12, 3),
                     kind: NationEventKind::TagSwitch("MUG".parse().unwrap()),
                 },
             ],
@@ -633,7 +633,7 @@ ironman_test!(
         starting: "SIS",
         player: "MUG",
         patch: "1.30.3.0",
-        date: Eu4Date::parse_from_str("1508.04.27").unwrap()
+        date: Eu4Date::parse("1508.04.27").unwrap()
     },
     |query: Query, _melted_data: &[u8]| {
         let province_owners = query.province_owners();
@@ -650,7 +650,7 @@ ironman_test!(
         starting: "KOL",
         player: "KOL",
         patch: "1.30.3.0",
-        date: Eu4Date::parse_from_str("1821.01.03").unwrap()
+        date: Eu4Date::parse("1821.01.03").unwrap()
     }
 );
 
@@ -661,7 +661,7 @@ ironman_test!(
         starting: "MLO",
         player: "ITA",
         patch: "1.29.6.0",
-        date: Eu4Date::parse_from_str("1547.03.05").unwrap()
+        date: Eu4Date::parse("1547.03.05").unwrap()
     },
     |query: Query, _melted_data: &[u8]| {
         assert_eq!(
@@ -682,7 +682,7 @@ ironman_test!(
         starting: "BUR",
         player: "BUR",
         patch: "1.30.4.0",
-        date: Eu4Date::parse_from_str("1821.01.03").unwrap()
+        date: Eu4Date::parse("1821.01.03").unwrap()
     }
 );
 
@@ -693,7 +693,7 @@ ironman_test!(
         starting: "BYZ",
         player: "BYZ",
         patch: "1.30.4.0",
-        date: Eu4Date::parse_from_str("1513.05.25").unwrap()
+        date: Eu4Date::parse("1513.05.25").unwrap()
     }
 );
 
@@ -704,7 +704,7 @@ ironman_test!(
         starting: "SZO",
         player: "SZO",
         patch: "1.30.4.0",
-        date: Eu4Date::parse_from_str("1800.01.01").unwrap()
+        date: Eu4Date::parse("1800.01.01").unwrap()
     },
     |query: Query, _melted_data: &[u8]| {
         assert_eq!(
@@ -720,7 +720,7 @@ fn cilli_history() -> NationEvents {
         latest: "CRO".parse().unwrap(),
         stored: "CRO".parse().unwrap(),
         events: vec![NationEvent {
-            date: Eu4Date::new(1509, 6, 6).unwrap(),
+            date: Eu4Date::from_ymd(1509, 6, 6),
             kind: NationEventKind::TagSwitch("CRO".parse().unwrap()),
         }],
     }
@@ -733,7 +733,7 @@ ironman_test!(
         starting: "CLI",
         player: "CRO",
         patch: "1.30.1.0",
-        date: Eu4Date::parse_from_str("1509.06.10").unwrap()
+        date: Eu4Date::parse("1509.06.10").unwrap()
     },
     |query: Query, _melted_data: &[u8]| {
         let province_owners = query.province_owners();
@@ -881,7 +881,7 @@ ironman_test!(
         starting: "CAS",
         player: "CAS",
         patch: "1.30.6.0",
-        date: Eu4Date::parse_from_str("1505.11.25").unwrap()
+        date: Eu4Date::parse("1505.11.25").unwrap()
     },
     |query: Query, _melted_data: &[u8]| {
         assert!(!query.save().meta.is_ironman);
@@ -895,7 +895,7 @@ ironman_test!(
         starting: "ENG",
         player: "ENG",
         patch: "1.31.0.0",
-        date: Eu4Date::parse_from_str("1444.11.11").unwrap()
+        date: Eu4Date::parse("1444.11.11").unwrap()
     },
     |_query: Query, melted_data: &[u8]| {
         // Find inukshuk
@@ -911,6 +911,6 @@ ironman_test!(
         starting: "NOR",
         player: "NOR",
         patch: "1.31.4.0",
-        date: Eu4Date::parse_from_str("1676.6.7").unwrap()
+        date: Eu4Date::parse("1676.6.7").unwrap()
     }
 );

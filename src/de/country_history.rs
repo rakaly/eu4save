@@ -46,7 +46,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                         "primary_culture" => primary_culture = map.next_value()?,
                         "add_government_reform" => add_government_reform.push(map.next_value()?),
                         x => {
-                            if let Some(date) = Eu4Date::parse_from_str(x) {
+                            if let Ok(date) = Eu4Date::parse(x) {
                                 let event = map.next_value()?;
                                 events.push((date, event));
                             }
