@@ -254,6 +254,8 @@ pub struct Province {
     pub modifiers: Vec<Modifier>,
     #[jomini(default)]
     pub history: ProvinceHistory,
+    #[jomini(default = "default_true")]
+    pub ub: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -784,4 +786,8 @@ pub struct BattleSide {
 
     #[serde(deserialize_with = "empty_string_is_none")]
     pub commander: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
 }
