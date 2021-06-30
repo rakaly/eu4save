@@ -924,6 +924,7 @@ fn province_owners(save: &Eu4Save) -> ProvinceOwners {
 fn calc_histories(save: &Eu4Save, nation_events: &[NationEvents]) -> Vec<PlayerHistory> {
     let mut result = Vec::with_capacity(save.game.players_countries.len());
     let players = players(save);
+    let mut leftovers = Vec::new();
     for (&tag, country) in save.game.countries.iter().filter(|(_, c)| c.was_player) {
         let tag_players: Vec<_> = players
             .iter()
@@ -941,12 +942,39 @@ fn calc_histories(save: &Eu4Save, nation_events: &[NationEvents]) -> Vec<PlayerH
                 events: Vec::new(),
             });
 
-        result.push(PlayerHistory {
+        let no_players = tag_players.is_empty();
+        let history = PlayerHistory {
             history,
             is_human: country.human,
             player_names: tag_players,
-        })
+        };
+
+        if country.was_player && no_players {
+            leftovers.push(history);
+        } else {
+            result.push(history);
+        }
     }
+
+    // Only for ironman will we try and resolve "release and play as" as the
+    // save does not often paint an accurate picture of these transitions. And
+    // we need to track these for achievements like spaghetti western.
+    if result.len() == 1 && save.meta.is_ironman {
+        for x in &mut result {
+            if x.is_human && x.player_names.len() == 1 && x.history.stored == x.history.latest {
+                let country = save.game.countries.get(&x.history.stored);
+                let rpa = country.map_or(false, |x| x.has_switched_nation);
+                let alive = country.map_or(false, |x| x.num_of_cities > 0);
+                if rpa && alive {
+                    if let Some(end) = leftovers.pop() {
+                        x.history.initial = end.history.initial;
+                    }
+                }
+            }
+        }
+    }
+
+    result.append(&mut leftovers);
 
     result
 }
