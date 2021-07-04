@@ -1,3 +1,9 @@
+## v0.5.3 - 2021-06-08
+
+- Fix improper melted output when a name ended with a quote
+- Include mod info in deserialization
+- Track release and play as in ironman
+
 ## v0.5.2 - 2021-06-08
 
 - Allow invalid dates to be melted except in error mode
