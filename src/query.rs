@@ -546,6 +546,12 @@ impl Query {
     }
 
     fn mana_spent_indexed(&self, data: &[(i32, i32)]) -> CountryManaSpend {
+        let offset = if self.save().meta.savegame_version.second >= 31 {
+            1
+        } else {
+            0
+        };
+
         let force_march = find_index(8, data) + find_index(45, data);
         CountryManaSpend {
             buy_idea: find_index(0, data),
@@ -573,30 +579,30 @@ impl Query {
             reduce_we: find_index(22, data),
             boost_faction: find_index(23, data),
             raise_war_taxes: find_index(24, data),
-            buy_native_advancement: find_index(25, data),
-            increse_tariffs: find_index(26, data),
-            promote_merc: find_index(27, data),
-            decrease_tariffs: find_index(28, data),
-            move_trade_port: find_index(29, data),
-            create_trade_post: find_index(30, data),
-            siege_sorties: find_index(31, data),
-            buy_religious_reform: find_index(32, data),
-            set_primary_culture: find_index(33, data),
-            add_accepted_culture: find_index(34, data),
-            remove_accepted_culture: find_index(35, data),
-            strengthen_government: find_index(36, data),
-            boost_militarization: find_index(37, data),
-            artillery_barrage: find_index(39, data),
-            establish_siberian_frontier: find_index(40, data),
-            government_interaction: find_index(41, data),
-            naval_barrage: find_index(43, data),
-            create_leader: find_index(46, data),
-            enforce_culture: find_index(47, data),
-            effect: find_index(48, data),
-            minority_expulsion: find_index(49, data),
-            other: find_index(38, data)
-                + find_index(42, data)
-                + find_index(44, data)
+            buy_native_advancement: if offset != 0 { 0 } else { find_index(25, data) },
+            increse_tariffs: find_index(26 - offset, data),
+            promote_merc: find_index(27 - offset, data),
+            decrease_tariffs: find_index(28 - offset, data),
+            move_trade_port: find_index(29 - offset, data),
+            create_trade_post: find_index(30 - offset, data),
+            siege_sorties: find_index(31 - offset, data),
+            buy_religious_reform: find_index(32 - offset, data),
+            set_primary_culture: find_index(33 - offset, data),
+            add_accepted_culture: find_index(34 - offset, data),
+            remove_accepted_culture: find_index(35 - offset, data),
+            strengthen_government: find_index(36 - offset, data),
+            boost_militarization: find_index(37 - offset, data),
+            artillery_barrage: find_index(39 - offset, data),
+            establish_siberian_frontier: find_index(40 - offset, data),
+            government_interaction: find_index(41 - offset, data),
+            naval_barrage: find_index(43 - offset, data),
+            create_leader: find_index(46 - offset, data),
+            enforce_culture: find_index(47 - offset, data),
+            effect: find_index(48 - offset, data),
+            minority_expulsion: find_index(49 - offset, data),
+            other: find_index(38 - offset, data)
+                + find_index(42 - offset, data)
+                + find_index(44 - offset, data)
                 + data
                     .iter()
                     .filter(|(ind, _)| *ind > 49)
