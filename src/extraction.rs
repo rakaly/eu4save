@@ -269,7 +269,7 @@ where
         .read_to_end(&mut buffer)
         .map_err(|e| Eu4ErrorKind::ZipExtraction(name, e))?;
 
-    if let Some(data) = is_bin(&buffer) {
+    if let Some(data) = is_bin(buffer) {
         let res = BinaryDeserializer::eu4_builder()
             .on_failed_resolve(on_failed_resolve)
             .from_slice(data, &TokenLookup)
@@ -278,7 +278,7 @@ where
                 err: e,
             })?;
         Ok((res, Encoding::BinZip))
-    } else if let Some(data) = is_text(&buffer) {
+    } else if let Some(data) = is_text(buffer) {
         let res = TextDeserializer::from_windows1252_slice(data)?;
         Ok((res, Encoding::TextZip))
     } else {

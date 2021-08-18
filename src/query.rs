@@ -428,7 +428,7 @@ impl Query {
         self.save
             .game
             .countries
-            .get(&country_tag)
+            .get(country_tag)
             .map(|x| self.country_color_to_hex(x))
     }
 

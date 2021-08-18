@@ -41,7 +41,7 @@ where
 
     let mut missing_indices = Vec::new();
     for i in 0..max_indices {
-        if ded.iter().find(|&x| i == x.index).is_none() {
+        if !ded.iter().any(|x| i == x.index) {
             missing_indices.push(i);
         }
     }

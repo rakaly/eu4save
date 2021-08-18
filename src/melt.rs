@@ -80,7 +80,7 @@ impl Melter {
             .map_or(false, |x| x == &[0x50, 0x4b, 0x03, 0x04][..]);
 
         if is_zip {
-            self.melt_zip(&mut out, &mut unknown_tokens, &data)?;
+            self.melt_zip(&mut out, &mut unknown_tokens, data)?;
         } else {
             out.reserve(data.len() * 2);
             let cut_header_len = if data
