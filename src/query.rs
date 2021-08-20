@@ -135,6 +135,7 @@ pub struct CountryManaSpend {
     pub effect: i32,
     pub minority_expulsion: i32,
     pub other: i32,
+    pub add_tribal_land: i32,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
@@ -596,13 +597,18 @@ impl Query {
             establish_siberian_frontier: find_index(40 - offset, data),
             government_interaction: find_index(41 - offset, data),
             naval_barrage: find_index(43 - offset, data),
-            create_leader: find_index(46 - offset, data),
-            enforce_culture: find_index(47 - offset, data),
-            effect: find_index(48 - offset, data),
-            minority_expulsion: find_index(49 - offset, data),
+            add_tribal_land: if offset != 1 {
+                0
+            } else {
+                find_index(44 - offset, data)
+            },
+            create_leader: find_index(46, data),
+            enforce_culture: find_index(47, data),
+            effect: find_index(48, data),
+            minority_expulsion: find_index(49, data),
             other: find_index(38 - offset, data)
                 + find_index(42 - offset, data)
-                + find_index(44 - offset, data)
+                + find_index(44, data)
                 + data
                     .iter()
                     .filter(|(ind, _)| *ind > 49)
