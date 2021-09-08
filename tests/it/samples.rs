@@ -335,3 +335,17 @@ fn test_handle_heavily_nested_events() {
     let (_save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
     assert_eq!(encoding, Encoding::TextZip);
 }
+
+#[test]
+fn test_paperman_text() -> Result<(), Box<dyn Error>> {
+    let data = utils::request("paperman.eu4.zip");
+    let reader = Cursor::new(&data[..]);
+    let mut zip = zip::ZipArchive::new(reader)?;
+    let mut zip_file = zip.by_index(0)?;
+    let mut buffer = Vec::with_capacity(0);
+    zip_file.read_to_end(&mut buffer)?;
+    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer))?;
+    assert_eq!(encoding, Encoding::Text);
+    assert_eq!(save.meta.player, "GER".parse()?);
+    Ok(())
+}

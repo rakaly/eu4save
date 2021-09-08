@@ -14,7 +14,7 @@ pub struct Eu4SaveMeta {
     pub game: Option<GameState>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, JominiDeserialize)]
 pub struct Meta {
     pub campaign_id: String,
     pub save_game: String,
@@ -22,20 +22,21 @@ pub struct Meta {
     pub displayed_country_name: String,
     pub campaign_length: i32,
     pub date: Eu4Date,
-    #[serde(default)]
+    #[jomini(default)]
     pub is_ironman: bool,
-    #[serde(default, alias = "multi_player")]
+    #[jomini(default, alias = "multi_player")]
     pub multiplayer: bool,
     pub not_observer: bool,
-    #[serde(default)]
+    #[jomini(default)]
     pub dlc_enabled: Vec<String>,
-    #[serde(default)]
+    #[jomini(default)]
     pub mod_enabled: Vec<String>,
-    #[serde(default)]
+    #[jomini(default)]
     pub mods_enabled_names: Vec<ModName>,
+    #[jomini(take_last)]
     pub checksum: String,
     pub savegame_version: SavegameVersion,
-    #[serde(default)]
+    #[jomini(default)]
     pub is_random_new_world: bool,
 }
 
@@ -78,6 +79,7 @@ pub struct GameState {
     pub active_wars: Vec<ActiveWar>,
     #[jomini(duplicated, alias = "previous_war")]
     pub previous_wars: Vec<PreviousWar>,
+    #[jomini(default)]
     pub achievement_ok: bool,
     #[jomini(default)]
     pub achievement: Vec<i32>,
