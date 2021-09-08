@@ -14,7 +14,7 @@ pub struct Eu4SaveMeta {
     pub game: Option<GameState>,
 }
 
-#[derive(Debug, Clone, JominiDeserialize)]
+#[derive(Debug, Clone, JominiDeserialize, Serialize)]
 pub struct Meta {
     pub campaign_id: String,
     pub save_game: String,
@@ -25,6 +25,7 @@ pub struct Meta {
     #[jomini(default)]
     pub is_ironman: bool,
     #[jomini(default, alias = "multi_player")]
+    #[serde(alias = "multi_player")]
     pub multiplayer: bool,
     pub not_observer: bool,
     #[jomini(default)]
