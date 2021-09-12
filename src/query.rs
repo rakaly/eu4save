@@ -190,8 +190,8 @@ pub struct NationEvents {
     pub initial: CountryTag,
 
     /// The latest tag that a country achieved. If DMS -> IRE but then
-    // IRE is annexed by SCO which culture shifts to form IRE then both
-    // initial tags of SCO and DMS will report a latest tag of IRE
+    /// IRE is annexed by SCO which culture shifts to form IRE then both
+    /// initial tags of SCO and DMS will report a latest tag of IRE
     pub latest: CountryTag,
 
     /// The tag which the history of this country is stored under. For
