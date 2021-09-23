@@ -1,11 +1,11 @@
 use crate::utils;
 use eu4save::{
-    models::CountryEvent,
+    models::{CountryEvent, Meta},
     query::{
         BuildingConstruction, BuildingEvent, NationEvent, NationEventKind, NationEvents,
         PlayerHistory, Query,
     },
-    Encoding, Eu4Date, Eu4Extractor, PdsDate, ProvinceId,
+    Encoding, Eu4Date, Eu4Extractor, PdsDate, ProvinceId, RawEncoding,
 };
 use std::io::{Cursor, Read};
 use std::{collections::HashMap, error::Error};
@@ -77,6 +77,23 @@ fn test_eu4_compressed_text() -> Result<(), Box<dyn Error>> {
 
     let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&data[..]))?;
     assert!(save.game.is_none());
+    Ok(())
+}
+
+#[test]
+fn test_eu4_compressed_text_raw() -> Result<(), Box<dyn Error>> {
+    let data = utils::request("eng.txt.compressed.eu4");
+    let reader = Cursor::new(&data[..]);
+    let mut zip = zip::ZipArchive::new(reader)?;
+    let mut zip_file = zip.by_name("meta")?;
+    let mut buffer = Vec::with_capacity(0);
+    zip_file.read_to_end(&mut buffer)?;
+
+    let (meta, encoding) = Eu4Extractor::extract_raw(&buffer)?;
+    let meta: Meta = meta;
+    assert_eq!(encoding, RawEncoding::Text);
+    assert_eq!(meta.player, "ENG".parse()?);
+
     Ok(())
 }
 

@@ -1,9 +1,12 @@
 use crate::models::{Eu4Save, Eu4SaveMeta, GameState, Meta};
 use crate::{tokens::TokenLookup, Eu4Error, Eu4ErrorKind, FailedResolveStrategy};
 use jomini::{BinaryDeserializer, TextDeserializer, TextTape};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 use std::fmt;
 use std::io::{Read, Seek, SeekFrom};
+
+const TXT_HEADER: &[u8] = b"EU4txt";
+const BIN_HEADER: &[u8] = b"EU4bin";
 
 /// Describes the format of the save before decoding
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -32,6 +35,16 @@ impl fmt::Display for Encoding {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_str())
     }
+}
+
+/// Describes the format of the save before decoding
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RawEncoding {
+    /// Save is a plaintext document
+    Text,
+
+    /// Save is a binary document
+    Bin,
 }
 
 /// The memory allocation strategy for handling zip files
@@ -88,7 +101,7 @@ impl Eu4ExtractorBuilder {
     where
         R: Read + Seek,
     {
-        let mut header = [0; "EU4txt".len()];
+        let mut header = [0; TXT_HEADER.len()];
         reader.read_exact(&mut header)?;
 
         let mut buffer = Vec::with_capacity(0);
@@ -120,7 +133,7 @@ impl Eu4ExtractorBuilder {
     where
         R: Read + Seek,
     {
-        let mut header = [0; "EU4txt".len()];
+        let mut header = [0; TXT_HEADER.len()];
         reader.read_exact(&mut header)?;
 
         let mut buffer = Vec::with_capacity(0);
@@ -171,7 +184,7 @@ impl Eu4ExtractorBuilder {
     where
         R: Read + Seek,
     {
-        let mut header = [0; "EU4txt".len()];
+        let mut header = [0; TXT_HEADER.len()];
         reader.read_exact(&mut header)?;
 
         let mut buffer = Vec::with_capacity(0);
@@ -203,6 +216,30 @@ impl Eu4ExtractorBuilder {
             Ok((Eu4SaveMeta { meta, game: None }, encoding))
         } else {
             Err(Eu4ErrorKind::UnknownHeader.into())
+        }
+    }
+
+    pub fn extract_raw<'de, T>(&self, data: &'de [u8]) -> Result<(T, RawEncoding), Eu4Error>
+    where
+        T: Deserialize<'de>,
+    {
+        if data.len() < TXT_HEADER.len() {
+            return Err(Eu4ErrorKind::UnknownHeader.into());
+        }
+
+        let (header, body) = data.split_at(TXT_HEADER.len());
+        match header {
+            TXT_HEADER => {
+                let result: T = TextDeserializer::from_windows1252_slice(body)?;
+                Ok((result, RawEncoding::Text))
+            }
+            BIN_HEADER => {
+                let result: T = BinaryDeserializer::eu4_builder()
+                    .on_failed_resolve(self.on_failed_resolve)
+                    .from_slice(body, &TokenLookup)?;
+                Ok((result, RawEncoding::Bin))
+            }
+            _ => Err(Eu4ErrorKind::UnknownHeader.into()),
         }
     }
 }
@@ -241,6 +278,14 @@ impl Eu4Extractor {
         R: Read + Seek,
     {
         Self::builder().extract_meta_optimistic(reader)
+    }
+
+    /// Customize how data is deserialized from raw data
+    pub fn extract_raw<'de, T>(data: &'de [u8]) -> Result<(T, RawEncoding), Eu4Error>
+    where
+        T: Deserialize<'de>,
+    {
+        Self::builder().extract_raw(data)
     }
 }
 
@@ -328,7 +373,7 @@ where
 }
 
 fn is_text(data: &[u8]) -> Option<&[u8]> {
-    let sentry = b"EU4txt";
+    let sentry = TXT_HEADER;
     if data.get(..sentry.len()).map_or(false, |x| x == sentry) {
         Some(&data[sentry.len()..])
     } else {
@@ -337,7 +382,7 @@ fn is_text(data: &[u8]) -> Option<&[u8]> {
 }
 
 fn is_bin(data: &[u8]) -> Option<&[u8]> {
-    let sentry = b"EU4bin";
+    let sentry = BIN_HEADER;
     if data.get(..sentry.len()).map_or(false, |x| x == sentry) {
         Some(&data[sentry.len()..])
     } else {
