@@ -294,7 +294,7 @@ impl Melter {
                     let mut mmap = memmap::MmapMut::map_anon(zip_file.size() as usize)?;
                     std::io::copy(&mut zip_file, &mut mmap.as_mut())
                         .map_err(|e| Eu4ErrorKind::ZipExtraction(file, e))?;
-                    self.melt_zip_entry(out, unknown_tokens, &mmap[..], file)?
+                    self.melt_entry(out, unknown_tokens, &mmap[..], file)?
                 }
             }
         }
