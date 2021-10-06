@@ -223,7 +223,23 @@ impl Melter {
         Ok(())
     }
 
-    fn melt_zip_entry(
+    pub fn melt_entries(
+        &self,
+        metadata: &[u8],
+        gamestate: &[u8],
+        ai: &[u8],
+    ) -> Result<(Vec<u8>, HashSet<u16>), Eu4Error> {
+        let mut out = Vec::with_capacity(gamestate.len());
+        out.extend_from_slice(b"EU4txt\n");
+
+        let mut unknown_tokens = HashSet::new();
+        self.melt_entry(&mut out, &mut unknown_tokens, metadata, "metadata")?;
+        self.melt_entry(&mut out, &mut unknown_tokens, gamestate, "gamestate")?;
+        self.melt_entry(&mut out, &mut unknown_tokens, ai, "ai")?;
+        Ok((out, unknown_tokens))
+    }
+
+    fn melt_entry(
         &self,
         mut out: &mut Vec<u8>,
         unknown_tokens: &mut HashSet<u16>,
@@ -270,7 +286,7 @@ impl Melter {
                     zip_file
                         .read_to_end(&mut inflated_data)
                         .map_err(|e| Eu4ErrorKind::ZipExtraction(file, e))?;
-                    self.melt_zip_entry(out, unknown_tokens, &inflated_data, file)?
+                    self.melt_entry(out, unknown_tokens, &inflated_data, file)?
                 }
 
                 #[cfg(feature = "mmap")]
