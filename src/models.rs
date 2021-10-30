@@ -164,16 +164,14 @@ pub struct HRE {
     pub electors: Vec<CountryTag>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
-#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 pub enum TaxManpowerModifier {
     Historical,
     Random,
     Equal,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
-#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
 pub enum GameDifficulty {
     VeryEasy,
     Easy,
@@ -182,8 +180,7 @@ pub enum GameDifficulty {
     VeryHard,
 }
 
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[derive(Debug, Clone, Serialize)]
 pub struct GameplayOptions {
     pub difficulty: GameDifficulty,
     pub tax_manpower_modifier: TaxManpowerModifier,
