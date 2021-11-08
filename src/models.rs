@@ -580,6 +580,7 @@ pub struct Loan {
     pub fixed_interest: bool,
     pub amount: i32,
     pub expiry_date: Eu4Date,
+    #[serde(default)]
     pub spawned: bool,
 }
 
