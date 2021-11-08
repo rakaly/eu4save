@@ -28,6 +28,7 @@ pub fn dlc_id(name: &str) -> Option<i32> {
         "Golden Century" => Some(95),
         "Emperor" => Some(101),
         "Leviathan" => Some(106),
+        "Origins" => Some(110),
         _ => None,
     }
 }
