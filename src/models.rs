@@ -88,6 +88,7 @@ pub struct GameState {
     pub completed_achievements: Vec<i32>,
     #[jomini(alias = "gameplaysettings")]
     pub gameplay_settings: GameplaySettings,
+    pub diplomacy: Diplomacy,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -801,4 +802,22 @@ pub struct BattleSide {
 
 fn default_true() -> bool {
     true
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct Diplomacy {
+    #[jomini(duplicated, default)]
+    pub dependency: Vec<DiplomacyDependency>,
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct DiplomacyDependency {
+    first: CountryTag,
+    second: CountryTag,
+    start_date: Eu4Date,
+    #[jomini(default)]
+    end_date: Option<Eu4Date>,
+    subject_type: String,
 }
