@@ -807,17 +807,17 @@ fn default_true() -> bool {
 #[derive(Debug, Clone, JominiDeserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Diplomacy {
-    #[jomini(duplicated, default)]
-    pub dependency: Vec<DiplomacyDependency>,
+    #[jomini(duplicated, default, alias = "dependency")]
+    pub dependencies: Vec<DiplomacyDependency>,
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct DiplomacyDependency {
-    first: CountryTag,
-    second: CountryTag,
-    start_date: Eu4Date,
+    pub first: CountryTag,
+    pub second: CountryTag,
+    pub start_date: Eu4Date,
     #[jomini(default)]
-    end_date: Option<Eu4Date>,
-    subject_type: String,
+    pub end_date: Option<Eu4Date>,
+    pub subject_type: String,
 }
