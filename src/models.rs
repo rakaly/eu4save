@@ -366,6 +366,8 @@ pub struct Country {
     pub innovativeness: f32,
     #[jomini(default)]
     pub religious_unity: f32,
+    #[jomini(default)]
+    pub church: Option<CountryChurch>,
     pub initialized_rivals: bool,
     pub national_focus: Option<String>,
     pub recalculate_strategy: bool,
@@ -569,6 +571,13 @@ pub struct CountryColors {
     pub map_color: Vec<u8>,
     #[serde(default, deserialize_with = "deserialize_vec_overflow_byte")]
     pub country_color: Vec<u8>,
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+pub struct CountryChurch {
+    pub power: f32,
+    #[jomini(duplicated, alias = "aspect")]
+    pub aspects: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
