@@ -574,6 +574,7 @@ pub struct CountryColors {
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct CountryChurch {
     pub power: f32,
     #[jomini(duplicated, alias = "aspect")]
