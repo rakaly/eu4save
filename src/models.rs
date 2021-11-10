@@ -816,7 +816,8 @@ pub struct Diplomacy {
 pub struct DiplomacyDependency {
     pub first: CountryTag,
     pub second: CountryTag,
-    pub start_date: Eu4Date,
+    #[jomini(default)]
+    pub start_date: Option<Eu4Date>,
     #[jomini(default)]
     pub end_date: Option<Eu4Date>,
     pub subject_type: String,
