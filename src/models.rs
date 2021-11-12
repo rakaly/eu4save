@@ -588,6 +588,7 @@ pub struct Loan {
     pub id: ObjId,
     pub lender: String,
     pub interest: f32,
+    #[serde(default)]
     pub fixed_interest: bool,
     pub amount: i32,
     pub expiry_date: Eu4Date,
