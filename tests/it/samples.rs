@@ -53,10 +53,7 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     }];
 
     let reb_decision = query
-        .save()
-        .game
-        .countries
-        .get(&("REB".parse().unwrap()))
+        .country(&"REB".parse().unwrap())
         .unwrap()
         .decision_seed;
     assert_eq!(reb_decision, 684859145);

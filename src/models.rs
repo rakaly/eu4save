@@ -70,7 +70,8 @@ pub struct GameState {
     pub economic_hegemon: Option<Hegemon>,
     pub religion_instance_data: HashMap<String, ReligionInstanceDatum>,
     pub empire: Option<HRE>,
-    pub countries: HashMap<CountryTag, Country>,
+    #[jomini(default, deserialize_with = "deserialize_vec_pair")]
+    pub countries: Vec<(CountryTag, Country)>,
     pub provinces: HashMap<ProvinceId, Province>,
     pub income_statistics: LedgerData,
     pub nation_size_statistics: LedgerData,
@@ -295,7 +296,7 @@ pub enum ProvinceEvent {
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct ControllerEvent {
-    tag: CountryTag,
+    pub tag: CountryTag,
 }
 
 #[derive(Debug, Clone)]

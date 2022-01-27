@@ -290,7 +290,7 @@ impl Eu4Extractor {
 }
 
 fn melt_in_memory<T, R>(
-    mut buffer: &mut Vec<u8>,
+    buffer: &mut Vec<u8>,
     name: &'static str,
     zip: &mut zip::ZipArchive<R>,
     on_failed_resolve: FailedResolveStrategy,
@@ -311,7 +311,7 @@ where
 
     buffer.reserve(zip_file.size() as usize);
     zip_file
-        .read_to_end(&mut buffer)
+        .read_to_end(buffer)
         .map_err(|e| Eu4ErrorKind::ZipExtraction(name, e))?;
 
     if let Some(data) = is_bin(buffer) {

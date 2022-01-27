@@ -55,20 +55,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         save.game
             .countries
             .iter()
-            .map(|(&tag, c)| (tag, c.ledger.income.as_slice())),
+            .map(|(tag, c)| (*tag, c.ledger.income.as_slice())),
     );
     deduce_vec(
         save.game
             .countries
             .iter()
-            .map(|(&tag, c)| (tag, c.ledger.expense.as_slice())),
+            .map(|(tag, c)| (*tag, c.ledger.expense.as_slice())),
     );
     deduce_vec(
         save.game
             .countries
             .iter()
             .filter(|(_tag, c)| c.num_of_cities > 0)
-            .map(|(&tag, c)| (tag, c.losses.members.as_slice())),
+            .map(|(tag, c)| (*tag, c.losses.members.as_slice())),
     );
 
     Ok(())

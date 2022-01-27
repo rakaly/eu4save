@@ -240,22 +240,86 @@ pub struct ResolvedWarParticipants {
     pub participants: Vec<ResolvedWarParticipant>,
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct SaveCountry<'a> {
+    pub id: usize,
+    pub tag: CountryTag,
+    pub country: &'a Country,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TagId {
+    id: usize,
+    country_index: usize,
+    tag: CountryTag,
+}
+
 #[derive(Debug)]
 pub struct Query {
     save: Eu4Save,
+    tag_ids: Vec<TagId>,
+    tag_lookup: HashMap<CountryTag, TagId>,
     buildings: OnceCell<HashSet<String>>,
 }
 
 impl Query {
     pub fn from_save(save: Eu4Save) -> Self {
+        let tag_ids: Vec<_> = save
+            .game
+            .countries
+            .iter()
+            .enumerate()
+            .map(|(i, (tag, _))| TagId {
+                country_index: i,
+                id: i + 1,
+                tag: *tag,
+            })
+            .collect();
+
+        let tag_lookup = tag_ids.iter().map(|id| (id.tag, *id)).collect();
+
         Query {
             save,
+            tag_ids,
+            tag_lookup,
             buildings: OnceCell::default(),
         }
     }
 
     pub fn save(&self) -> &Eu4Save {
         &self.save
+    }
+
+    pub fn save_countries(&self) -> impl Iterator<Item = SaveCountry> + '_ {
+        self.save
+            .game
+            .countries
+            .iter()
+            .zip(self.tag_ids.iter())
+            .map(|((_, country), tag_id)| SaveCountry {
+                id: tag_id.id,
+                tag: tag_id.tag,
+                country,
+            })
+    }
+
+    pub fn save_country(&self, tag: &CountryTag) -> Option<SaveCountry> {
+        self.tag_lookup.get(tag).and_then(|tag_id| {
+            self.save
+                .game
+                .countries
+                .get(tag_id.country_index)
+                .map(|(_, country)| SaveCountry {
+                    id: tag_id.id,
+                    tag: tag_id.tag,
+                    country,
+                })
+        })
+    }
+
+    pub fn country(&self, tag: &CountryTag) -> Option<&Country> {
+        self.save_country(tag).map(|x| x.country)
     }
 
     /// Returns a set of the names of the players who participated in a playthrough.
@@ -276,7 +340,63 @@ impl Query {
     /// - The names of the players in the session
     /// - A list of all prior tags that country had been
     pub fn player_histories(&self, nation_events: &[NationEvents]) -> Vec<PlayerHistory> {
-        calc_histories(&self.save, nation_events)
+        let save = self.save();
+        let mut result = Vec::with_capacity(save.game.players_countries.len());
+        let players = players(save);
+        let mut leftovers = Vec::new();
+        for (tag, country) in save.game.countries.iter().filter(|(_, c)| c.was_player) {
+            let tag = *tag;
+            let tag_players: Vec<_> = players
+                .iter()
+                .filter(|x| x.tag == tag)
+                .map(|x| x.name.clone())
+                .collect();
+            let history = nation_events
+                .iter()
+                .find(|x| x.stored == tag)
+                .cloned()
+                .unwrap_or_else(|| NationEvents {
+                    initial: tag,
+                    latest: tag,
+                    stored: tag,
+                    events: Vec::new(),
+                });
+
+            let no_players = tag_players.is_empty();
+            let history = PlayerHistory {
+                history,
+                is_human: country.human,
+                player_names: tag_players,
+            };
+
+            if country.was_player && no_players {
+                leftovers.push(history);
+            } else {
+                result.push(history);
+            }
+        }
+
+        // Only for ironman will we try and resolve "release and play as" as the
+        // save does not often paint an accurate picture of these transitions. And
+        // we need to track these for achievements like spaghetti western.
+        if result.len() == 1 && save.meta.is_ironman {
+            for x in &mut result {
+                if x.is_human && x.player_names.len() == 1 && x.history.stored == x.history.latest {
+                    let country = self.country(&x.history.stored);
+                    let rpa = country.map_or(false, |x| x.has_switched_nation);
+                    let alive = country.map_or(false, |x| x.num_of_cities > 0);
+                    if rpa && alive {
+                        if let Some(end) = leftovers.pop() {
+                            x.history.initial = end.history.initial;
+                        }
+                    }
+                }
+            }
+        }
+
+        result.append(&mut leftovers);
+
+        result
     }
 
     /// Calculates the major events that befell countries (annexations, appearances, and tag switches)
@@ -426,10 +546,7 @@ impl Query {
     }
 
     pub fn country_tag_hex_color(&self, country_tag: &CountryTag) -> Option<String> {
-        self.save
-            .game
-            .countries
-            .get(country_tag)
+        self.country(country_tag)
             .map(|x| self.country_color_to_hex(x))
     }
 
@@ -470,7 +587,7 @@ impl Query {
             .countries
             .iter()
             .filter(|(_, country)| country.num_of_cities > 0)
-            .map(|(&tag, country)| (tag, self.country_income_breakdown(country)))
+            .map(|(tag, country)| (*tag, self.country_income_breakdown(country)))
             .collect()
     }
 
@@ -480,7 +597,7 @@ impl Query {
             .countries
             .iter()
             .filter(|(_, country)| country.num_of_cities > 0)
-            .map(|(&tag, country)| (tag, self.country_expense_breakdown(country)))
+            .map(|(tag, country)| (*tag, self.country_expense_breakdown(country)))
             .collect()
     }
 
@@ -490,7 +607,7 @@ impl Query {
             .countries
             .iter()
             .filter(|(_, c)| c.ledger.totalexpensetable.iter().any(|&x| x > 0.0))
-            .map(|(&tag, country)| (tag, self.country_total_expense_breakdown(country)))
+            .map(|(tag, country)| (*tag, self.country_total_expense_breakdown(country)))
             .collect()
     }
 
@@ -712,7 +829,8 @@ fn nation_events(save: &Eu4Save, province_owners: &ProvinceOwners) -> Vec<Nation
     let mut nation_events = HashMap::with_capacity(save.game.countries.len());
     let mut all_switches = Vec::with_capacity(save.game.countries.len());
     let mut initial_to_stored = HashMap::with_capacity(save.game.countries.len());
-    for (&tag, country) in &save.game.countries {
+    for (tag, country) in &save.game.countries {
+        let tag = *tag;
         let mut country_tag_switches = Vec::new();
 
         for (date, events) in &country.history.events {
@@ -931,64 +1049,6 @@ fn province_owners(save: &Eu4Save) -> ProvinceOwners {
     changes.sort_unstable_by_key(|x| (x.date, x.province));
 
     ProvinceOwners { initial, changes }
-}
-
-fn calc_histories(save: &Eu4Save, nation_events: &[NationEvents]) -> Vec<PlayerHistory> {
-    let mut result = Vec::with_capacity(save.game.players_countries.len());
-    let players = players(save);
-    let mut leftovers = Vec::new();
-    for (&tag, country) in save.game.countries.iter().filter(|(_, c)| c.was_player) {
-        let tag_players: Vec<_> = players
-            .iter()
-            .filter(|x| x.tag == tag)
-            .map(|x| x.name.clone())
-            .collect();
-        let history = nation_events
-            .iter()
-            .find(|x| x.stored == tag)
-            .cloned()
-            .unwrap_or_else(|| NationEvents {
-                initial: tag,
-                latest: tag,
-                stored: tag,
-                events: Vec::new(),
-            });
-
-        let no_players = tag_players.is_empty();
-        let history = PlayerHistory {
-            history,
-            is_human: country.human,
-            player_names: tag_players,
-        };
-
-        if country.was_player && no_players {
-            leftovers.push(history);
-        } else {
-            result.push(history);
-        }
-    }
-
-    // Only for ironman will we try and resolve "release and play as" as the
-    // save does not often paint an accurate picture of these transitions. And
-    // we need to track these for achievements like spaghetti western.
-    if result.len() == 1 && save.meta.is_ironman {
-        for x in &mut result {
-            if x.is_human && x.player_names.len() == 1 && x.history.stored == x.history.latest {
-                let country = save.game.countries.get(&x.history.stored);
-                let rpa = country.map_or(false, |x| x.has_switched_nation);
-                let alive = country.map_or(false, |x| x.num_of_cities > 0);
-                if rpa && alive {
-                    if let Some(end) = leftovers.pop() {
-                        x.history.initial = end.history.initial;
-                    }
-                }
-            }
-        }
-    }
-
-    result.append(&mut leftovers);
-
-    result
 }
 
 fn players(save: &Eu4Save) -> Vec<Player> {

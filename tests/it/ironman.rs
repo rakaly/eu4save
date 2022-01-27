@@ -61,12 +61,7 @@ fn test_eu4_kandy_bin() {
     let nation_events = query.nation_events(&province_owners);
     let histories = query.player_histories(&nation_events);
 
-    let player = query
-        .save()
-        .game
-        .countries
-        .get(&"BHA".parse().unwrap())
-        .unwrap();
+    let player = query.country(&"BHA".parse().unwrap()).unwrap();
     assert!(!player.completed_missions.is_empty());
 
     assert_eq!(
@@ -107,16 +102,7 @@ fn test_eu4_kandy_bin() {
         "C23".parse().unwrap(),
     ];
 
-    assert_eq!(
-        query
-            .save()
-            .game
-            .countries
-            .get(&"BHA".parse().unwrap())
-            .unwrap()
-            .subjects,
-        subjects
-    );
+    assert_eq!(player.subjects, subjects);
 
     // Testing binary encoded saves can extract province building history perfectly fine
     let london = query
@@ -933,12 +919,7 @@ ironman_test!(
         date: Eu4Date::parse("1555.11.2").unwrap()
     },
     |query: Query, _melted_data: &[u8]| {
-        let player = query
-            .save()
-            .game
-            .countries
-            .get(&"TUR".parse().unwrap())
-            .unwrap();
+        let player = query.country(&"TUR".parse().unwrap()).unwrap();
         let m = query.country_mana_breakdown(&player);
 
         #[rustfmt::skip]

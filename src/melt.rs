@@ -241,7 +241,7 @@ impl Melter {
 
     fn melt_entry(
         &self,
-        mut out: &mut Vec<u8>,
+        out: &mut Vec<u8>,
         unknown_tokens: &mut HashSet<u16>,
         inflated_data: &[u8],
         file: &str,
@@ -254,7 +254,7 @@ impl Melter {
         })?;
 
         let write_checksum = file == "ai";
-        self.convert(&mut out, unknown_tokens, &tape, write_checksum)
+        self.convert(out, unknown_tokens, &tape, write_checksum)
     }
 
     fn melt_zip(
