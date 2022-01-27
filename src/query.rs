@@ -255,6 +255,13 @@ struct TagId {
     tag: CountryTag,
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct Inheritance {
+   start_year: i16,
+   end_year: i16,
+   pu_roll: u8,
+}
+
 #[derive(Debug)]
 pub struct Query {
     save: Eu4Save,
@@ -291,7 +298,7 @@ impl Query {
         &self.save
     }
 
-    pub fn save_countries(&self) -> impl Iterator<Item = SaveCountry> + '_ {
+    pub fn countries(&self) -> impl Iterator<Item = SaveCountry> + '_ {
         self.save
             .game
             .countries
@@ -420,6 +427,75 @@ impl Query {
 
     pub fn tag_resolver(&self, nation_events: &[NationEvents]) -> TagResolver {
         TagResolver::create(nation_events)
+    }
+
+    pub fn inherit_roll(&self, country: &SaveCountry) -> u64 {
+        let hre_ruler = self
+            .save()
+            .game
+            .empire
+            .as_ref()
+            .and_then(|x| x.emperor)
+            .and_then(|x| self.country(&x))
+            .and_then(|x| x.monarch.as_ref())
+            .map(|x| x.id)
+            .unwrap_or_default();
+
+        let papacy_controller = self
+            .save()
+            .game
+            .religion_instance_data
+            .get("catholic")
+            .and_then(|x| x.papacy.as_ref())
+            .and_then(|x| self.save_country(&x.controller))
+            .map(|x| x.id)
+            .unwrap_or_default();
+
+        let ruler = country
+            .country
+            .monarch
+            .as_ref()
+            .map(|x| x.id)
+            .unwrap_or_default();
+
+        let previous_rulers = country
+            .country
+            .previous_monarchs
+            .iter()
+            .map(|x| u64::from(x.id));
+
+        let capital_province = country.country.capital.as_u16();
+
+        let provinces = country.country.num_of_cities;
+
+        u64::from(hre_ruler)
+            + papacy_controller as u64
+            + u64::from(ruler)
+            + previous_rulers.sum::<u64>()
+            + u64::from(capital_province)
+            + provinces as u64
+            + country.id as u64
+    }
+
+    pub fn inherit(&self, country: &SaveCountry) -> Inheritance {
+        let roll = self.inherit_roll(country);
+
+        let year = self.save().meta.date.year();
+        let pu_roll = ((roll + u64::from(year as u64)) % 100) as u8;
+        let century = (year / 100) * 100;
+        let mut start_window = century + ((roll % 100) as i16);
+        let mut end_window = start_window + 4;
+
+        if end_window < year {
+            end_window += 100;
+            start_window += 100;
+        }
+
+        Inheritance {
+            start_year: start_window,
+            end_year: end_window,
+            pu_roll,
+        }
     }
 
     pub fn resolved_war_participants(
