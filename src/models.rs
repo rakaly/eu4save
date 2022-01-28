@@ -158,11 +158,10 @@ pub struct ReligionInstanceDatum {
     pub papacy: Option<Papacy>,
 }
 
-
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Papacy {
-  pub controller: CountryTag,
+    pub controller: CountryTag,
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]

@@ -58,6 +58,20 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
         .decision_seed;
     assert_eq!(reb_decision, 684859145);
 
+    assert_eq!(
+        query.save().meta.date.iso_8601().to_string(),
+        String::from("1444-12-04")
+    );
+    let inherit = query.inherit(&query.save_country(&"ENG".parse().unwrap()).unwrap());
+
+    assert_eq!(inherit.subtotal, 6836);
+    assert_eq!(inherit.start_t0_year, 1380);
+    assert_eq!(inherit.end_t0_year, 1454);
+    assert_eq!(inherit.start_t1_year, 1455);
+    assert_eq!(inherit.end_t1_year, 1459);
+    assert_eq!(inherit.start_t2_year, 1460);
+    assert_eq!(inherit.end_t2_year, 1479);
+
     assert_eq!(histories, expected_histories);
     let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&buffer))?;
     assert!(save.game.is_some());
