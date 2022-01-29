@@ -197,6 +197,24 @@ fn test_eu4_ita1() {
 }
 
 #[test]
+fn test_inheritance_values() {
+    let data = utils::request("patch132.eu4");
+    let (save, _) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
+    let query = Query::from_save(save);
+
+    let inherit = query.inherit(&query.save_country(&"WUR".parse().unwrap()).unwrap());
+
+    assert_eq!(inherit.subtotal, 40672);
+    assert_eq!(inherit.inheritance_value, 16);
+    assert_eq!(inherit.start_t0_year, 1428);
+    assert_eq!(inherit.end_t0_year, 1502);
+    assert_eq!(inherit.start_t1_year, 1503);
+    assert_eq!(inherit.end_t1_year, 1507);
+    assert_eq!(inherit.start_t2_year, 1508);
+    assert_eq!(inherit.end_t2_year, 1527);
+}
+
+#[test]
 fn test_roundtrip_melt() {
     let data = utils::request("kandy2.bin.eu4");
     let (out, _unknown) = eu4save::Melter::new()

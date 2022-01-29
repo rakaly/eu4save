@@ -263,7 +263,7 @@ pub struct Inheritance {
     pub start_t2_year: i16,
     pub end_t2_year: i16,
     pub inheritance_value: u8,
-    pub subtotal: u64,
+    pub subtotal: i64,
     pub calculations: Vec<Calculation>,
 }
 
@@ -276,12 +276,12 @@ pub enum TagDependency {
 #[derive(Debug, Clone, Serialize)]
 pub struct Calculation {
     pub name: String,
-    pub value: u64,
+    pub value: i64,
     pub dependency: TagDependency,
 }
 
 impl Calculation {
-    pub fn new(name: &str, value: u64, dependency: TagDependency) -> Self {
+    pub fn new(name: &str, value: i64, dependency: TagDependency) -> Self {
         Self {
             name: String::from(name),
             value,
@@ -453,7 +453,7 @@ impl Query {
         TagResolver::create(nation_events)
     }
 
-    fn inherit_subtotal(&self, country: &SaveCountry) -> (u64, Vec<Calculation>) {
+    fn inherit_subtotal(&self, country: &SaveCountry) -> (i64, Vec<Calculation>) {
         let hre_ruler = self
             .save()
             .game
@@ -462,7 +462,7 @@ impl Query {
             .and_then(|x| x.emperor)
             .and_then(|x| self.country(&x))
             .and_then(|x| x.monarch.as_ref())
-            .map(|x| u64::from(x.id))
+            .map(|x| i64::from(x.id))
             .unwrap_or_default();
 
         let papacy_controller = self
@@ -479,30 +479,30 @@ impl Query {
             .unwrap_or_else(|| "---".parse().unwrap());
         let papacy_id = papacy_controller
             .as_ref()
-            .map(|x| x.id as u64)
+            .map(|x| x.id as i64)
             .unwrap_or_default();
 
         let ruler = country
             .country
             .monarch
             .as_ref()
-            .map(|x| u64::from(x.id))
+            .map(|x| i64::from(x.id))
             .unwrap_or_default();
 
         let previous_rulers = country
             .country
             .previous_monarchs
             .iter()
-            .map(|x| u64::from(x.id))
-            .sum::<u64>();
+            .map(|x| i64::from(x.id))
+            .sum::<i64>();
 
-        let capital_province = u64::from(country.country.capital.as_u16());
+        let capital_province = i64::from(country.country.capital.as_u16());
 
-        let provinces = country.country.num_of_cities as u64;
+        let provinces = i64::from(country.country.num_of_cities);
 
         #[rustfmt::skip]
         let calculations = vec![
-            Calculation::new("Nation ID", country.id as u64, TagDependency::Dependent(country.tag)),
+            Calculation::new("Nation ID", country.id as i64, TagDependency::Dependent(country.tag)),
             Calculation::new("HRE Ruler ID", hre_ruler, TagDependency::Independent),
             Calculation::new("Curia Controller Nation ID", papacy_id, TagDependency::Dependent(papacy_tag)),
             Calculation::new("Ruler ID", ruler, TagDependency::Dependent(country.tag)),
@@ -517,7 +517,7 @@ impl Query {
             + previous_rulers
             + capital_province
             + provinces
-            + country.id as u64;
+            + country.id as i64;
 
         (raw, calculations)
     }
@@ -526,45 +526,27 @@ impl Query {
         let (subtotal, calculations) = self.inherit_subtotal(country);
 
         let year = i64::from(self.save().meta.date.year());
-        let inheritance_value = ((subtotal as i64) + year) % 100;
-        let century = (year / 100) * 100;
+        let inheritance_value = (subtotal + year) % 100;
 
-        let t0_mod = (year + inheritance_value) % 100;
-        let t1_mod = ((year + inheritance_value) + 75) % 100;
-        let t2_mod = ((year + inheritance_value) + 80) % 100;
+        let t0_mod = (0 - inheritance_value) % 100;
+        let t1_mod = (75 - inheritance_value) % 100;
+        let t2_mod = (80 - inheritance_value) % 100;
 
         // end date < year => +100
         // end date > year + 100 => -100
-        let t0_offset = if century + t0_mod + 75 < year {
-            100
-        } else if century + t0_mod + 75 > year + 100 {
-            -100
-        } else {
-            0
-        };
+        let t0_offset = if year + t0_mod + 74 < year { 100 } else { 0 };
 
-        let t1_offset = if century + t1_mod + 5 < year {
-            100
-        } else if century + t1_mod + 5 > year + 100 {
-            -100
-        } else {
-            0
-        };
+        let t1_offset = if year + t1_mod + 4 < year { 100 } else { 0 };
 
-        let t2_offset = if century + t2_mod + 20 < year {
-            100
-        } else if century + t2_mod + 20 > year + 100 {
-            -100
-        } else {
-            0
-        };
+        let t2_offset = if year + t2_mod + 19 < year { 100 } else { 0 };
 
-        let start_t0_year = century + t0_offset + t0_mod;
-        let end_t0_year = century + t0_offset + t0_mod + 74;
-        let start_t1_year = century + t1_offset + t1_mod;
-        let end_t1_year = century + t1_offset + t1_mod + 4;
-        let start_t2_year = century + t2_offset + t2_mod;
-        let end_t2_year = century + t2_offset + t2_mod + 19;
+        // dbg!((century, t0_offset, t0_mod));
+        let start_t0_year = year + t0_mod + t0_offset;
+        let end_t0_year = year + t0_mod + t0_offset + 74;
+        let start_t1_year = year + t1_mod + t1_offset;
+        let end_t1_year = year + t1_mod + t1_offset + 4;
+        let start_t2_year = year + t2_mod + t2_offset;
+        let end_t2_year = year + t2_mod + t2_offset + 19;
 
         Inheritance {
             start_t0_year: start_t0_year as i16,
