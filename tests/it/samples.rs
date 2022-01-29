@@ -65,12 +65,13 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     let inherit = query.inherit(&query.save_country(&"ENG".parse().unwrap()).unwrap());
 
     assert_eq!(inherit.subtotal, 6836);
-    assert_eq!(inherit.start_t0_year, 1380);
-    assert_eq!(inherit.end_t0_year, 1454);
-    assert_eq!(inherit.start_t1_year, 1455);
-    assert_eq!(inherit.end_t1_year, 1459);
-    assert_eq!(inherit.start_t2_year, 1460);
-    assert_eq!(inherit.end_t2_year, 1479);
+    assert_eq!(inherit.inheritance_value, 80);
+    assert_eq!(inherit.start_t0_year, 1424);
+    assert_eq!(inherit.end_t0_year, 1498);
+    assert_eq!(inherit.start_t1_year, 1499);
+    assert_eq!(inherit.end_t1_year, 1503);
+    assert_eq!(inherit.start_t2_year, 1504);
+    assert_eq!(inherit.end_t2_year, 1523);
 
     assert_eq!(histories, expected_histories);
     let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&buffer))?;

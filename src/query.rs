@@ -525,14 +525,13 @@ impl Query {
     pub fn inherit(&self, country: &SaveCountry) -> Inheritance {
         let (subtotal, calculations) = self.inherit_subtotal(country);
 
-        let year = self.save().meta.date.year();
-        let total = subtotal + year as u64;
-        let inheritance_value = ((subtotal + year as u64) % 100) as u8;
+        let year = i64::from(self.save().meta.date.year());
+        let inheritance_value = ((subtotal as i64) + year) % 100;
         let century = (year / 100) * 100;
 
-        let t0_mod = (total % 100) as i16;
-        let t1_mod = ((total + 75) % 100) as i16;
-        let t2_mod = ((total + 80) % 100) as i16;
+        let t0_mod = (year + inheritance_value) % 100;
+        let t1_mod = ((year + inheritance_value) + 75) % 100;
+        let t2_mod = ((year + inheritance_value) + 80) % 100;
 
         // end date < year => +100
         // end date > year + 100 => -100
@@ -568,13 +567,13 @@ impl Query {
         let end_t2_year = century + t2_offset + t2_mod + 19;
 
         Inheritance {
-            start_t0_year,
-            end_t0_year,
-            start_t1_year,
-            end_t1_year,
-            start_t2_year,
-            end_t2_year,
-            inheritance_value,
+            start_t0_year: start_t0_year as i16,
+            end_t0_year: end_t0_year as i16,
+            start_t1_year: start_t1_year as i16,
+            end_t1_year: end_t1_year as i16,
+            start_t2_year: start_t2_year as i16,
+            end_t2_year: end_t2_year as i16,
+            inheritance_value: inheritance_value as u8,
             subtotal,
             calculations,
         }
