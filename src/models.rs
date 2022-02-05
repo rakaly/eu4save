@@ -505,6 +505,18 @@ impl CountryEvent {
             _ => None,
         }
     }
+
+    pub fn as_leader(&self) -> Option<&Leader> {
+        self.as_monarch()
+            .and_then(|x| x.leader.as_ref())
+            .or_else(|| {
+                if let CountryEvent::Leader(x) = &self {
+                    Some(x)
+                } else {
+                    None
+                }
+            })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
