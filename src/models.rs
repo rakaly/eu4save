@@ -438,6 +438,8 @@ pub struct Country {
     pub mercenary_companries: Vec<MercenaryCompany>,
     pub monarch: Option<ObjId>,
     pub heir: Option<ObjId>,
+    #[jomini(duplicated, alias = "leader")]
+    pub leaders: Vec<ObjId>,
     #[jomini(duplicated, alias = "previous_monarch")]
     pub previous_monarchs: Vec<ObjId>,
 }
