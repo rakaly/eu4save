@@ -565,6 +565,7 @@ pub struct Leader {
     #[serde(default)]
     pub siege: u16,
     pub monarch_id: Option<ObjId>,
+    pub personality: Option<String>,
 
     // While activation and id can be none, it is so rare that there
     // is a test case for it to prevent regression.
