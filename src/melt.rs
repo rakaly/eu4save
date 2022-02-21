@@ -1,7 +1,7 @@
-use crate::{tokens::TokenLookup, Eu4Date, Eu4Error, Eu4ErrorKind, Extraction};
+use crate::{flavor::Eu4Flavor, tokens::TokenLookup, Eu4Date, Eu4Error, Eu4ErrorKind, Extraction};
 use jomini::{
-    common::PdsDate, BinaryTape, BinaryToken, FailedResolveStrategy, TextWriterBuilder,
-    TokenResolver, WriteVisitor,
+    common::PdsDate, BinaryFlavor, BinaryTape, BinaryToken, FailedResolveStrategy,
+    TextWriterBuilder, TokenResolver, WriteVisitor,
 };
 use std::{
     collections::HashSet,
@@ -98,7 +98,7 @@ impl Melter {
             } else {
                 0
             };
-            let tape = BinaryTape::from_eu4(&data[cut_header_len..])?;
+            let tape = BinaryTape::from_slice(&data[cut_header_len..])?;
             self.convert(&mut out, &mut unknown_tokens, &tape, true, resolver)?;
         }
 
@@ -129,6 +129,7 @@ impl Melter {
         let mut known_number = false;
         let mut known_date = false;
         let tokens = tape.tokens();
+        let flavor = Eu4Flavor::new();
 
         while let Some(token) = tokens.get(token_idx) {
             match token {
@@ -172,8 +173,8 @@ impl Melter {
                 BinaryToken::Unquoted(x) => {
                     wtr.write_unquoted(x.as_bytes())?;
                 }
-                BinaryToken::F32(x) => wtr.write_f32(*x)?,
-                BinaryToken::F64(x) => wtr.write_f64(*x)?,
+                BinaryToken::F32(x) => wtr.write_f32(flavor.visit_f32(*x))?,
+                BinaryToken::F64(x) => wtr.write_f64(flavor.visit_f64(*x))?,
                 BinaryToken::Token(x) => match resolver.resolve(*x) {
                     Some(id)
                         if ((self.rewrite && id == "is_ironman")
@@ -282,7 +283,7 @@ impl Melter {
     where
         Q: TokenResolver,
     {
-        let tape = BinaryTape::from_eu4(&inflated_data["EU4bin".len()..]).map_err(|e| {
+        let tape = BinaryTape::from_slice(&inflated_data["EU4bin".len()..]).map_err(|e| {
             Eu4ErrorKind::Deserialize {
                 part: Some(file.to_string()),
                 err: e,
