@@ -1,3 +1,4 @@
+use crate::flavor::Eu4Flavor;
 use crate::models::{Eu4Save, Eu4SaveMeta, GameState, Meta};
 use crate::tokens::TokenLookup;
 use crate::{Eu4Error, Eu4ErrorKind, FailedResolveStrategy};
@@ -294,7 +295,7 @@ impl Eu4ExtractorBuilder {
                 Ok((result, RawEncoding::Text))
             }
             BIN_HEADER => {
-                let result: T = BinaryDeserializer::eu4_builder()
+                let result: T = BinaryDeserializer::builder_flavor(Eu4Flavor::new())
                     .on_failed_resolve(self.on_failed_resolve)
                     .from_slice(body, resolver)?;
                 Ok((result, RawEncoding::Bin))
@@ -384,7 +385,7 @@ where
         .map_err(|e| Eu4ErrorKind::ZipExtraction(name, e))?;
 
     if let Some(data) = is_bin(buffer) {
-        let res = BinaryDeserializer::eu4_builder()
+        let res = BinaryDeserializer::builder_flavor(Eu4Flavor::new())
             .on_failed_resolve(on_failed_resolve)
             .from_slice(data, &lookup)
             .map_err(|e| Eu4ErrorKind::Deserialize {
@@ -427,7 +428,7 @@ where
     let buffer = &mmap[..];
 
     if let Some(data) = is_bin(&buffer) {
-        let res = BinaryDeserializer::eu4_builder()
+        let res = BinaryDeserializer::builder_flavor(Eu4Flavor::new())
             .on_failed_resolve(on_failed_resolve)
             .from_slice(data, &lookup)
             .map_err(|e| Eu4ErrorKind::Deserialize {

@@ -71,6 +71,7 @@ mod dlc;
 mod errors;
 mod eu4date;
 mod extraction;
+pub(crate) mod flavor;
 mod melt;
 /// Repository of raw structs extracted from a save file
 pub mod models;
