@@ -1,6 +1,7 @@
 use crate::models::{Eu4Save, Eu4SaveMeta, GameState, Meta};
-use crate::{tokens::TokenLookup, Eu4Error, Eu4ErrorKind, FailedResolveStrategy};
-use jomini::{BinaryDeserializer, TextDeserializer, TextTape};
+use crate::tokens::TokenLookup;
+use crate::{Eu4Error, Eu4ErrorKind, FailedResolveStrategy};
+use jomini::{BinaryDeserializer, TextDeserializer, TextTape, TokenResolver};
 use serde::{de::DeserializeOwned, Deserialize};
 use std::fmt;
 use std::io::{Read, Seek, SeekFrom};
@@ -97,9 +98,14 @@ impl Eu4ExtractorBuilder {
 
     /// Extract just the metadata from the save. This can be efficiently done if
     /// a file is zip encoded.
-    pub fn extract_meta<R>(&self, mut reader: R) -> Result<(Meta, Encoding), Eu4Error>
+    pub fn extract_meta_with_tokens<R, Q>(
+        &self,
+        mut reader: R,
+        resolver: &Q,
+    ) -> Result<(Meta, Encoding), Eu4Error>
     where
         R: Read + Seek,
+        Q: TokenResolver,
     {
         let mut header = [0; TXT_HEADER.len()];
         reader.read_exact(&mut header)?;
@@ -114,13 +120,17 @@ impl Eu4ExtractorBuilder {
             let mut zip =
                 zip::ZipArchive::new(reader).map_err(Eu4ErrorKind::ZipCentralDirectory)?;
             match self.extraction {
-                Extraction::InMemory => {
-                    melt_in_memory(&mut buffer, "meta", &mut zip, self.on_failed_resolve)
-                }
+                Extraction::InMemory => melt_in_memory(
+                    &mut buffer,
+                    "meta",
+                    &mut zip,
+                    self.on_failed_resolve,
+                    resolver,
+                ),
 
                 #[cfg(feature = "mmap")]
                 Extraction::MmapTemporaries => {
-                    melt_with_temporary("meta", &mut zip, self.on_failed_resolve)
+                    melt_with_temporary("meta", &mut zip, self.on_failed_resolve, resolver)
                 }
             }
         } else {
@@ -128,10 +138,24 @@ impl Eu4ExtractorBuilder {
         }
     }
 
-    /// Extract all info from a save
-    pub fn extract_save<R>(&self, mut reader: R) -> Result<(Eu4Save, Encoding), Eu4Error>
+    /// Extract just the metadata from the save. This can be efficiently done if
+    /// a file is zip encoded.
+    pub fn extract_meta<R>(&self, reader: R) -> Result<(Meta, Encoding), Eu4Error>
     where
         R: Read + Seek,
+    {
+        self.extract_meta_with_tokens(reader, &TokenLookup)
+    }
+
+    /// Extract all info from a save
+    pub fn extract_save_with_tokens<R, Q>(
+        &self,
+        mut reader: R,
+        resolver: &Q,
+    ) -> Result<(Eu4Save, Encoding), Eu4Error>
+    where
+        R: Read + Seek,
+        Q: TokenResolver,
     {
         let mut header = [0; TXT_HEADER.len()];
         reader.read_exact(&mut header)?;
@@ -148,24 +172,32 @@ impl Eu4ExtractorBuilder {
             let mut zip =
                 zip::ZipArchive::new(reader).map_err(Eu4ErrorKind::ZipCentralDirectory)?;
             let (meta, encoding) = match self.extraction {
-                Extraction::InMemory => {
-                    melt_in_memory(&mut buffer, "meta", &mut zip, self.on_failed_resolve)
-                }
+                Extraction::InMemory => melt_in_memory(
+                    &mut buffer,
+                    "meta",
+                    &mut zip,
+                    self.on_failed_resolve,
+                    resolver,
+                ),
 
                 #[cfg(feature = "mmap")]
                 Extraction::MmapTemporaries => {
-                    melt_with_temporary("meta", &mut zip, self.on_failed_resolve)
+                    melt_with_temporary("meta", &mut zip, self.on_failed_resolve, resolver)
                 }
             }?;
 
             let (game, _) = match self.extraction {
-                Extraction::InMemory => {
-                    melt_in_memory(&mut buffer, "gamestate", &mut zip, self.on_failed_resolve)
-                }
+                Extraction::InMemory => melt_in_memory(
+                    &mut buffer,
+                    "gamestate",
+                    &mut zip,
+                    self.on_failed_resolve,
+                    resolver,
+                ),
 
                 #[cfg(feature = "mmap")]
                 Extraction::MmapTemporaries => {
-                    melt_with_temporary("gamestate", &mut zip, self.on_failed_resolve)
+                    melt_with_temporary("gamestate", &mut zip, self.on_failed_resolve, resolver)
                 }
             }?;
 
@@ -175,14 +207,33 @@ impl Eu4ExtractorBuilder {
         }
     }
 
+    /// Extract all info from a save
+    pub fn extract_save<R>(&self, reader: R) -> Result<(Eu4Save, Encoding), Eu4Error>
+    where
+        R: Read + Seek,
+    {
+        self.extract_save_with_tokens(reader, &TokenLookup)
+    }
+
     /// For the times where all you want is the metadata but will accept the game state too save on
     /// future needless double parsing.
-    pub fn extract_meta_optimistic<R>(
+    pub fn extract_meta_optimistic<R>(&self, reader: R) -> Result<(Eu4SaveMeta, Encoding), Eu4Error>
+    where
+        R: Read + Seek,
+    {
+        self.extract_meta_optimistic_with_tokens(reader, &TokenLookup)
+    }
+
+    /// For the times where all you want is the metadata but will accept the game state too save on
+    /// future needless double parsing.
+    pub fn extract_meta_optimistic_with_tokens<R, Q>(
         &self,
         mut reader: R,
+        resolver: &Q,
     ) -> Result<(Eu4SaveMeta, Encoding), Eu4Error>
     where
         R: Read + Seek,
+        Q: TokenResolver,
     {
         let mut header = [0; TXT_HEADER.len()];
         reader.read_exact(&mut header)?;
@@ -203,13 +254,17 @@ impl Eu4ExtractorBuilder {
             let mut zip =
                 zip::ZipArchive::new(reader).map_err(Eu4ErrorKind::ZipCentralDirectory)?;
             let (meta, encoding) = match self.extraction {
-                Extraction::InMemory => {
-                    melt_in_memory(&mut buffer, "meta", &mut zip, self.on_failed_resolve)
-                }
+                Extraction::InMemory => melt_in_memory(
+                    &mut buffer,
+                    "meta",
+                    &mut zip,
+                    self.on_failed_resolve,
+                    resolver,
+                ),
 
                 #[cfg(feature = "mmap")]
                 Extraction::MmapTemporaries => {
-                    melt_with_temporary("meta", &mut zip, self.on_failed_resolve)
+                    melt_with_temporary("meta", &mut zip, self.on_failed_resolve, resolver)
                 }
             }?;
 
@@ -219,9 +274,14 @@ impl Eu4ExtractorBuilder {
         }
     }
 
-    pub fn extract_raw<'de, T>(&self, data: &'de [u8]) -> Result<(T, RawEncoding), Eu4Error>
+    pub fn extract_raw_with_tokens<'de, T, Q>(
+        &self,
+        data: &'de [u8],
+        resolver: &'de Q,
+    ) -> Result<(T, RawEncoding), Eu4Error>
     where
         T: Deserialize<'de>,
+        Q: TokenResolver,
     {
         if data.len() < TXT_HEADER.len() {
             return Err(Eu4ErrorKind::UnknownHeader.into());
@@ -236,11 +296,18 @@ impl Eu4ExtractorBuilder {
             BIN_HEADER => {
                 let result: T = BinaryDeserializer::eu4_builder()
                     .on_failed_resolve(self.on_failed_resolve)
-                    .from_slice(body, &TokenLookup)?;
+                    .from_slice(body, resolver)?;
                 Ok((result, RawEncoding::Bin))
             }
             _ => Err(Eu4ErrorKind::UnknownHeader.into()),
         }
+    }
+
+    pub fn extract_raw<'de, T>(&self, data: &'de [u8]) -> Result<(T, RawEncoding), Eu4Error>
+    where
+        T: Deserialize<'de>,
+    {
+        self.extract_raw_with_tokens(data, &TokenLookup)
     }
 }
 
@@ -289,15 +356,17 @@ impl Eu4Extractor {
     }
 }
 
-fn melt_in_memory<T, R>(
+fn melt_in_memory<T, R, RES>(
     buffer: &mut Vec<u8>,
     name: &'static str,
     zip: &mut zip::ZipArchive<R>,
     on_failed_resolve: FailedResolveStrategy,
+    lookup: RES,
 ) -> Result<(T, Encoding), Eu4Error>
 where
     R: Read + Seek,
     T: DeserializeOwned,
+    RES: TokenResolver,
 {
     buffer.clear();
     let mut zip_file = zip
@@ -317,7 +386,7 @@ where
     if let Some(data) = is_bin(buffer) {
         let res = BinaryDeserializer::eu4_builder()
             .on_failed_resolve(on_failed_resolve)
-            .from_slice(data, &TokenLookup)
+            .from_slice(data, &lookup)
             .map_err(|e| Eu4ErrorKind::Deserialize {
                 part: Some(name.to_string()),
                 err: e,
@@ -332,14 +401,16 @@ where
 }
 
 #[cfg(feature = "mmap")]
-fn melt_with_temporary<T, R>(
+fn melt_with_temporary<T, R, RES>(
     name: &'static str,
     zip: &mut zip::ZipArchive<R>,
     on_failed_resolve: FailedResolveStrategy,
+    lookup: RES,
 ) -> Result<(T, Encoding), Eu4Error>
 where
     R: Read + Seek,
     T: DeserializeOwned,
+    RES: TokenResolver,
 {
     let mut zip_file = zip
         .by_name(name)
@@ -358,7 +429,7 @@ where
     if let Some(data) = is_bin(&buffer) {
         let res = BinaryDeserializer::eu4_builder()
             .on_failed_resolve(on_failed_resolve)
-            .from_slice(data, &TokenLookup)
+            .from_slice(data, &lookup)
             .map_err(|e| Eu4ErrorKind::Deserialize {
                 part: Some(name.to_string()),
                 err: e,

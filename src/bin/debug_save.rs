@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let file = File::open(&args[1])?;
     let reader = BufReader::new(file);
-    let (save, _encoding) = Eu4Extractor::extract_save(reader)?;
+    let (save, _encoding) = Eu4Extractor::builder().extract_save(reader)?;
 
     let query = eu4save::query::Query::from_save(save);
     let owners = query.province_owners();

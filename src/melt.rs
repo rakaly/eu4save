@@ -71,7 +71,14 @@ impl Melter {
     }
 
     /// Convert ironman data to plaintext
-    pub fn melt(&self, data: &[u8]) -> Result<(Vec<u8>, HashSet<u16>), Eu4Error> {
+    pub fn melt_with_tokens<Q>(
+        &self,
+        data: &[u8],
+        resolver: &Q,
+    ) -> Result<(Vec<u8>, HashSet<u16>), Eu4Error>
+    where
+        Q: TokenResolver,
+    {
         let mut out: Vec<u8> = b"EU4txt\n".to_vec();
         let mut unknown_tokens = HashSet::new();
 
@@ -80,7 +87,7 @@ impl Melter {
             .map_or(false, |x| x == &[0x50, 0x4b, 0x03, 0x04][..]);
 
         if is_zip {
-            self.melt_zip(&mut out, &mut unknown_tokens, data)?;
+            self.melt_zip(&mut out, &mut unknown_tokens, data, resolver)?;
         } else {
             out.reserve(data.len() * 2);
             let cut_header_len = if data
@@ -92,19 +99,28 @@ impl Melter {
                 0
             };
             let tape = BinaryTape::from_eu4(&data[cut_header_len..])?;
-            self.convert(&mut out, &mut unknown_tokens, &tape, true)?;
+            self.convert(&mut out, &mut unknown_tokens, &tape, true, resolver)?;
         }
 
         Ok((out, unknown_tokens))
     }
 
-    fn convert(
+    /// Convert ironman data to plaintext
+    pub fn melt(&self, data: &[u8]) -> Result<(Vec<u8>, HashSet<u16>), Eu4Error> {
+        self.melt_with_tokens(data, &TokenLookup)
+    }
+
+    fn convert<Q>(
         &self,
         writer: &mut Vec<u8>,
         unknown_tokens: &mut HashSet<u16>,
         tape: &BinaryTape,
         write_checksum: bool,
-    ) -> Result<(), Eu4Error> {
+        resolver: &Q,
+    ) -> Result<(), Eu4Error>
+    where
+        Q: TokenResolver,
+    {
         let mut wtr = TextWriterBuilder::new()
             .indent_char(b'\t')
             .indent_factor(1)
@@ -158,7 +174,7 @@ impl Melter {
                 }
                 BinaryToken::F32(x) => wtr.write_f32(*x)?,
                 BinaryToken::F64(x) => wtr.write_f64(*x)?,
-                BinaryToken::Token(x) => match TokenLookup.resolve(*x) {
+                BinaryToken::Token(x) => match resolver.resolve(*x) {
                     Some(id)
                         if ((self.rewrite && id == "is_ironman")
                             || (id == "checksum" && !write_checksum))
@@ -223,29 +239,49 @@ impl Melter {
         Ok(())
     }
 
-    pub fn melt_entries(
+    pub fn melt_entries<Q>(
         &self,
         metadata: &[u8],
         gamestate: &[u8],
         ai: &[u8],
-    ) -> Result<(Vec<u8>, HashSet<u16>), Eu4Error> {
+        resolver: &Q,
+    ) -> Result<(Vec<u8>, HashSet<u16>), Eu4Error>
+    where
+        Q: TokenResolver,
+    {
         let mut out = Vec::with_capacity(gamestate.len());
         out.extend_from_slice(b"EU4txt\n");
 
         let mut unknown_tokens = HashSet::new();
-        self.melt_entry(&mut out, &mut unknown_tokens, metadata, "metadata")?;
-        self.melt_entry(&mut out, &mut unknown_tokens, gamestate, "gamestate")?;
-        self.melt_entry(&mut out, &mut unknown_tokens, ai, "ai")?;
+        self.melt_entry(
+            &mut out,
+            &mut unknown_tokens,
+            metadata,
+            resolver,
+            "metadata",
+        )?;
+        self.melt_entry(
+            &mut out,
+            &mut unknown_tokens,
+            gamestate,
+            resolver,
+            "gamestate",
+        )?;
+        self.melt_entry(&mut out, &mut unknown_tokens, ai, resolver, "ai")?;
         Ok((out, unknown_tokens))
     }
 
-    fn melt_entry(
+    fn melt_entry<Q>(
         &self,
         out: &mut Vec<u8>,
         unknown_tokens: &mut HashSet<u16>,
         inflated_data: &[u8],
+        resolver: &Q,
         file: &str,
-    ) -> Result<(), Eu4Error> {
+    ) -> Result<(), Eu4Error>
+    where
+        Q: TokenResolver,
+    {
         let tape = BinaryTape::from_eu4(&inflated_data["EU4bin".len()..]).map_err(|e| {
             Eu4ErrorKind::Deserialize {
                 part: Some(file.to_string()),
@@ -254,15 +290,19 @@ impl Melter {
         })?;
 
         let write_checksum = file == "ai";
-        self.convert(out, unknown_tokens, &tape, write_checksum)
+        self.convert(out, unknown_tokens, &tape, write_checksum, resolver)
     }
 
-    fn melt_zip(
+    fn melt_zip<Q>(
         &self,
         out: &mut Vec<u8>,
         unknown_tokens: &mut HashSet<u16>,
         zip_data: &[u8],
-    ) -> Result<(), Eu4Error> {
+        resolver: &Q,
+    ) -> Result<(), Eu4Error>
+    where
+        Q: TokenResolver,
+    {
         let zip_reader = Cursor::new(&zip_data);
         let mut zip =
             zip::ZipArchive::new(zip_reader).map_err(Eu4ErrorKind::ZipCentralDirectory)?;
@@ -286,7 +326,7 @@ impl Melter {
                     zip_file
                         .read_to_end(&mut inflated_data)
                         .map_err(|e| Eu4ErrorKind::ZipExtraction(file, e))?;
-                    self.melt_entry(out, unknown_tokens, &inflated_data, file)?
+                    self.melt_entry(out, unknown_tokens, &inflated_data, resolver, file)?
                 }
 
                 #[cfg(feature = "mmap")]
@@ -294,7 +334,7 @@ impl Melter {
                     let mut mmap = memmap::MmapMut::map_anon(zip_file.size() as usize)?;
                     std::io::copy(&mut zip_file, &mut mmap.as_mut())
                         .map_err(|e| Eu4ErrorKind::ZipExtraction(file, e))?;
-                    self.melt_entry(out, unknown_tokens, &mmap[..], file)?
+                    self.melt_entry(out, unknown_tokens, &mmap[..], resolver, file)?
                 }
             }
         }
