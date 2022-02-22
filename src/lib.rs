@@ -79,7 +79,7 @@ mod province_id;
 /// Ergonomic module for querying info from a save file
 pub mod query;
 mod tag_resolver;
-mod tokens;
+pub mod tokens;
 
 pub use country_tag::*;
 pub use dlc::*;
