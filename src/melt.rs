@@ -240,7 +240,16 @@ impl Melter {
         Ok(())
     }
 
-    pub fn melt_entries<Q>(
+    pub fn melt_entries(
+        &self,
+        metadata: &[u8],
+        gamestate: &[u8],
+        ai: &[u8],
+    ) -> Result<(Vec<u8>, HashSet<u16>), Eu4Error> {
+        self.melt_entries_with_tokens(metadata, gamestate, ai, &TokenLookup)
+    }
+
+    pub fn melt_entries_with_tokens<Q>(
         &self,
         metadata: &[u8],
         gamestate: &[u8],
