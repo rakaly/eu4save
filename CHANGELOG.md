@@ -1,3 +1,8 @@
+## v0.6.1 - 2022-03-20
+
+- Improve accuracy of melting output
+- Melted output is now compatible from loading from in game menu
+
 ## v0.6.0 - 2022-02-22
 
 - Expose token stringification customization with `_with_tokens` methods
