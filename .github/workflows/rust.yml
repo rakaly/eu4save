@@ -64,5 +64,6 @@ jobs:
       if: matrix.build == 'nightly'
       run: |
         cargo install cargo-fuzz
-        cargo fuzz build fuzz_melt
-        cargo fuzz build fuzz_extract
+        echo "fuzzing disabled due to https://github.com/rust-fuzz/cargo-fuzz/issues/291"
+        # cargo fuzz build fuzz_melt
+        # cargo fuzz build fuzz_extract
