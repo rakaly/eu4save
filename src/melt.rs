@@ -551,7 +551,7 @@ mod tests {
             0x00, 0x03, 0x00, 0x42, 0x48, 0x41,
         ];
 
-        let expected = b"EU4txt\ndate=1804.12.9\nplayer=\"BHA\"\n";
+        let expected = b"EU4txt\ndate=1804.12.9\nplayer=\"BHA\"";
         let (out, _unknown) = Melter::new()
             .with_on_failed_resolve(FailedResolveStrategy::Error)
             .melt(&data)
@@ -567,7 +567,7 @@ mod tests {
             0x01, 0x04, 0x00, 0x38, 0x2a, 0x01, 0x00, 0x0f, 0x00, 0x03, 0x00, 0x42, 0x48, 0x41,
         ];
 
-        let expected = "EU4txt\ndate=1804.12.9\nimpassable={ }\nplayer=\"BHA\"\n";
+        let expected = "EU4txt\ndate=1804.12.9\nimpassable={ }\nplayer=\"BHA\"";
         let (out, _unknown) = Melter::new()
             .with_on_failed_resolve(FailedResolveStrategy::Error)
             .melt(&data)
@@ -576,7 +576,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_quoting_keys() {
+    fn test_skip_quoting_flags() {
         let mut data = vec![];
         data.extend_from_slice(b"EU4bin");
         data.extend_from_slice(&[0xcc, 0x29, 0x01, 0x00, 0x03, 0x00, 0x0f, 0x00, 0x11, 0x00]);
@@ -585,12 +585,12 @@ mod tests {
         data.extend_from_slice(b"1444.11.11\n");
         data.extend_from_slice(&0x0004u16.to_le_bytes());
 
-        let expected = b"EU4txt\nflags={\n\tschools_initiated=\"1444.11.11\"\n}\n";
+        let expected = "EU4txt\nflags={\n\tschools_initiated=1444.11.11\n\n}";
         let (out, _unknown) = Melter::new()
             .with_on_failed_resolve(FailedResolveStrategy::Error)
             .melt(&data)
             .unwrap();
-        assert_eq!(out, &expected[..]);
+        assert_eq!(std::str::from_utf8(&out).unwrap(), &expected[..]);
     }
 
     #[test]
@@ -601,7 +601,7 @@ mod tests {
             0x00, 0x03, 0x00, 0x42, 0x48, 0x41,
         ];
 
-        let expected = "EU4txt\nplayer=\"BHA\"\n";
+        let expected = "EU4txt\nplayer=\"BHA\"";
         let (out, _unknown) = Melter::new()
             .with_on_failed_resolve(FailedResolveStrategy::Ignore)
             .melt(&data)
@@ -617,7 +617,7 @@ mod tests {
             0x48, 0x41,
         ];
 
-        let expected = "EU4txt\ndate=__unknown_0xffff\nplayer=\"BHA\"\n";
+        let expected = "EU4txt\ndate=__unknown_0xffff\nplayer=\"BHA\"";
         let (out, _unknown) = Melter::new()
             .with_on_failed_resolve(FailedResolveStrategy::Ignore)
             .melt(&data)
