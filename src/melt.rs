@@ -1,28 +1,47 @@
 use crate::{flavor::Eu4Flavor, tokens::TokenLookup, Eu4Date, Eu4Error, Eu4ErrorKind, Extraction};
 use jomini::{
     common::PdsDate, BinaryFlavor, BinaryTape, BinaryToken, FailedResolveStrategy,
-    TextWriterBuilder, TokenResolver, WriteVisitor,
+    TextWriterBuilder, TokenResolver,
 };
 use std::{
     collections::HashSet,
-    io::{Cursor, Read, Write},
+    io::{Cursor, Read},
 };
 
-struct Eu4Visitor;
-impl WriteVisitor for Eu4Visitor {
-    fn visit_f32<W>(&self, mut writer: W, data: f32) -> Result<(), jomini::Error>
-    where
-        W: Write,
-    {
-        write!(writer, "{:.3}", data).map_err(|e| e.into())
+struct QuoteMode {
+    kind: QuoteKind,
+    idx: usize,
+}
+
+impl QuoteMode {
+    fn new() -> Self {
+        QuoteMode {
+            kind: QuoteKind::Inactive,
+            idx: 0,
+        }
     }
 
-    fn visit_f64<W>(&self, mut writer: W, data: f64) -> Result<(), jomini::Error>
-    where
-        W: Write,
-    {
-        write!(writer, "{:.5}", data).map_err(|e| e.into())
+    fn clear(&mut self) {
+        self.kind = QuoteKind::Inactive;
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum QuoteKind {
+    // Regular quoting rules
+    Inactive,
+
+    // Unquote scalar and containers
+    UnquoteAll,
+
+    // Unquote only a scalar value
+    UnquoteScalar,
+
+    // Quote only a scalar value
+    QuoteScalar,
+
+    // Quote object keys
+    ForceQuote,
 }
 
 /// Convert ironman data to plaintext
@@ -124,25 +143,37 @@ impl Melter {
         let mut wtr = TextWriterBuilder::new()
             .indent_char(b'\t')
             .indent_factor(1)
-            .from_writer_visitor(writer, Eu4Visitor);
+            .from_writer(writer);
         let mut token_idx = 0;
         let mut known_number = false;
         let mut known_date = false;
+        let mut quote_mode = QuoteMode::new();
+        let mut long_format = false;
+        let mut depth = 0;
         let tokens = tape.tokens();
         let flavor = Eu4Flavor::new();
 
         while let Some(token) = tokens.get(token_idx) {
             match token {
                 BinaryToken::Object(_) => {
+                    depth += 1;
                     wtr.write_object_start()?;
                 }
                 BinaryToken::HiddenObject(_) => {
+                    depth += 1;
                     wtr.write_hidden_object_start()?;
                 }
                 BinaryToken::Array(_) => {
+                    depth += 1;
                     wtr.write_array_start()?;
                 }
-                BinaryToken::End(_x) => {
+                BinaryToken::End(x) => {
+                    depth -= 1;
+
+                    if *x == quote_mode.idx {
+                        quote_mode.clear();
+                    }
+
                     wtr.write_end()?;
                 }
                 BinaryToken::Bool(x) => wtr.write_bool(*x)?,
@@ -168,13 +199,40 @@ impl Melter {
                     }
                 }
                 BinaryToken::Quoted(x) => {
-                    wtr.write_quoted(x.as_bytes())?;
+                    match quote_mode.kind {
+                        QuoteKind::Inactive if wtr.expecting_key() => {
+                            wtr.write_unquoted(x.as_bytes())?
+                        }
+                        QuoteKind::Inactive => wtr.write_quoted(x.as_bytes())?,
+                        QuoteKind::ForceQuote => wtr.write_quoted(x.as_bytes())?,
+                        QuoteKind::UnquoteAll => wtr.write_unquoted(x.as_bytes())?,
+                        QuoteKind::UnquoteScalar if token_idx == quote_mode.idx => {
+                            wtr.write_unquoted(x.as_bytes())?
+                        }
+                        QuoteKind::UnquoteScalar => wtr.write_quoted(x.as_bytes())?,
+                        QuoteKind::QuoteScalar if token_idx == quote_mode.idx => {
+                            wtr.write_quoted(x.as_bytes())?
+                        }
+                        QuoteKind::QuoteScalar => wtr.write_unquoted(x.as_bytes())?,
+                    };
+
+                    // Clear quote mode after encountering a scalar value
+                    if token_idx == quote_mode.idx {
+                        quote_mode.clear();
+                    }
                 }
                 BinaryToken::Unquoted(x) => {
                     wtr.write_unquoted(x.as_bytes())?;
                 }
-                BinaryToken::F32(x) => wtr.write_f32(flavor.visit_f32(*x))?,
-                BinaryToken::F64(x) => wtr.write_f64(flavor.visit_f64(*x))?,
+                BinaryToken::F32(x) => {
+                    let val = flavor.visit_f32(*x);
+                    if long_format {
+                        write!(&mut wtr, "{:.6}", val)?;
+                    } else {
+                        write!(&mut wtr, "{:.3}", val)?;
+                    }
+                }
+                BinaryToken::F64(x) => write!(&mut wtr, "{:.5}", flavor.visit_f64(*x))?,
                 BinaryToken::Token(x) => match resolver.resolve(*x) {
                     Some(id)
                         if ((self.rewrite && id == "is_ironman")
@@ -197,6 +255,93 @@ impl Melter {
                         // There are certain tokens that we know are integers and will dupe the date heuristic
                         known_number = id == "random" || id.ends_with("seed") || id == "id";
                         known_date = id == "date_built";
+
+                        match id {
+                            "friend"
+                            | "production_leader_tag"
+                            | "dynamic_countries"
+                            | "electors"
+                            | "cores"
+                            | "named_unrest"
+                            | "claims"
+                            | "country_of_origin"
+                            | "granted_privileges"
+                            | "attackers"
+                            | "defenders"
+                            | "persistent_attackers"
+                            | "persistent_defenders"
+                            | "mission_slot"
+                            | "votes"
+                            | "ruler_flags"
+                            | "neighbours"
+                            | "home_neighbours"
+                            | "core_neighbours"
+                            | "call_to_arms_friends"
+                            | "allies"
+                            | "extended_allies"
+                            | "trade_embargoed_by"
+                            | "trade_embargoes"
+                            | "transfer_trade_power_from"
+                            | "friend_tags"
+                            | "hidden_flags"
+                            | "members"
+                            | "colony_claim"
+                            | "harsh"
+                            | "concilatory"
+                            | "current_at_war_with"
+                            | "current_war_allies"
+                            | "participating_countries"
+                            | "subjects"
+                            | "support_independence"
+                            | "transfer_trade_power_to"
+                            | "guarantees"
+                            | "warnings"
+                            | "flags" => {
+                                quote_mode = QuoteMode {
+                                    kind: QuoteKind::UnquoteAll,
+                                    idx: token_idx + 1,
+                                };
+                            }
+                            _ => {}
+                        }
+
+                        if depth == 2
+                            && matches!(id, "discovered_by" | "tribal_owner" | "active_disaster")
+                        {
+                            quote_mode = QuoteMode {
+                                kind: QuoteKind::UnquoteAll,
+                                idx: token_idx + 1,
+                            };
+                        }
+
+                        match id {
+                            "culture_group" | "saved_names" | "tech_level_dates"
+                            | "incident_variables" => {
+                                quote_mode = QuoteMode {
+                                    kind: QuoteKind::ForceQuote,
+                                    idx: token_idx + 1,
+                                };
+                            }
+                            "subjects" => {
+                                quote_mode = QuoteMode {
+                                    kind: QuoteKind::QuoteScalar,
+                                    idx: token_idx + 1,
+                                };
+                            }
+                            _ => {}
+                        }
+
+                        if depth == 4 && id == "leader" {
+                            quote_mode = QuoteMode {
+                                kind: QuoteKind::UnquoteScalar,
+                                idx: token_idx + 1,
+                            }
+                        }
+
+                        if depth == 0 && id == "ai" {
+                            long_format = true;
+                        }
+
                         wtr.write_unquoted(id.as_bytes())?;
                     }
                     None => {
