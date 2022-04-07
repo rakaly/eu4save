@@ -1185,7 +1185,18 @@ fn province_owners(save: &Eu4Save) -> ProvinceOwners {
         }
     }
 
-    changes.sort_unstable_by_key(|x| (x.date, x.province));
+    // Keep the sort stable so that when we come across a province history like
+    // below, we keep "BUL" after "NAP", which could signify NAP conquering a
+    // province and then immediately releasing bulgaria.
+    // ```
+    // 1477.2.27={
+    //   owner="NAP"
+    // }
+    // 1477.2.27={
+    //   owner="BUL"
+    // }
+    // ```
+    changes.sort_by_key(|x| (x.date, x.province));
 
     ProvinceOwners { initial, changes }
 }
