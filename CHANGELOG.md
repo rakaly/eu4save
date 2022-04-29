@@ -1,3 +1,7 @@
+## v0.6.2 - 2022-04-29
+
+- Update zip dependency to latest
+
 ## v0.6.1 - 2022-03-20
 
 - Improve accuracy of melting output
