@@ -266,6 +266,7 @@ pub struct Province {
     pub history: ProvinceHistory,
     #[jomini(default = "default_true")]
     pub ub: bool,
+    pub colonysize: Option<f32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
