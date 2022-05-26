@@ -912,7 +912,7 @@ impl Query {
             .history
             .events
             .iter()
-            .map(|(date, events)| {
+            .flat_map(|(date, events)| {
                 events.0.iter().filter_map(move |event| match event {
                     ProvinceEvent::KV((key, value)) => {
                         let constructed = if let ProvinceEventValue::Bool(x) = value {
@@ -937,8 +937,7 @@ impl Query {
                     }
                     _ => None,
                 })
-            })
-            .flatten();
+            });
 
         initial_buildings.chain(over_time).collect()
     }
@@ -1095,7 +1094,7 @@ fn nation_events(save: &Eu4Save, province_owners: &ProvinceOwners) -> Vec<Nation
 
     let mut result = Vec::with_capacity(save.game.countries.len());
     for (initial, stored) in initial_to_stored {
-        let events = nation_events.remove(&stored).unwrap_or_else(Vec::new);
+        let events = nation_events.remove(&stored).unwrap_or_default();
         let latest = events
             .iter()
             .filter_map(|x| match x.kind {
