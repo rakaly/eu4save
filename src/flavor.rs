@@ -1,4 +1,4 @@
-use jomini::{BinaryFlavor, Encoding, Windows1252Encoding};
+use jomini::{Encoding, Windows1252Encoding, binary::BinaryFlavor};
 
 /// The eu4 binary flavor
 #[derive(Debug, Default)]

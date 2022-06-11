@@ -86,7 +86,7 @@ pub use dlc::*;
 pub use errors::*;
 pub use eu4date::*;
 pub use extraction::*;
-pub use jomini::FailedResolveStrategy;
+pub use jomini::binary::FailedResolveStrategy;
 pub use melt::*;
 pub use province_id::*;
 pub use tag_resolver::*;

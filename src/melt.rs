@@ -1,7 +1,8 @@
 use crate::{flavor::Eu4Flavor, tokens::TokenLookup, Eu4Date, Eu4Error, Eu4ErrorKind, Extraction};
 use jomini::{
-    common::PdsDate, BinaryFlavor, BinaryTape, BinaryToken, FailedResolveStrategy,
-    TextWriterBuilder, TokenResolver,
+    binary::{BinaryFlavor, FailedResolveStrategy, TokenResolver},
+    common::PdsDate,
+    BinaryTape, BinaryToken, TextWriterBuilder,
 };
 use std::{
     collections::HashSet,

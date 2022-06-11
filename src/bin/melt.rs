@@ -1,4 +1,4 @@
-use jomini::FailedResolveStrategy;
+use eu4save::FailedResolveStrategy;
 use std::env;
 use std::io::Write;
 

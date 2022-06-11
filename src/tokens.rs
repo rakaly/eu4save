@@ -1,4 +1,4 @@
-use jomini::TokenResolver;
+use jomini::binary::TokenResolver;
 
 pub struct TokenLookup;
 
