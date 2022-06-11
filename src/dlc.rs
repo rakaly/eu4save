@@ -4,7 +4,7 @@
 /// to have the id so one doesn't need to compare strings.
 ///
 /// For more information on IDs see the wiki:
-/// https://eu4.paradoxwikis.com/Downloadable_content
+/// <https://eu4.paradoxwikis.com/Downloadable_content>
 ///
 /// ```rust
 /// assert_eq!(eu4save::dlc_id("Dharma"), Some(90))

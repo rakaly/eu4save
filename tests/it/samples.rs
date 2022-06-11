@@ -1,11 +1,12 @@
 use crate::utils;
 use eu4save::{
+    file::Eu4FileEntryName,
     models::{CountryEvent, Meta},
     query::{
         BuildingConstruction, BuildingEvent, NationEvent, NationEventKind, NationEvents,
         PlayerHistory, Query,
     },
-    Encoding, Eu4Date, Eu4Extractor, PdsDate, ProvinceId, RawEncoding,
+    Encoding, EnvTokens, Eu4Date, Eu4File, PdsDate, ProvinceId,
 };
 use std::io::{Cursor, Read};
 use std::{collections::HashMap, error::Error};
@@ -18,8 +19,11 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     let mut zip_file = zip.by_index(0)?;
     let mut buffer = Vec::with_capacity(0);
     zip_file.read_to_end(&mut buffer)?;
-    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer))?;
-    assert_eq!(encoding, Encoding::Text);
+
+    let file = Eu4File::from_slice(&buffer)?;
+    let save = file.deserializer().build_save(&EnvTokens)?;
+
+    assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "ENG".parse()?);
 
     let query = Query::from_save(save);
@@ -74,8 +78,6 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     assert_eq!(inherit.end_t2_year, 1463);
 
     assert_eq!(histories, expected_histories);
-    let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&buffer))?;
-    assert!(save.game.is_some());
 
     Ok(())
 }
@@ -83,50 +85,34 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_eu4_compressed_text() -> Result<(), Box<dyn Error>> {
     let data = utils::request("eng.txt.compressed.eu4");
-    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
-    assert_eq!(encoding, Encoding::TextZip);
+    let file = Eu4File::from_slice(&data)?;
+    let save = file.deserializer().build_save(&EnvTokens)?;
+    assert_eq!(file.encoding(), Encoding::TextZip);
     assert_eq!(save.meta.player, "ENG".parse()?);
 
-    let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&data[..]))?;
-    assert!(save.game.is_none());
     Ok(())
 }
 
 #[test]
 fn test_eu4_compressed_text_raw() -> Result<(), Box<dyn Error>> {
     let data = utils::request("eng.txt.compressed.eu4");
-    let reader = Cursor::new(&data[..]);
-    let mut zip = zip::ZipArchive::new(reader)?;
-    let mut zip_file = zip.by_name("meta")?;
-    let mut buffer = Vec::with_capacity(0);
-    zip_file.read_to_end(&mut buffer)?;
-
-    let (meta, encoding) = Eu4Extractor::extract_raw(&buffer)?;
-    let meta: Meta = meta;
-    assert_eq!(encoding, RawEncoding::Text);
+    let file = Eu4File::from_slice(&data)?;
+    let mut entries = file.entries();
+    let meta_entry = entries.next_entry().unwrap();
+    assert_eq!(meta_entry.name(), Some(Eu4FileEntryName::Meta));
+    let mut zip_sink = Vec::new();
+    let meta_parsed = meta_entry.parse(&mut zip_sink)?;
+    let meta: Meta = meta_parsed.deserializer().build(&EnvTokens)?;
+    assert_eq!(file.encoding(), Encoding::TextZip);
     assert_eq!(meta.player, "ENG".parse()?);
-
-    Ok(())
-}
-
-#[cfg(feature = "mmap")]
-#[test]
-fn test_eu4_compressed_text_mmap() -> Result<(), Box<dyn Error>> {
-    use eu4save::Extraction;
-    let data = utils::request("eng.txt.compressed.eu4");
-    let (save, encoding) = Eu4Extractor::builder()
-        .with_extraction(Extraction::MmapTemporaries)
-        .extract_save(Cursor::new(&data[..]))?;
-    assert_eq!(encoding, Encoding::TextZip);
-    assert_eq!(save.meta.player, "ENG".parse()?);
-
     Ok(())
 }
 
 #[test]
 pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let data = utils::request("mp_Uesugi.eu4");
-    let (save, _encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
+    let file = Eu4File::from_slice(&data)?;
+    let save = file.deserializer().build_save(&EnvTokens)?;
     assert!(save.meta.multiplayer);
 
     let query = Query::from_save(save);
@@ -331,8 +317,9 @@ fn test_missing_leader_activation_save() -> Result<(), Box<dyn Error>> {
     let mut buffer = Vec::with_capacity(0);
     zip_file.read_to_end(&mut buffer)?;
 
-    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer[..]))?;
-    assert_eq!(encoding, Encoding::Text);
+    let file = Eu4File::from_slice(&buffer)?;
+    let save = file.deserializer().build_save(&EnvTokens)?;
+    assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "NED".parse()?);
 
     let none_activation: Vec<_> = save
@@ -361,8 +348,9 @@ fn test_handle_heavily_nested_events() {
     // "flavor_eng.9880" or the symposium event for great britain where every ten years the event
     // fires. https://eu4.paradoxwikis.com/English_events#Symposium
     let data = utils::request("HashMP_Game56_S7End.eu4");
-    let (_save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..])).unwrap();
-    assert_eq!(encoding, Encoding::TextZip);
+    let file = Eu4File::from_slice(&data).unwrap();
+    let _save = file.deserializer().build_save(&EnvTokens).unwrap();
+    assert_eq!(file.encoding(), Encoding::TextZip);
 }
 
 #[test]
@@ -373,8 +361,16 @@ fn test_paperman_text() -> Result<(), Box<dyn Error>> {
     let mut zip_file = zip.by_index(0)?;
     let mut buffer = Vec::with_capacity(0);
     zip_file.read_to_end(&mut buffer)?;
-    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer))?;
-    assert_eq!(encoding, Encoding::Text);
+    let file = Eu4File::from_slice(&buffer).unwrap();
+    let save = file.deserializer().build_save(&EnvTokens).unwrap();
+    assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "GER".parse()?);
     Ok(())
+}
+
+#[test]
+fn fix_crash_on_long_country_tag_debug_mode() {
+    let data = include_bytes!("fixtures/crash1.bin");
+    let file = Eu4File::from_slice(data).unwrap();
+    let _save = file.deserializer().build_save(&EnvTokens);
 }

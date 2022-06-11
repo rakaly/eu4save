@@ -1,6 +1,5 @@
-use eu4save::{CountryTag, Eu4Extractor};
+use eu4save::{CountryTag, EnvTokens, Eu4File};
 use std::env;
-use std::io::Cursor;
 use std::{collections::HashSet, fmt::Display};
 
 #[derive(Debug)]
@@ -50,7 +49,8 @@ where
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let data = std::fs::read(&args[1])?;
-    let (save, _encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
+    let file = Eu4File::from_slice(&data)?;
+    let save = file.deserializer().build_save(&EnvTokens)?;
     deduce_vec(
         save.game
             .countries
