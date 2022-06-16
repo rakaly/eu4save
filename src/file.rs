@@ -1,12 +1,13 @@
 #![allow(dead_code)]
-use crate::{flavor::Eu4Flavor, models::Eu4Save, Eu4Error, Eu4ErrorKind};
+use crate::{flavor::Eu4Flavor, Eu4Error, Eu4ErrorKind};
 use jomini::{
-    binary::{TokenResolver, BinaryDeserializerBuilder, FailedResolveStrategy}, json::JsonOptions, text::ObjectReader, BinaryDeserializer, BinaryTape,
-    TextDeserializer, TextTape,
+    binary::{BinaryDeserializerBuilder, FailedResolveStrategy, TokenResolver},
+    json::JsonOptions,
+    BinaryDeserializer, BinaryTape, TextDeserializer, TextTape,
 };
 use serde::Deserialize;
 use std::io::{Cursor, Read};
-use zip::{read::ZipFile, result::ZipError, ZipArchive};
+use zip::{read::ZipFile, result::ZipError};
 
 const TXT_HEADER: &[u8] = b"EU4txt";
 const BIN_HEADER: &[u8] = b"EU4bin";
@@ -92,6 +93,15 @@ struct Eu4Zip<'a> {
 impl<'a> Eu4Zip<'a> {
     fn files(&self) -> Eu4ZipFiles<'a> {
         Eu4ZipFiles::new(self.archive.clone())
+    }
+
+    fn read_to_end(&self, zip_sink: &'a mut Vec<u8>) -> Result<(), std::io::Error> {
+        let mut files = self.files();
+        while let Some(mut file) = files.next_file() {
+            file.read_to_end(zip_sink)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -182,7 +192,6 @@ impl<'a> Eu4ZipFile<'a> {
     pub fn read_to_end(&mut self, buf: &mut Vec<u8>) -> std::io::Result<usize> {
         let mut header = [0; TXT_HEADER.len()];
         self.file.read_exact(&mut header)?;
-        buf.clear();
         buf.reserve(self.size());
         self.file.read_to_end(buf)
     }
@@ -262,20 +271,16 @@ struct Eu4TextFile<'a> {
 }
 
 impl<'a> Eu4TextFile<'a> {
-    pub fn json(&self, zip_sink: &'a mut Vec<u8>) -> TextTape<'a> {
+    pub fn parse(&mut self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4Text<'a>, Eu4Error> {
         match &self.data {
-            FileEncoding::None(data) => TextTape::from_slice(data).unwrap(),
-            FileEncoding::Zip(x) => {
-                zip_sink.clear();
-                zip_sink.reserve(x.inflated_size as usize);
-
-                let mut files = x.files();
-                while let Some(mut file) = files.next_file() {
-                    file.read_to_end(zip_sink).unwrap();
-                }
-
-                TextTape::from_slice(zip_sink).unwrap()
-                // tape.windows1252_reader().json().
+            FileEncoding::None(x) => Ok(Eu4Text {
+                tape: TextTape::from_slice(x)?,
+            }),
+            FileEncoding::Zip(zip) => {
+                zip.read_to_end(zip_sink)?;
+                Ok(Eu4Text {
+                    tape: TextTape::from_slice(zip_sink.as_slice())?,
+                })
             }
         }
     }
@@ -474,7 +479,6 @@ impl<'a> Eu4Text<'a> {
     }
 }
 
-
 struct Eu4BinaryEntry<'a> {
     data: EntryEncoding<'a>,
 }
@@ -524,8 +528,14 @@ impl<'a, 'b> Eu4BinaryDeserializer<'a, 'b> {
         self
     }
 
-    pub fn build<T, R>(&self, resolver: &'a R) -> Result<T, Eu4Error> where R: TokenResolver, T: Deserialize<'a> {
-        self.builder.from_tape(&self.tape, resolver).map_err(|e| e.into())
+    pub fn build<T, R>(&self, resolver: &'a R) -> Result<T, Eu4Error>
+    where
+        R: TokenResolver,
+        T: Deserialize<'a>,
+    {
+        self.builder
+            .from_tape(&self.tape, resolver)
+            .map_err(|e| e.into())
     }
 }
 
@@ -577,7 +587,7 @@ mod tests {
     }
 
     #[test]
-    fn test_zip_meta_text() {
+    fn test_zip_meta_text_file() {
         #[derive(Deserialize)]
         struct MyMeta<'a> {
             date: &'a str,
@@ -606,4 +616,25 @@ mod tests {
 
         assert!(found);
     }
+
+    #[test]
+    fn test_zip_meta_text_files() {
+        #[derive(Deserialize)]
+        struct MySave<'a> {
+            date: &'a str,
+            speed: u16,
+            base: u16,
+        }
+
+        let zip_data = create_zip(b"date=1463.5.28\n", b"speed=2", b"base=4636");
+
+        let file = Eu4File::builder().from_slice(&zip_data).unwrap();
+        let mut sink = Vec::new();
+        let text = file.as_text().unwrap().parse(&mut sink).unwrap();
+        let actual: MySave = text.deserialize_as().unwrap();
+        assert_eq!(actual.date, "1463.5.28");
+        assert_eq!(actual.speed, 2);
+        assert_eq!(actual.base, 4636);
+    }
+
 }
