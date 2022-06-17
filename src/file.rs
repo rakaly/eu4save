@@ -45,7 +45,7 @@ impl Eu4FileBuilder {
             })
         } else if let Some(bin_data) = is_bin(data) {
             Ok(Eu4File {
-                kind: FileKind::Text(bin_data),
+                kind: FileKind::Binary(bin_data),
             })
         } else {
             let cursor = Cursor::new(data);
@@ -230,6 +230,16 @@ impl<'a> Eu4File<'a> {
         Eu4FileBuilder {}
     }
 
+    pub fn deserialize(&self) {
+        match &self.kind {
+            FileKind::Text(x) => {}
+
+            FileKind::Binary(x) => {}
+
+            FileKind::Zip(zip) => {}
+        }
+    }
+
     pub fn entries(&self) -> Eu4FileEntries {
         match &self.kind {
             FileKind::Text(x) => Eu4FileEntries {
@@ -264,6 +274,18 @@ impl<'a> Eu4File<'a> {
             _ => None,
         }
     }
+
+    pub fn as_binary(&self) -> Option<Eu4BinaryFile> {
+        match &self.kind {
+            FileKind::Binary(x) => Some(Eu4BinaryFile {
+                data: FileEncoding::None(x),
+            }),
+            FileKind::Zip(x) if !x.is_text => Some(Eu4BinaryFile {
+                data: FileEncoding::Zip(x.clone()),
+            }),
+            _ => None,
+        }
+    }
 }
 
 struct Eu4TextFile<'a> {
@@ -273,14 +295,10 @@ struct Eu4TextFile<'a> {
 impl<'a> Eu4TextFile<'a> {
     pub fn parse(&mut self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4Text<'a>, Eu4Error> {
         match &self.data {
-            FileEncoding::None(x) => Ok(Eu4Text {
-                tape: TextTape::from_slice(x)?,
-            }),
+            FileEncoding::None(x) => Eu4Text::from_slice(x),
             FileEncoding::Zip(zip) => {
                 zip.read_to_end(zip_sink)?;
-                Ok(Eu4Text {
-                    tape: TextTape::from_slice(zip_sink.as_slice())?,
-                })
+                Eu4Text::from_slice(zip_sink.as_slice())
             }
         }
     }
@@ -424,16 +442,12 @@ struct Eu4TextEntry<'a> {
 impl<'a> Eu4TextEntry<'a> {
     pub fn parse(&self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4Text<'a>, Eu4Error> {
         match &self.data {
-            EntryEncoding::None(x) => {
-                let tape = TextTape::from_slice(x)?;
-                Ok(Eu4Text { tape })
-            }
+            EntryEncoding::None(x) => Eu4Text::from_slice(x),
             EntryEncoding::Zip { files, index } => {
                 let mut files = files.clone();
                 let mut file = files.retrieve_file(*index);
                 file.read_to_end(zip_sink)?;
-                let tape = TextTape::from_slice(zip_sink.as_slice())?;
-                Ok(Eu4Text { tape })
+                Eu4Text::from_slice(zip_sink.as_slice())
             }
         }
     }
@@ -444,6 +458,11 @@ struct Eu4Text<'a> {
 }
 
 impl<'a> Eu4Text<'a> {
+    pub fn from_slice(data: &'a [u8]) -> Result<Self, Eu4Error> {
+        let tape = TextTape::from_slice(data)?;
+        Ok(Eu4Text { tape })
+    }
+
     pub fn to_json_string(&self, options: JsonOptions) -> String {
         self.tape
             .windows1252_reader()
@@ -477,6 +496,26 @@ impl<'a> Eu4Text<'a> {
     {
         TextDeserializer::from_windows1252_tape(&self.tape).map_err(|e| e.into())
     }
+}
+
+struct Eu4BinaryFile<'a> {
+    data: FileEncoding<'a>,
+}
+
+impl<'a> Eu4BinaryFile<'a> {
+    // pub fn parse(&mut self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4Binary<'a>, Eu4Error> {
+    //     match &self.data {
+    //         FileEncoding::None(x) => Ok(Eu4Binary {
+    //             tape: BinaryTape::from_slice(x)?,
+    //         }),
+    //         FileEncoding::Zip(zip) => {
+    //             zip.read_to_end(zip_sink)?;
+    //             Ok(Eu4Binary {
+    //                 tape: BinaryTape::from_slice(zip_sink.as_slice())?,
+    //             })
+    //         }
+    //     }
+    // }
 }
 
 struct Eu4BinaryEntry<'a> {
@@ -636,5 +675,4 @@ mod tests {
         assert_eq!(actual.speed, 2);
         assert_eq!(actual.base, 4636);
     }
-
 }
