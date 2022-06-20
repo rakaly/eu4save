@@ -6,7 +6,7 @@ use jomini::{
     BinaryDeserializer, BinaryTape, TextDeserializer, TextTape,
 };
 use serde::Deserialize;
-use std::io::{Cursor, Read};
+use std::{io::{Cursor, Read}, collections::HashSet};
 use zip::{read::ZipFile, result::ZipError};
 
 const TXT_HEADER: &[u8] = b"EU4txt";
@@ -611,9 +611,7 @@ impl<'a> Eu4Binary<'a> {
     }
 
     pub fn melter<'b>(&'b self) -> Eu4Melter<'a, 'b> {
-        Eu4Melter { 
-            tape: &self.tape,
-        }
+        Eu4Melter::new(&self.tape)
     }
 }
 
@@ -639,11 +637,44 @@ impl<'a, 'b> Eu4BinaryDeserializer<'a, 'b> {
     }
 }
 
-struct Eu4Melter<'a, 'b> {
+pub struct Eu4Melter<'a, 'b> {
     tape: &'b BinaryTape<'a>,
 
     verbatim: bool,
     on_failed_resolve: FailedResolveStrategy,
+}
+
+impl<'a, 'b> Eu4Melter<'a, 'b> {
+    pub fn new(tape: &'b BinaryTape<'a>) -> Self {
+        Eu4Melter {
+            tape,
+            verbatim: false,
+            on_failed_resolve: FailedResolveStrategy::Ignore,
+        }
+    }
+
+    pub fn with_verbatim(&mut self, verbatim: bool) -> &mut Self {
+        self.verbatim = verbatim;
+        self
+    }
+
+    pub fn on_failed_resolve(&mut self, strategy: FailedResolveStrategy) -> &mut Self {
+        self.on_failed_resolve = strategy;
+        self
+    }
+
+    pub fn melt(&self) -> Result<MeltOutput, Eu4Error> {
+        melt(&self)
+    }
+}
+
+pub struct MeltOutput {
+    data: Vec<u8>,
+    unknown_tokens: HashSet<u16>,
+}
+
+fn melt(options: &Eu4Melter) -> Result<MeltOutput, Eu4Error> {
+    todo!()
 }
 
 #[cfg(test)]
