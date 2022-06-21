@@ -87,6 +87,7 @@ pub use dlc::*;
 pub use errors::*;
 pub use eu4date::*;
 pub use extraction::*;
+pub use file::{Eu4File};
 pub use jomini::binary::FailedResolveStrategy;
 pub use melt::*;
 pub use province_id::*;

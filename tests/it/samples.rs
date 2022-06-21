@@ -5,7 +5,7 @@ use eu4save::{
         BuildingConstruction, BuildingEvent, NationEvent, NationEventKind, NationEvents,
         PlayerHistory, Query,
     },
-    Encoding, Eu4Date, Eu4Extractor, PdsDate, ProvinceId, RawEncoding,
+    Encoding, Eu4Date, Eu4Extractor, PdsDate, ProvinceId, RawEncoding, Eu4File, tokens::EnvTokens,
 };
 use std::io::{Cursor, Read};
 use std::{collections::HashMap, error::Error};
@@ -18,8 +18,10 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     let mut zip_file = zip.by_index(0)?;
     let mut buffer = Vec::with_capacity(0);
     zip_file.read_to_end(&mut buffer)?;
-    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer))?;
-    assert_eq!(encoding, Encoding::Text);
+
+    let save = Eu4File::from_slice(&buffer)?.deserializer().build(&EnvTokens)?;
+    // let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&buffer))?;
+    // assert_eq!(encoding, Encoding::Text);
     assert_eq!(save.meta.player, "ENG".parse()?);
 
     let query = Query::from_save(save);

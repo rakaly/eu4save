@@ -1,6 +1,6 @@
 use crate::flavor::Eu4Flavor;
 use crate::models::{Eu4Save, Eu4SaveMeta, GameState, Meta};
-use crate::tokens::TokenLookup;
+use crate::tokens::EnvTokens;
 use crate::{Eu4Error, Eu4ErrorKind, FailedResolveStrategy};
 use jomini::binary::TokenResolver;
 use jomini::{BinaryDeserializer, TextDeserializer, TextTape};
@@ -146,7 +146,7 @@ impl Eu4ExtractorBuilder {
     where
         R: Read + Seek,
     {
-        self.extract_meta_with_tokens(reader, &TokenLookup)
+        self.extract_meta_with_tokens(reader, &EnvTokens)
     }
 
     /// Extract all info from a save
@@ -214,7 +214,7 @@ impl Eu4ExtractorBuilder {
     where
         R: Read + Seek,
     {
-        self.extract_save_with_tokens(reader, &TokenLookup)
+        self.extract_save_with_tokens(reader, &EnvTokens)
     }
 
     /// For the times where all you want is the metadata but will accept the game state too save on
@@ -223,7 +223,7 @@ impl Eu4ExtractorBuilder {
     where
         R: Read + Seek,
     {
-        self.extract_meta_optimistic_with_tokens(reader, &TokenLookup)
+        self.extract_meta_optimistic_with_tokens(reader, &EnvTokens)
     }
 
     /// For the times where all you want is the metadata but will accept the game state too save on
@@ -309,7 +309,7 @@ impl Eu4ExtractorBuilder {
     where
         T: Deserialize<'de>,
     {
-        self.extract_raw_with_tokens(data, &TokenLookup)
+        self.extract_raw_with_tokens(data, &EnvTokens)
     }
 }
 

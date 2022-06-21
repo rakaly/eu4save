@@ -1,12 +1,12 @@
 #![allow(dead_code)]
-use crate::{flavor::Eu4Flavor, models::Eu4Save, Eu4Error, Eu4ErrorKind};
+use crate::{flavor::Eu4Flavor, models::Eu4Save, Eu4Error, Eu4ErrorKind, Eu4Melter};
 use jomini::{
     binary::{BinaryDeserializerBuilder, FailedResolveStrategy, TokenResolver},
     json::JsonOptions,
     BinaryDeserializer, BinaryTape, TextDeserializer, TextTape,
 };
 use serde::Deserialize;
-use std::{io::{Cursor, Read}, collections::HashSet};
+use std::io::{Cursor, Read};
 use zip::{read::ZipFile, result::ZipError};
 
 const TXT_HEADER: &[u8] = b"EU4txt";
@@ -173,7 +173,7 @@ enum Eu4Tokens<'a> {
     Binary(BinaryTape<'a>),
 }
 
-struct Eu4File<'a> {
+pub struct Eu4File<'a> {
     kind: FileKind<'a>,
 }
 
@@ -290,7 +290,7 @@ enum Eu4ParsedFileKind<'a> {
     Binary(Eu4Binary<'a>),
 }
 
-struct Eu4ParsedFile<'a> {
+pub struct Eu4ParsedFile<'a> {
     kind: Eu4ParsedFileKind<'a>,
 }
 
@@ -321,7 +321,7 @@ impl<'a> Eu4ParsedFile<'a> {
     }
 }
 
-struct Eu4SaveDeserializer<'a, 'b> {
+pub struct Eu4SaveDeserializer<'a, 'b> {
     file: &'b Eu4File<'a>,
     builder: BinaryDeserializerBuilder<Eu4Flavor>,
 }
@@ -337,7 +337,15 @@ impl<'a, 'b> Eu4SaveDeserializer<'a, 'b> {
         R: TokenResolver,
     {
         match &self.file.kind {
-            FileKind::Text(x) => TextDeserializer::from_windows1252_slice(x).map_err(|e| e.into()),
+            FileKind::Text(x) => {
+                let tape = TextTape::from_slice(x).unwrap();
+                for (key, _op, value) in tape.windows1252_reader().fields() {
+                    if key.read_str() == "savegame_version" {
+                        dbg!(value.json().to_string().unwrap());
+                    }
+                }
+                TextDeserializer::from_windows1252_slice(x).map_err(|e| e.into())
+            },
             FileKind::Binary(x) => self.builder.from_slice(x, resolver).map_err(|e| e.into()),
             FileKind::Zip(zip) => {
                 let mut zip_sink = Vec::new();
@@ -361,7 +369,7 @@ enum Eu4DeserializerKind<'a, 'b> {
     Binary(Eu4BinaryDeserializer<'a, 'b>),
 }
 
-struct Eu4Deserializer<'a, 'b> {
+pub struct Eu4Deserializer<'a, 'b> {
     kind: Eu4DeserializerKind<'a, 'b>,
 }
 
@@ -400,7 +408,7 @@ enum Eu4FileEntriesKind<'a> {
     },
 }
 
-struct Eu4FileEntries<'a> {
+pub struct Eu4FileEntries<'a> {
     kind: Eu4FileEntriesKind<'a>,
 }
 
@@ -446,13 +454,13 @@ enum Eu4FileEntryKind<'a> {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum Eu4FileEntryName {
+pub enum Eu4FileEntryName {
     Gamestate,
     Meta,
     Ai,
 }
 
-struct Eu4FileEntry<'a> {
+pub struct Eu4FileEntry<'a> {
     kind: Eu4FileEntryKind<'a>,
 }
 
@@ -512,7 +520,7 @@ enum EntryEncoding<'a> {
     },
 }
 
-struct Eu4TextEntry<'a> {
+pub struct Eu4TextEntry<'a> {
     data: EntryEncoding<'a>,
 }
 
@@ -530,7 +538,7 @@ impl<'a> Eu4TextEntry<'a> {
     }
 }
 
-struct Eu4Text<'a> {
+pub struct Eu4Text<'a> {
     tape: TextTape<'a>,
 }
 
@@ -575,7 +583,7 @@ impl<'a> Eu4Text<'a> {
     }
 }
 
-struct Eu4BinaryEntry<'a> {
+pub struct Eu4BinaryEntry<'a> {
     data: EntryEncoding<'a>,
 }
 
@@ -593,7 +601,7 @@ impl<'a> Eu4BinaryEntry<'a> {
     }
 }
 
-struct Eu4Binary<'a> {
+pub struct Eu4Binary<'a> {
     tape: BinaryTape<'a>,
 }
 
@@ -615,7 +623,7 @@ impl<'a> Eu4Binary<'a> {
     }
 }
 
-struct Eu4BinaryDeserializer<'a, 'b> {
+pub struct Eu4BinaryDeserializer<'a, 'b> {
     builder: BinaryDeserializerBuilder<Eu4Flavor>,
     tape: &'b BinaryTape<'a>,
 }
@@ -635,46 +643,6 @@ impl<'a, 'b> Eu4BinaryDeserializer<'a, 'b> {
             .from_tape(self.tape, resolver)
             .map_err(|e| e.into())
     }
-}
-
-pub struct Eu4Melter<'a, 'b> {
-    tape: &'b BinaryTape<'a>,
-
-    verbatim: bool,
-    on_failed_resolve: FailedResolveStrategy,
-}
-
-impl<'a, 'b> Eu4Melter<'a, 'b> {
-    pub fn new(tape: &'b BinaryTape<'a>) -> Self {
-        Eu4Melter {
-            tape,
-            verbatim: false,
-            on_failed_resolve: FailedResolveStrategy::Ignore,
-        }
-    }
-
-    pub fn with_verbatim(&mut self, verbatim: bool) -> &mut Self {
-        self.verbatim = verbatim;
-        self
-    }
-
-    pub fn on_failed_resolve(&mut self, strategy: FailedResolveStrategy) -> &mut Self {
-        self.on_failed_resolve = strategy;
-        self
-    }
-
-    pub fn melt(&self) -> Result<MeltOutput, Eu4Error> {
-        melt(&self)
-    }
-}
-
-pub struct MeltOutput {
-    data: Vec<u8>,
-    unknown_tokens: HashSet<u16>,
-}
-
-fn melt(options: &Eu4Melter) -> Result<MeltOutput, Eu4Error> {
-    todo!()
 }
 
 #[cfg(test)]
