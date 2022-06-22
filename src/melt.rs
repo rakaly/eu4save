@@ -528,7 +528,7 @@ impl<'a, 'b> Eu4Melter<'a, 'b> {
     where
         R: TokenResolver,
     {
-        melt(&self, resolver)
+        melt(self, resolver)
     }
 }
 

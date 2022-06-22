@@ -332,32 +332,41 @@ impl<'a, 'b> Eu4SaveDeserializer<'a, 'b> {
         self
     }
 
-    pub fn build<R>(self, resolver: &'a R) -> Result<Eu4Save, Eu4Error>
+    pub fn build_save<R>(self, resolver: &'a R) -> Result<Eu4Save, Eu4Error>
     where
         R: TokenResolver,
     {
         match &self.file.kind {
             FileKind::Text(x) => {
-                let tape = TextTape::from_slice(x).unwrap();
-                for (key, _op, value) in tape.windows1252_reader().fields() {
-                    if key.read_str() == "savegame_version" {
-                        dbg!(value.json().to_string().unwrap());
-                    }
-                }
-                TextDeserializer::from_windows1252_slice(x).map_err(|e| e.into())
-            },
-            FileKind::Binary(x) => self.builder.from_slice(x, resolver).map_err(|e| e.into()),
+                let data = Eu4Text::from_slice(x)?;
+                Ok(Eu4Save {
+                    meta: data.deserialize()?,
+                    game: data.deserialize()?,
+                })
+            }
+            FileKind::Binary(x) => {
+                let data = Eu4Binary::from_slice(x)?;
+                Ok(Eu4Save {
+                    meta: self.builder.from_tape(&data.tape, resolver)?,
+                    game: self.builder.from_tape(&data.tape, resolver)?,
+                })
+            }
             FileKind::Zip(zip) => {
                 let mut zip_sink = Vec::new();
                 zip.read_to_end(&mut zip_sink)?;
 
                 if zip.is_text {
-                    TextDeserializer::from_windows1252_slice(zip_sink.as_slice())
-                        .map_err(|e| e.into())
+                    let data = Eu4Text::from_slice(&zip_sink)?;
+                    Ok(Eu4Save {
+                        meta: data.deserialize()?,
+                        game: data.deserialize()?,
+                    })
                 } else {
-                    self.builder
-                        .from_slice(zip_sink.as_slice(), resolver)
-                        .map_err(|e| e.into())
+                    let data = Eu4Binary::from_slice(&zip_sink)?;
+                    Ok(Eu4Save {
+                        meta: self.builder.from_tape(&data.tape, resolver)?,
+                        game: self.builder.from_tape(&data.tape, resolver)?,
+                    })
                 }
             }
         }

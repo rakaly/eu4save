@@ -165,6 +165,7 @@ impl Eu4ExtractorBuilder {
         let mut buffer = Vec::with_capacity(0);
         if is_text(&header).is_some() {
             reader.read_to_end(&mut buffer)?;
+            dbg!(buffer.len());
             let tape = TextTape::from_slice(&buffer)?;
             let meta: Meta = TextDeserializer::from_windows1252_tape(&tape)?;
             let game: GameState = TextDeserializer::from_windows1252_tape(&tape)?;

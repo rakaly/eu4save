@@ -1,3 +1,71 @@
+## v0.7.0 - TBD
+
+Save data can now be converted to JSON
+
+This release introduces the file API. This is a major change, but by the end hopefully there's an agreement that it is much better. The two main goals that will be demonstrated with this new API is performance and flexibility.
+
+But first, it's important to show that ergonomics for those that just want the save data have remained relatively strong:
+
+```rust
+let file = Eu4File::from_slice(&buffer)?;
+let save: Eu4Save = file.deserializer().build_save(&EnvTokens)?;
+```
+
+EU4 saves are large, and deserialization into an `Eu4Save` is fast by all measures, but it can still be taxing, especially if only a small tidbit of the save is required. For instance, it could prove beneficial to deserialize high priority information in an initial pass and then gather additional data later. I'm personally interested in parsing out province owner information first in order to cut down on time to display the map in pdx.tools.
+
+This is why the new API allows one to easily deserialize into user provided structs:
+
+```rust
+#[derive(Deserialize)]
+struct MyGame {
+    score_statistics: LedgerData,
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // ...
+    let file = Eu4File::from_slice(&data)?;
+    let mut zip_sink = Vec::new();
+    let file = file.parse(&mut zip_sink)?;
+    let scores: MyGame = file.deserializer().build(&EnvTokens)?;
+    // ...
+    // Then the parsed file can be reused
+    let game: GameState = file.deserializer().build(&EnvTokens)?;
+}
+```
+
+The above deserialization is 200x faster than if the same data was accessed through an `Eu4Save` (0.2ms vs 40ms).
+
+There's more flexibility in teasing out performance, as users can eschew the owned nature `Eu4Save`, where heap allocated `String`s abound for [zero copy deserialization](https://serde.rs/lifetimes.html) to reduce memory pressures and allocation time:
+
+```rust
+#[derive(Deserialize)]
+struct MyGame2<'a> {
+    current_age: &'a str,
+
+    #[serde(borrow)]
+    displayed_country_name: Cow<'a, str>,
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // ...
+    let file = Eu4File::from_slice(&data)?;
+    let mut zip_sink = Vec::new();
+    let file = file.parse(&mut zip_sink)?;
+    let game: MyGame2 = file.deserializer().build(&EnvTokens)?;
+}
+```
+
+In the previous examples, there's a `zip_sink` vector that affords us the flexibility and performance shown. Only when the given data is a zip file is the zip sink used to store the inflated contents. Uncompressed saves will not write to the sink. Formerly the API took in a generic `Read + Seek` instance, which seems like a loss flexibility compared to the now stipulated slice, but behind the scenes for uncompressed saves, the code would still call `read_to_end` causing callers who wrapped an uncompressed saves in a `Cursor` to have the save duplicated in memory. Thus, in a funny way, requiring byte slices is more memory efficient as only zip files could take advantage of the memory savings of streaming IO and zip files are 10x smaller than uncompressed, and so shouldn't have an issue being passed as a slice. 
+   
+The use case that embodies these improvements is serializing a save file to JSON if certain save metadata is detected. Previously this use case could require decompressing and parsing data multiple times but now there is always a one time cost:
+
+```rust
+let mut zip_sink = Vec::new();
+let file = Eu4File::from_slice(&data)?;
+let file = file.parse(&mut zip_sink)?;
+
+```
+
 ## v0.6.2 - 2022-04-29
 
 - Update zip dependency to latest
