@@ -55,14 +55,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-In the previous examples, there's a `zip_sink` vector that affords us the flexibility and performance shown. Only when the given data is a zip file is the zip sink used to store the inflated contents. Uncompressed saves will not write to the sink. Formerly the API took in a generic `Read + Seek` instance, which seems like a loss flexibility compared to the now stipulated slice, but behind the scenes for uncompressed saves, the code would still call `read_to_end` causing callers who wrapped an uncompressed saves in a `Cursor` to have the save duplicated in memory. Thus, in a funny way, requiring byte slices is more memory efficient as only zip files could take advantage of the memory savings of streaming IO and zip files are 10x smaller than uncompressed, and so shouldn't have an issue being passed as a slice. 
-   
-The use case that embodies these improvements is serializing a save file to JSON if certain save metadata is detected. Previously this use case could require decompressing and parsing data multiple times but now there is always a one time cost:
+In the previous examples, there's a `zip_sink` vector that affords us the flexibility and performance shown. Only when the given data is a zip file is the zip sink used to store the inflated contents. Uncompressed saves will not write to the sink. Formerly the API took in a generic `Read + Seek` instance, which seems like a loss flexibility compared to the now stipulated slice, but behind the scenes for uncompressed saves, the code would still call `read_to_end` causing callers who wrapped an uncompressed saves in a `Cursor` to have the save duplicated in memory. Thus, in a funny way, requiring byte slices is more memory efficient as only zip files could take advantage of the memory savings of streaming IO and zip files are 10x smaller than uncompressed, and so shouldn't have an issue being passed as a slice.
+
+Speaking of decompression, the new file API allows one to easily traverse the files in the zip file, such that one can decompress and parse only the desired files. For instance, if one is interested in data found in the metadata part of a save:
 
 ```rust
-let mut zip_sink = Vec::new();
-let file = Eu4File::from_slice(&data)?;
-let file = file.parse(&mut zip_sink)?;
+fn get_meta(data: &[u8]) -> Result<Meta, Box<dyn std::error::Error>> {
+    // ...
+    let file = Eu4File::from_slice(data)?;
+    let mut entries = file.entries();
+    let mut zip_sink = Vec::new();
+    while let Some(entry) = entries.next_entry() {
+        if matches!(entry.name(), Some(Eu4FileEntryName::Meta) | None) {
+            let data = entry.parse(&mut sink)?;
+            let meta: Meta = data.deserializer().build(&EnvTokens)?;
+            return Some(meta);
+        }
+    }
+
+    None
+}
+```
+
+Everything thing so far can be embodied in the following use case: serialize a save file to JSON if certain save metadata is detected. Previously this use case could require decompressing and parsing data multiple times but now there is always a one time cost:
+
+```rust
+#[derive(Deserialize)]
+struct MyMeta {
+    savegame_version: SavegameVersion,
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let file = Eu4File::from_slice(&data)?;
+    let mut entries = file.entries();
+    let mut zip_sink = Vec::new();
+    while let Some(entry) = entries.next_entry() {
+        if matches!(entry.name(), Some(Eu4FileEntryName::Meta) | None) {
+            let data = entry.parse(&mut sink)?;
+            let meta: MyMeta = data.deserializer().build(&EnvTokens)?;
+            
+            // Only want to serialize to json saves that are from 1.33 
+            if meta.savegame_version.second == 33 {
+                if entry.name().is_none() {
+                    // MELT first if needed.
+                }
+            }
+        }
+    }
+}
 
 ```
 

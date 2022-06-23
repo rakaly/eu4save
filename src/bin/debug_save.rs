@@ -1,4 +1,8 @@
-use eu4save::{Eu4File, tokens::EnvTokens, models::{GameState, LedgerData}};
+use eu4save::{
+    models::{GameState, LedgerData},
+    tokens::EnvTokens,
+    Eu4File,
+};
 use serde::Deserialize;
 use std::{env, time::Instant};
 
@@ -14,9 +18,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let data = std::fs::read(&args[1])?;
     let file = Eu4File::from_slice(&data)?;
     let file = file.parse(&mut zip_sink)?;
-    
+
     let now = Instant::now();
-    let _abc:MyGame = file.deserializer().build(&EnvTokens)?;
+    let _abc: MyGame = file.deserializer().build(&EnvTokens)?;
     let elapsed_time = now.elapsed();
     println!("Running score took {}us.", elapsed_time.as_micros());
 
