@@ -514,7 +514,7 @@ impl<'a, 'b> Eu4Melter<'a, 'b> {
         }
     }
 
-    pub fn with_verbatim(&mut self, verbatim: bool) -> &mut Self {
+    pub fn verbatim(&mut self, verbatim: bool) -> &mut Self {
         self.verbatim = verbatim;
         self
     }

@@ -1,9 +1,8 @@
-#![allow(dead_code)]
-use crate::{flavor::Eu4Flavor, models::Eu4Save, Eu4Error, Eu4ErrorKind, Eu4Melter};
+use crate::{flavor::Eu4Flavor, models::Eu4Save, Encoding, Eu4Error, Eu4ErrorKind, Eu4Melter};
 use jomini::{
     binary::{BinaryDeserializerBuilder, FailedResolveStrategy, TokenResolver},
-    json::JsonOptions,
-    BinaryDeserializer, BinaryTape, TextDeserializer, TextTape,
+    text::ObjectReader,
+    BinaryDeserializer, BinaryTape, TextDeserializer, TextTape, Windows1252Encoding,
 };
 use serde::Deserialize;
 use std::io::{Cursor, Read};
@@ -30,16 +29,11 @@ fn is_bin(data: &[u8]) -> Option<&[u8]> {
     }
 }
 
-fn is_zip(data: &[u8]) -> bool {
-    let sentry = [0x50, 0x4b, 0x03, 0x04];
-    data.get(..sentry.len()).map_or(false, |x| x == sentry)
-}
-
 #[derive(Debug, Clone)]
 struct Eu4Zip<'a> {
     archive: zip::ZipArchive<Cursor<&'a [u8]>>,
     is_text: bool,
-    inflated_size: u64,
+    inflated_size: usize,
 }
 
 impl<'a> Eu4Zip<'a> {
@@ -61,14 +55,15 @@ impl<'a> Eu4Zip<'a> {
 struct VerifiedIndex {
     index: usize,
     name: Eu4FileEntryName,
+    size: usize,
 }
 
 #[derive(Debug, Clone)]
 struct Eu4ZipFiles<'a> {
     archive: zip::ZipArchive<Cursor<&'a [u8]>>,
-    meta_index: Option<usize>,
-    gamestate_index: Option<usize>,
-    ai_index: Option<usize>,
+    meta_index: Option<VerifiedIndex>,
+    gamestate_index: Option<VerifiedIndex>,
+    ai_index: Option<VerifiedIndex>,
 }
 
 impl<'a> Eu4ZipFiles<'a> {
@@ -77,12 +72,31 @@ impl<'a> Eu4ZipFiles<'a> {
         let mut gamestate_index = None;
         let mut ai_index = None;
 
-        for i in 0..archive.len() {
-            if let Ok(file) = archive.by_index(i) {
+        for index in 0..archive.len() {
+            if let Ok(file) = archive.by_index(index) {
+                let size = file.size() as usize;
                 match file.name() {
-                    "meta" => meta_index = Some(i),
-                    "gamestate" => gamestate_index = Some(i),
-                    "ai" => ai_index = Some(i),
+                    "meta" => {
+                        meta_index = Some(VerifiedIndex {
+                            name: Eu4FileEntryName::Meta,
+                            index,
+                            size,
+                        })
+                    }
+                    "gamestate" => {
+                        gamestate_index = Some(VerifiedIndex {
+                            name: Eu4FileEntryName::Gamestate,
+                            index,
+                            size,
+                        })
+                    }
+                    "ai" => {
+                        ai_index = Some(VerifiedIndex {
+                            name: Eu4FileEntryName::Ai,
+                            index,
+                            size,
+                        })
+                    }
                     _ => {}
                 }
             }
@@ -102,28 +116,10 @@ impl<'a> Eu4ZipFiles<'a> {
     }
 
     pub fn next_index(&mut self) -> Option<VerifiedIndex> {
-        if let Some(index) = self.meta_index.take() {
-            return Some(VerifiedIndex {
-                index,
-                name: Eu4FileEntryName::Meta,
-            });
-        }
-
-        if let Some(index) = self.gamestate_index.take() {
-            return Some(VerifiedIndex {
-                index,
-                name: Eu4FileEntryName::Gamestate,
-            });
-        }
-
-        if let Some(index) = self.ai_index.take() {
-            return Some(VerifiedIndex {
-                index,
-                name: Eu4FileEntryName::Ai,
-            });
-        }
-
-        None
+        self.meta_index
+            .take()
+            .or_else(|| self.gamestate_index.take())
+            .or_else(|| self.ai_index.take())
     }
 
     pub fn next_file(&mut self) -> Option<Eu4ZipFile> {
@@ -137,7 +133,6 @@ impl<'a> Eu4ZipFiles<'a> {
 
 struct Eu4ZipFile<'a> {
     file: ZipFile<'a>,
-    // name: Eu4FileEntryName,
 }
 
 impl<'a> Eu4ZipFile<'a> {
@@ -151,26 +146,12 @@ impl<'a> Eu4ZipFile<'a> {
     pub fn size(&self) -> usize {
         self.file.size() as usize
     }
-
-    // pub fn name(&self) -> Eu4FileEntryName {
-    //     self.name
-    // }
 }
 
 enum FileKind<'a> {
     Text(&'a [u8]),
     Binary(&'a [u8]),
     Zip(Eu4Zip<'a>),
-}
-
-enum FileEncoding<'a> {
-    None(&'a [u8]),
-    Zip(Eu4Zip<'a>),
-}
-
-enum Eu4Tokens<'a> {
-    Text(TextTape<'a>),
-    Binary(BinaryTape<'a>),
 }
 
 pub struct Eu4File<'a> {
@@ -197,7 +178,7 @@ impl<'a> Eu4File<'a> {
                     let mut found_text = None;
                     let mut eu4_files = Eu4ZipFiles::new(zip);
                     while let Some(mut file) = eu4_files.next_file() {
-                        inflated_size += file.file.size();
+                        inflated_size += file.size();
 
                         if found_text.is_none() {
                             file.file.read_exact(&mut header)?;
@@ -219,6 +200,22 @@ impl<'a> Eu4File<'a> {
                 Err(ZipError::InvalidArchive(_)) => Err(Eu4ErrorKind::UnknownHeader.into()),
                 Err(e) => Err(Eu4Error::new(Eu4ErrorKind::ZipCentralDirectory(e))),
             }
+        }
+    }
+
+    pub fn encoding(&self) -> Encoding {
+        match &self.kind {
+            FileKind::Text(_) => Encoding::Text,
+            FileKind::Binary(_) => Encoding::Bin,
+            FileKind::Zip(zip) if zip.is_text => Encoding::TextZip,
+            FileKind::Zip(_) => Encoding::BinZip,
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match &self.kind {
+            FileKind::Text(x) | FileKind::Binary(x) => x.len(),
+            FileKind::Zip(x) => x.inflated_size,
         }
     }
 
@@ -285,7 +282,7 @@ impl<'a> Eu4File<'a> {
     }
 }
 
-enum Eu4ParsedFileKind<'a> {
+pub enum Eu4ParsedFileKind<'a> {
     Text(Eu4Text<'a>),
     Binary(Eu4Binary<'a>),
 }
@@ -307,6 +304,10 @@ impl<'a> Eu4ParsedFile<'a> {
             Eu4ParsedFileKind::Binary(x) => Some(x),
             _ => None,
         }
+    }
+
+    pub fn kind(&self) -> &Eu4ParsedFileKind {
+        &self.kind
     }
 
     pub fn deserializer(&self) -> Eu4Deserializer {
@@ -482,6 +483,13 @@ impl<'a> Eu4FileEntry<'a> {
         }
     }
 
+    pub fn size(&self) -> usize {
+        match &self.kind {
+            Eu4FileEntryKind::Text(x) | Eu4FileEntryKind::Binary(x) => x.len(),
+            Eu4FileEntryKind::Zip { index, .. } => index.size,
+        }
+    }
+
     pub fn parse(&self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4ParsedFile<'a>, Eu4Error> {
         match &self.kind {
             Eu4FileEntryKind::Text(x) => Ok(Eu4ParsedFile {
@@ -510,71 +518,7 @@ impl<'a> Eu4FileEntry<'a> {
             }
         }
     }
-
-    // pub fn as_binary(&self) -> Option<Eu4BinaryEntry<'a>> {
-    //     match &self.kind {
-    //         Eu4FileEntryKind::Binary(x) => Some(Eu4BinaryEntry {
-    //             data: EntryEncoding::None(x),
-    //         }),
-    //         Eu4FileEntryKind::Zip {
-    //             files,
-    //             is_text,
-    //             index,
-    //         } if !*is_text => Some(Eu4BinaryEntry {
-    //             data: EntryEncoding::Zip {
-    //                 files: files.clone(),
-    //                 index: *index,
-    //             },
-    //         }),
-    //         _ => None,
-    //     }
-    // }
-
-    // pub fn as_text(&self) -> Option<Eu4TextEntry<'a>> {
-    //     match &self.kind {
-    //         Eu4FileEntryKind::Text(x) => Some(Eu4TextEntry {
-    //             data: EntryEncoding::None(x),
-    //         }),
-    //         Eu4FileEntryKind::Zip {
-    //             files,
-    //             is_text,
-    //             index,
-    //         } if *is_text => Some(Eu4TextEntry {
-    //             data: EntryEncoding::Zip {
-    //                 files: files.clone(),
-    //                 index: *index,
-    //             },
-    //         }),
-    //         _ => None,
-    //     }
-    // }
 }
-
-enum EntryEncoding<'a> {
-    None(&'a [u8]),
-    Zip {
-        files: Eu4ZipFiles<'a>,
-        index: VerifiedIndex,
-    },
-}
-
-// pub struct Eu4TextEntry<'a> {
-//     data: EntryEncoding<'a>,
-// }
-
-// impl<'a> Eu4TextEntry<'a> {
-//     pub fn parse(&self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4Text<'a>, Eu4Error> {
-//         match &self.data {
-//             EntryEncoding::None(x) => Eu4Text::from_slice(x),
-//             EntryEncoding::Zip { files, index } => {
-//                 let mut files = files.clone();
-//                 let mut file = files.retrieve_file(*index);
-//                 file.read_to_end(zip_sink)?;
-//                 Eu4Text::from_slice(zip_sink.as_slice())
-//             }
-//         }
-//     }
-// }
 
 pub struct Eu4Text<'a> {
     tape: TextTape<'a>,
@@ -586,31 +530,8 @@ impl<'a> Eu4Text<'a> {
         Ok(Eu4Text { tape })
     }
 
-    pub fn to_json_string(&self, options: JsonOptions) -> String {
-        self.tape
-            .windows1252_reader()
-            .json()
-            .with_options(options)
-            .to_string()
-    }
-
-    pub fn to_json_vec(&self, options: JsonOptions) -> Vec<u8> {
-        self.tape
-            .windows1252_reader()
-            .json()
-            .with_options(options)
-            .to_vec()
-    }
-
-    pub fn to_json_writer<W>(&self, writer: W, options: JsonOptions) -> Result<(), std::io::Error>
-    where
-        W: std::io::Write,
-    {
-        self.tape
-            .windows1252_reader()
-            .json()
-            .with_options(options)
-            .to_writer(writer)
+    pub fn reader(&self) -> ObjectReader<Windows1252Encoding> {
+        self.tape.windows1252_reader()
     }
 
     pub fn deserialize<T>(&self) -> Result<T, Eu4Error>
@@ -620,24 +541,6 @@ impl<'a> Eu4Text<'a> {
         TextDeserializer::from_windows1252_tape(&self.tape).map_err(|e| e.into())
     }
 }
-
-// pub struct Eu4BinaryEntry<'a> {
-//     data: EntryEncoding<'a>,
-// }
-
-// impl<'a> Eu4BinaryEntry<'a> {
-//     pub fn parse(&self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4Binary<'a>, Eu4Error> {
-//         match &self.data {
-//             EntryEncoding::None(x) => Eu4Binary::from_slice(x),
-//             EntryEncoding::Zip { files, index } => {
-//                 let mut files = files.clone();
-//                 let mut file = files.retrieve_file(*index);
-//                 file.read_to_end(zip_sink)?;
-//                 Eu4Binary::from_slice(zip_sink.as_slice())
-//             }
-//         }
-//     }
-// }
 
 pub struct Eu4Binary<'a> {
     tape: BinaryTape<'a>,
@@ -724,7 +627,7 @@ mod tests {
         let mut sink = Vec::new();
         let parsed = entry.parse(&mut sink).unwrap();
         let text = parsed.as_text().unwrap();
-        let json = text.to_json_string(JsonOptions::new());
+        let json = text.reader().json().to_string();
         assert_eq!(&json, r#"{"hello":"world"}"#);
     }
 
@@ -750,7 +653,7 @@ mod tests {
                 let actual: MyMeta = text.deserialize().unwrap();
                 assert_eq!(actual.date, "1463.5.28");
 
-                let out = text.to_json_string(JsonOptions::new());
+                let out = text.reader().json().to_string();
                 assert_eq!(&out, r#"{"date":"1463.5.28"}"#);
                 found = true;
             }

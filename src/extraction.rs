@@ -22,6 +22,8 @@ pub enum Encoding {
 
     /// Save is a zip that contained binary documents
     BinZip,
+
+    Bin,
 }
 
 impl Encoding {
@@ -30,6 +32,7 @@ impl Encoding {
             Encoding::Text => "text",
             Encoding::TextZip => "textzip",
             Encoding::BinZip => "binzip",
+            Encoding::Bin => "bin",
         }
     }
 }

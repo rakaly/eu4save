@@ -77,34 +77,7 @@ fn get_meta(data: &[u8]) -> Result<Meta, Box<dyn std::error::Error>> {
 }
 ```
 
-Everything thing so far can be embodied in the following use case: serialize a save file to JSON if certain save metadata is detected. Previously this use case could require decompressing and parsing data multiple times but now there is always a one time cost:
-
-```rust
-#[derive(Deserialize)]
-struct MyMeta {
-    savegame_version: SavegameVersion,
-}
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let file = Eu4File::from_slice(&data)?;
-    let mut entries = file.entries();
-    let mut zip_sink = Vec::new();
-    while let Some(entry) = entries.next_entry() {
-        if matches!(entry.name(), Some(Eu4FileEntryName::Meta) | None) {
-            let data = entry.parse(&mut sink)?;
-            let meta: MyMeta = data.deserializer().build(&EnvTokens)?;
-            
-            // Only want to serialize to json saves that are from 1.33 
-            if meta.savegame_version.second == 33 {
-                if entry.name().is_none() {
-                    // MELT first if needed.
-                }
-            }
-        }
-    }
-}
-
-```
+Everything thing so far can be embodied in the following use case: serialize a save file to JSON if certain save metadata is detected. Previously this use case could require decompressing and parsing data multiple times but now there is always a one time cost. See the `json` binary example.
 
 ## v0.6.2 - 2022-04-29
 
