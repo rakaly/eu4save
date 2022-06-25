@@ -23,15 +23,7 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     let file = Eu4File::from_slice(&buffer)?;
     let save = file.deserializer().build_save(&EnvTokens)?;
 
-    // #[derive(Deserialize)]
-    // struct MyFile {
-    //     savegame_version: SavegameVersion,
-    // }
-
-    // let version: Meta = text.deserialize().unwrap();
-    // assert_eq!(version.savegame_version.first, 1);
-
-    // assert_eq!(encoding, Encoding::Text);
+    assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "ENG".parse()?);
 
     let query = Query::from_save(save);
@@ -95,8 +87,9 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
 #[test]
 fn test_eu4_compressed_text() -> Result<(), Box<dyn Error>> {
     let data = utils::request("eng.txt.compressed.eu4");
-    let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
-    assert_eq!(encoding, Encoding::TextZip);
+    let file = Eu4File::from_slice(&data)?;
+    let save = file.deserializer().build_save(&EnvTokens)?;
+    assert_eq!(file.encoding(), Encoding::TextZip);
     assert_eq!(save.meta.player, "ENG".parse()?);
 
     let (save, _) = Eu4Extractor::extract_meta_optimistic(Cursor::new(&data[..]))?;
