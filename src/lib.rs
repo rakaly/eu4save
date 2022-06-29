@@ -2,18 +2,15 @@
 EU4 Save is a library to ergonomically work with EU4 saves (ironman + mp).
 
 ```rust
-use eu4save::{Eu4Extractor, Encoding, CountryTag};
-use std::io::Cursor;
+use eu4save::{Eu4File, Encoding, CountryTag, EnvTokens};
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
-let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
-assert_eq!(encoding, Encoding::TextZip);
+let file = Eu4File::from_slice(&data)?;
+let save = file.deserializer().build_save(&EnvTokens)?;
+assert_eq!(file.encoding(), Encoding::TextZip);
 assert_eq!(save.meta.player, "ENG".parse()?);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
-
-`Eu4Extractor` will deserialize both plaintext (used for mods, multiplayer,
-non-ironman saves) and binary (ironman) encoded saves into the same structure.
 
 ## Querying
 
@@ -31,11 +28,12 @@ trade?
 To help solve questions like these, the `Query` API was created
 
 ```rust
-use eu4save::{Eu4Extractor, Encoding, CountryTag, query::Query};
+use eu4save::{Eu4File, Encoding, CountryTag, EnvTokens, query::Query};
 use std::io::Cursor;
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
-let (save, _encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
+let file = Eu4File::from_slice(&data)?;
+let save = file.deserializer().build_save(&EnvTokens)?;
 let save_query = Query::from_save(save);
 let trade = save_query.country(&"ENG".parse()?)
     .map(|country| save_query.country_income_breakdown(country))
@@ -71,6 +69,7 @@ mod dlc;
 mod errors;
 mod eu4date;
 mod extraction;
+pub mod file;
 pub(crate) mod flavor;
 mod melt;
 /// Repository of raw structs extracted from a save file
@@ -79,14 +78,17 @@ mod province_id;
 /// Ergonomic module for querying info from a save file
 pub mod query;
 mod tag_resolver;
-pub mod tokens;
+mod tokens;
 
 pub use country_tag::*;
 pub use dlc::*;
 pub use errors::*;
 pub use eu4date::*;
 pub use extraction::*;
-pub use jomini::FailedResolveStrategy;
+#[doc(inline)]
+pub use file::Eu4File;
+pub use jomini::binary::FailedResolveStrategy;
 pub use melt::*;
 pub use province_id::*;
 pub use tag_resolver::*;
+pub use tokens::EnvTokens;

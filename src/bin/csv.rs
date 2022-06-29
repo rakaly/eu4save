@@ -1,13 +1,12 @@
-use eu4save::PdsDate;
+use eu4save::{EnvTokens, Eu4File, PdsDate};
 use std::env;
 use std::error::Error;
-use std::io::Cursor;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let file_data = std::fs::read(&args[1])?;
-    let cursor = Cursor::new(&file_data);
-    let (save, _) = eu4save::Eu4Extractor::builder().extract_save(cursor)?;
+    let file = Eu4File::from_slice(&file_data)?;
+    let save = file.deserializer().build_save(&EnvTokens)?;
 
     println!("date,tag,prestige");
     for (tag, country) in &save.game.countries {

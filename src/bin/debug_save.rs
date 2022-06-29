@@ -1,13 +1,12 @@
-use eu4save::Eu4Extractor;
+use eu4save::{EnvTokens, Eu4File};
 use std::env;
-use std::fs::File;
-use std::io::BufReader;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
-    let file = File::open(&args[1])?;
-    let reader = BufReader::new(file);
-    let (save, _encoding) = Eu4Extractor::builder().extract_save(reader)?;
+
+    let data = std::fs::read(&args[1])?;
+    let file = Eu4File::from_slice(&data)?;
+    let save = file.deserializer().build_save(&EnvTokens)?;
 
     let query = eu4save::query::Query::from_save(save);
     let owners = query.province_owners();

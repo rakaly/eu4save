@@ -4,6 +4,8 @@ use crate::{
 };
 use std::collections::HashMap;
 
+/// Tracks tag progression throughput history
+///
 /// The tag resolver is important to answering questions like "where are they
 /// now?" when looking at historic events like province changes or wars. When
 /// countries tag switch the tag resolver is able to connect historic events

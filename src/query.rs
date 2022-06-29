@@ -908,36 +908,32 @@ impl Query {
             }
         });
 
-        let over_time = province
-            .history
-            .events
-            .iter()
-            .flat_map(|(date, events)| {
-                events.0.iter().filter_map(move |event| match event {
-                    ProvinceEvent::KV((key, value)) => {
-                        let constructed = if let ProvinceEventValue::Bool(x) = value {
-                            if buildings.contains(key) {
-                                if *x {
-                                    BuildingConstruction::Constructed
-                                } else {
-                                    BuildingConstruction::Destroyed
-                                }
+        let over_time = province.history.events.iter().flat_map(|(date, events)| {
+            events.0.iter().filter_map(move |event| match event {
+                ProvinceEvent::KV((key, value)) => {
+                    let constructed = if let ProvinceEventValue::Bool(x) = value {
+                        if buildings.contains(key) {
+                            if *x {
+                                BuildingConstruction::Constructed
                             } else {
-                                return None;
+                                BuildingConstruction::Destroyed
                             }
                         } else {
                             return None;
-                        };
+                        }
+                    } else {
+                        return None;
+                    };
 
-                        Some(BuildingEvent {
-                            building: key.as_str(),
-                            date: *date,
-                            action: constructed,
-                        })
-                    }
-                    _ => None,
-                })
-            });
+                    Some(BuildingEvent {
+                        building: key.as_str(),
+                        date: *date,
+                        action: constructed,
+                    })
+                }
+                _ => None,
+            })
+        });
 
         initial_buildings.chain(over_time).collect()
     }

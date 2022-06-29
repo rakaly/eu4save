@@ -73,7 +73,7 @@ impl CountryTag {
 }
 
 #[inline]
-pub const fn is_tagc(b: u8) -> bool {
+pub(crate) const fn is_tagc(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'-'
 }
 
