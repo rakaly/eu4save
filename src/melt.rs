@@ -1,4 +1,4 @@
-use crate::{flavor::Eu4Flavor, Eu4Date, Eu4Error, Eu4ErrorKind};
+use crate::{file::Eu4Binary, flavor::Eu4Flavor, Eu4Date, Eu4Error, Eu4ErrorKind};
 use jomini::{
     binary::{BinaryFlavor, FailedResolveStrategy, TokenResolver},
     common::PdsDate,
@@ -42,17 +42,42 @@ enum QuoteKind {
     ForceQuote,
 }
 
+enum Eu4MelterKind<'a, 'b> {
+    Single(&'b BinaryTape<'a>),
+    Multiple {
+        meta: &'b Eu4Binary<'a>,
+        gamestate: &'b Eu4Binary<'a>,
+        ai: &'b Eu4Binary<'a>,
+    },
+}
+
 /// Convert a binary save to plaintext
 pub struct Eu4Melter<'a, 'b> {
-    tape: &'b BinaryTape<'a>,
+    kind: Eu4MelterKind<'a, 'b>,
     verbatim: bool,
     on_failed_resolve: FailedResolveStrategy,
 }
 
 impl<'a, 'b> Eu4Melter<'a, 'b> {
+    pub fn from_entries(
+        meta: &'b Eu4Binary<'a>,
+        gamestate: &'b Eu4Binary<'a>,
+        ai: &'b Eu4Binary<'a>,
+    ) -> Self {
+        Eu4Melter {
+            kind: Eu4MelterKind::Multiple {
+                meta,
+                gamestate,
+                ai,
+            },
+            verbatim: false,
+            on_failed_resolve: FailedResolveStrategy::Ignore,
+        }
+    }
+
     pub(crate) fn new(tape: &'b BinaryTape<'a>) -> Self {
         Eu4Melter {
-            tape,
+            kind: Eu4MelterKind::Single(tape),
             verbatim: false,
             on_failed_resolve: FailedResolveStrategy::Ignore,
         }
@@ -66,6 +91,78 @@ impl<'a, 'b> Eu4Melter<'a, 'b> {
     pub fn on_failed_resolve(&mut self, strategy: FailedResolveStrategy) -> &mut Self {
         self.on_failed_resolve = strategy;
         self
+    }
+
+    pub(crate) fn tokens_len(&self) -> usize {
+        match &self.kind {
+            Eu4MelterKind::Single(x) => x.tokens().len(),
+            Eu4MelterKind::Multiple {
+                meta,
+                gamestate,
+                ai,
+            } => {
+                meta.tape().tokens().len()
+                    + gamestate.tape().tokens().len()
+                    + ai.tape().tokens().len()
+            }
+        }
+    }
+
+    pub(crate) fn get_token(&self, idx: usize) -> Option<&BinaryToken> {
+        match &self.kind {
+            Eu4MelterKind::Single(x) => x.tokens().get(idx),
+            Eu4MelterKind::Multiple {
+                meta,
+                gamestate,
+                ai,
+            } => {
+                let mut idx = idx;
+
+                let meta_len = meta.tape().tokens().len();
+                if idx < meta_len {
+                    return meta.tape().tokens().get(idx);
+                }
+                idx -= meta_len;
+
+                let gamestate_len = gamestate.tape().tokens().len();
+                if idx < gamestate_len {
+                    return gamestate.tape().tokens().get(idx);
+                }
+                idx -= gamestate_len;
+                ai.tape().tokens().get(idx)
+            }
+        }
+    }
+
+    pub(crate) fn skip_value_idx(&self, token_idx: usize) -> usize {
+        let offset = match &self.kind {
+            Eu4MelterKind::Single(_) => 0,
+            Eu4MelterKind::Multiple {
+                meta, gamestate, ..
+            } => {
+                let mut idx = token_idx;
+
+                let meta_len = meta.tape().tokens().len();
+                if idx < meta_len {
+                    0
+                } else {
+                    idx -= meta_len;
+                    let gamestate_len = gamestate.tape().tokens().len();
+                    if idx < gamestate_len {
+                        meta_len
+                    } else {
+                        gamestate_len
+                    }
+                }
+            }
+        };
+
+        self.get_token(token_idx + 1)
+            .map(|next_token| match next_token {
+                BinaryToken::Object(end) | BinaryToken::Array(end) => offset + end + 1,
+                _ => token_idx + 2,
+            })
+            .unwrap_or(token_idx + 1)
     }
 
     pub fn melt<R>(&self, resolver: &R) -> Result<MeltedDocument, Eu4Error>
@@ -94,12 +191,12 @@ impl MeltedDocument {
     }
 }
 
-pub(crate) fn melt<R>(options: &Eu4Melter, resolver: &R) -> Result<MeltedDocument, Eu4Error>
+pub(crate) fn melt<R>(melter: &Eu4Melter, resolver: &R) -> Result<MeltedDocument, Eu4Error>
 where
     R: TokenResolver,
 {
-    let tokens = options.tape.tokens();
-    let mut out = Vec::with_capacity(tokens.len() * 10);
+    // let tokens = melter.tape.tokens();
+    let mut out = Vec::with_capacity(melter.tokens_len() * 10);
     out.extend_from_slice(b"EU4txt\n");
     let mut unknown_tokens = HashSet::new();
     let pos = out.len() as u64;
@@ -119,7 +216,7 @@ where
     let mut queued_checksum: Option<Scalar> = None;
     let flavor = Eu4Flavor::new();
 
-    while let Some(token) = tokens.get(token_idx) {
+    while let Some(token) = melter.get_token(token_idx) {
         match token {
             BinaryToken::Object(_) => {
                 depth += 1;
@@ -152,7 +249,7 @@ where
                 } else if known_date {
                     if let Some(date) = Eu4Date::from_binary(*x) {
                         wtr.write_date(date.game_fmt())?;
-                    } else if options.on_failed_resolve != FailedResolveStrategy::Error {
+                    } else if melter.on_failed_resolve != FailedResolveStrategy::Error {
                         wtr.write_i32(*x)?;
                     } else {
                         return Err(Eu4Error::new(Eu4ErrorKind::InvalidDate(*x)));
@@ -201,24 +298,16 @@ where
             BinaryToken::F64(x) => write!(&mut wtr, "{:.5}", flavor.visit_f64(*x))?,
             BinaryToken::Token(x) => match resolver.resolve(*x) {
                 Some(id) => {
-                    let skip = id == "is_ironman" && !options.verbatim || id == "checksum";
+                    let skip = (id == "is_ironman" && !melter.verbatim) || id == "checksum";
                     if skip && wtr.expecting_key() {
-                        let next = tokens.get(token_idx + 1);
+                        let next = melter.get_token(token_idx + 1);
                         if id == "checksum" {
                             if let Some(BinaryToken::Quoted(s)) = next {
                                 queued_checksum = Some(*s);
                             }
                         };
 
-                        let skipped_idx = next
-                            .map(|next_token| match next_token {
-                                BinaryToken::Object(end) => end + 1,
-                                BinaryToken::Array(end) => end + 1,
-                                _ => token_idx + 2,
-                            })
-                            .unwrap_or(token_idx + 1);
-
-                        token_idx = skipped_idx;
+                        token_idx = melter.skip_value_idx(token_idx);
                         continue;
                     }
 
@@ -314,21 +403,12 @@ where
 
                     wtr.write_unquoted(id.as_bytes())?;
                 }
-                None => match options.on_failed_resolve {
+                None => match melter.on_failed_resolve {
                     FailedResolveStrategy::Error => {
                         return Err(Eu4ErrorKind::UnknownToken { token_id: *x }.into());
                     }
                     FailedResolveStrategy::Ignore if wtr.expecting_key() => {
-                        let skip = tokens
-                            .get(token_idx + 1)
-                            .map(|next_token| match next_token {
-                                BinaryToken::Object(end) => end + 1,
-                                BinaryToken::Array(end) => end + 1,
-                                _ => token_idx + 2,
-                            })
-                            .unwrap_or(token_idx + 1);
-
-                        token_idx = skip;
+                        token_idx = melter.skip_value_idx(token_idx);
                         continue;
                     }
                     _ => {
@@ -526,5 +606,36 @@ mod tests {
             .melt(&EnvTokens)
             .unwrap();
         assert_eq!(std::str::from_utf8(out.data()).unwrap(), &expected[..]);
+    }
+
+    #[test]
+    fn test_melt_from_entries() {
+        let data = [
+            0x45, 0x55, 0x34, 0x62, 0x69, 0x6e, 0x89, 0x35, 0x01, 0x00, 0x0e, 0x00, 0x01, 0x98,
+            0x35, 0x01, 0x00, 0x0e, 0x00, 0x01, 0x79, 0x01, 0x01, 0x00, 0x0f, 0x00, 0x03, 0x00,
+            0x42, 0x48, 0x41,
+        ];
+
+        let meta = Eu4Binary::from_slice(&data).unwrap();
+
+        let mut gdata = data.to_vec();
+        gdata[13] = 0x3a;
+        gdata[14] = 0x29;
+
+        let gamestate = Eu4Binary::from_slice(&gdata).unwrap();
+
+        let mut adata = data.to_vec();
+        adata[13] = 0x76;
+        adata[14] = 0x29;
+        let ai = Eu4Binary::from_slice(&adata).unwrap();
+
+        let out = Eu4Melter::from_entries(&meta, &gamestate, &ai)
+            .melt(&EnvTokens)
+            .unwrap();
+
+        assert_eq!(
+            std::str::from_utf8(out.data()).unwrap(),
+            "EU4txt\ncan_be_annexed=yes\nis_emperor=yes\nis_bankrupt=yes\nchecksum=\"BHA\""
+        );
     }
 }

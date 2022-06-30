@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // if this is an uncompressed save, it could be quite large, so we
             // want to avoid reparsing it. Otherwise, we'll process the rest of
             // the zip data
-            if file.encoding().is_zip() {
+            if !file.encoding().is_zip() {
                 parsed_file_to_json(&parsed_file)?;
             } else {
                 zip_sink.clear();
