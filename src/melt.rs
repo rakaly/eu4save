@@ -169,8 +169,25 @@ impl<'a, 'b> Eu4Melter<'a, 'b> {
     where
         R: TokenResolver,
     {
-        melt(self, resolver)
+        let out = melt(self, resolver).map_err(|e| match e {
+            MelterError::Write(x) => Eu4ErrorKind::Writer(x),
+            MelterError::UnknownToken { token_id } => Eu4ErrorKind::UnknownToken { token_id },
+            MelterError::InvalidDate(x) => Eu4ErrorKind::InvalidDate(x),
+        })?;
+        Ok(out)
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum MelterError {
+    #[error("{0}")]
+    Write(#[from] jomini::Error),
+
+    #[error("")]
+    UnknownToken { token_id: u16 },
+
+    #[error("")]
+    InvalidDate(i32),
 }
 
 /// Output from melting a binary save to plaintext
@@ -191,7 +208,7 @@ impl MeltedDocument {
     }
 }
 
-pub(crate) fn melt<R>(melter: &Eu4Melter, resolver: &R) -> Result<MeltedDocument, Eu4Error>
+pub(crate) fn melt<R>(melter: &Eu4Melter, resolver: &R) -> Result<MeltedDocument, MelterError>
 where
     R: TokenResolver,
 {
@@ -252,7 +269,7 @@ where
                     } else if melter.on_failed_resolve != FailedResolveStrategy::Error {
                         wtr.write_i32(*x)?;
                     } else {
-                        return Err(Eu4Error::new(Eu4ErrorKind::InvalidDate(*x)));
+                        return Err(MelterError::InvalidDate(*x));
                     }
                     known_date = false;
                 } else if let Some(date) = Eu4Date::from_binary_heuristic(*x) {
@@ -405,7 +422,7 @@ where
                 }
                 None => match melter.on_failed_resolve {
                     FailedResolveStrategy::Error => {
-                        return Err(Eu4ErrorKind::UnknownToken { token_id: *x }.into());
+                        return Err(MelterError::UnknownToken { token_id: *x });
                     }
                     FailedResolveStrategy::Ignore if wtr.expecting_key() => {
                         token_idx = melter.skip_value_idx(token_idx);

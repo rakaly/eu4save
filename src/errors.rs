@@ -1,10 +1,10 @@
-use std::fmt;
-use std::io::Error as IoError;
 use zip::result::ZipError;
+use crate::file::Eu4FileEntryName;
 
 /// An EU4 Error
-#[derive(Debug)]
-pub struct Eu4Error(Box<Eu4ErrorKind>);
+#[derive(thiserror::Error, Debug)]
+#[error(transparent)]
+pub struct Eu4Error(#[from] Box<Eu4ErrorKind>);
 
 impl Eu4Error {
     pub(crate) fn new(kind: Eu4ErrorKind) -> Eu4Error {
@@ -17,85 +17,52 @@ impl Eu4Error {
     }
 }
 
-/// Specific type of error
-#[derive(Debug)]
-pub enum Eu4ErrorKind {
-    ZipCentralDirectory(ZipError),
-    ZipMissingEntry(&'static str, ZipError),
-    ZipExtraction(&'static str, IoError),
-    ZipSize(&'static str),
-    IoErr(IoError),
-    UnknownHeader,
-    UnknownToken {
-        token_id: u16,
-    },
-    Deserialize {
-        part: Option<String>,
-        err: jomini::Error,
-    },
-    CountryTagIncorrectSize,
-    CountryTagInvalidCharacters,
-    InvalidDate(i32),
-}
-
-impl fmt::Display for Eu4Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.kind() {
-            Eu4ErrorKind::ZipCentralDirectory(_) => {
-                write!(f, "unable to read zip central directory")
-            }
-            Eu4ErrorKind::ZipMissingEntry(s, _) => write!(f, "unable to locate {} in zip", s),
-            Eu4ErrorKind::ZipExtraction(s, _) => write!(f, "unable to extract {} in zip", s),
-            Eu4ErrorKind::ZipSize(s) => write!(f, "{} in zip is too large", s),
-            Eu4ErrorKind::IoErr(_) => write!(f, "io error"),
-            Eu4ErrorKind::UnknownHeader => write!(f, "unknown header encountered in zip"),
-            Eu4ErrorKind::UnknownToken { token_id } => {
-                write!(f, "unknown binary token encountered (id: {})", token_id)
-            }
-            Eu4ErrorKind::Deserialize { ref part, ref err } => match part {
-                Some(p) => write!(f, "error deserializing: {}: {}", p, err),
-                None => err.fmt(f),
-            },
-            Eu4ErrorKind::CountryTagIncorrectSize => {
-                write!(f, "input is incorrect size to be a country tag")
-            }
-            Eu4ErrorKind::CountryTagInvalidCharacters => {
-                write!(f, "input contains invalid characters for a country tag")
-            }
-            Eu4ErrorKind::InvalidDate(x) => write!(f, "expected {} to be parsed as a date", x),
-        }
-    }
-}
-
-impl std::error::Error for Eu4Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self.kind() {
-            Eu4ErrorKind::ZipCentralDirectory(e) => Some(e),
-            Eu4ErrorKind::ZipMissingEntry(_, e) => Some(e),
-            Eu4ErrorKind::ZipExtraction(_, e) => Some(e),
-            Eu4ErrorKind::IoErr(e) => Some(e),
-            Eu4ErrorKind::Deserialize { ref err, .. } => Some(err),
-            _ => None,
-        }
-    }
-}
-
-impl From<jomini::Error> for Eu4Error {
-    fn from(err: jomini::Error) -> Self {
-        Eu4Error::new(Eu4ErrorKind::Deserialize { part: None, err })
-    }
-}
-
-impl From<IoError> for Eu4Error {
-    fn from(err: IoError) -> Self {
-        Eu4Error::new(Eu4ErrorKind::IoErr(err))
-    }
-}
-
 impl From<Eu4ErrorKind> for Eu4Error {
     fn from(err: Eu4ErrorKind) -> Self {
         Eu4Error::new(err)
     }
+}
+
+/// Specific type of error
+#[derive(thiserror::Error, Debug)]
+pub enum Eu4ErrorKind {
+    #[error("unable to parse as zip: {0}")]
+    ZipArchive(#[from] ZipError),
+
+    #[error("unable to inflate zip entry: {name}: {source}")]
+    ZipInflation {
+        name: Eu4FileEntryName,
+
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("unknown header found in zip entry. Must be EU4txt or EU4bin")]
+    ZipHeader,
+
+    #[error("unknown header found in file. Must be EU4txt, EU4bin, or a zip file.")]
+    UnknownHeader,
+
+    #[error("unable to parse due to: {0}")]
+    Parse(#[source] jomini::Error),
+
+    #[error("unable to deserialize due to: {0}")]
+    Deserialize(#[source] jomini::Error),
+
+    #[error("error while writing output: {0}")]
+    Writer(#[source] jomini::Error),
+
+    #[error("unknown binary token encountered: {token_id:#x}")]
+    UnknownToken { token_id: u16 },
+
+    #[error("country tags must be 3 letters in length")]
+    CountryTagIncorrectSize,
+
+    #[error("country tags must contain only ascii letters")]
+    CountryTagInvalidCharacters,
+
+    #[error("expected the binary integer: {0} to be parsed as a date")]
+    InvalidDate(i32),
 }
 
 #[cfg(test)]

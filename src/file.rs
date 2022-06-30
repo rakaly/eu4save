@@ -6,7 +6,10 @@ use jomini::{
     BinaryDeserializer, BinaryTape, TextDeserializer, TextTape, Windows1252Encoding,
 };
 use serde::Deserialize;
-use std::io::{Cursor, Read};
+use std::{
+    fmt::Display,
+    io::{Cursor, Read},
+};
 use zip::{read::ZipFile, result::ZipError};
 
 const TXT_HEADER: &[u8] = b"EU4txt";
@@ -42,7 +45,7 @@ impl<'a> Eu4Zip<'a> {
         Eu4ZipFiles::new(self.archive.clone())
     }
 
-    fn read_to_end(&self, zip_sink: &'a mut Vec<u8>) -> Result<(), std::io::Error> {
+    fn read_to_end(&self, zip_sink: &'a mut Vec<u8>) -> Result<(), Eu4Error> {
         let mut files = self.files();
         while let Some(mut file) = files.next_file() {
             file.read_to_end(zip_sink)?;
@@ -113,7 +116,10 @@ impl<'a> Eu4ZipFiles<'a> {
 
     pub fn retrieve_file(&mut self, index: VerifiedIndex) -> Eu4ZipFile {
         let file = self.archive.by_index(index.index).unwrap();
-        Eu4ZipFile { file }
+        Eu4ZipFile {
+            file,
+            name: index.name,
+        }
     }
 
     pub fn next_index(&mut self) -> Option<VerifiedIndex> {
@@ -134,14 +140,26 @@ impl<'a> Eu4ZipFiles<'a> {
 
 struct Eu4ZipFile<'a> {
     file: ZipFile<'a>,
+    name: Eu4FileEntryName,
 }
 
 impl<'a> Eu4ZipFile<'a> {
-    pub fn read_to_end(&mut self, buf: &mut Vec<u8>) -> std::io::Result<usize> {
+    fn internal_read_to_end(&mut self, buf: &mut Vec<u8>) -> std::io::Result<usize> {
         let mut header = [0; TXT_HEADER.len()];
         self.file.read_exact(&mut header)?;
         buf.reserve(self.size());
         self.file.read_to_end(buf)
+    }
+
+    pub fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize, Eu4Error> {
+        let res = self
+            .internal_read_to_end(buf)
+            .map_err(|e| Eu4ErrorKind::ZipInflation {
+                name: self.name,
+                source: e,
+            })?;
+
+        Ok(res)
     }
 
     pub fn size(&self) -> usize {
@@ -189,13 +207,18 @@ impl<'a> Eu4File<'a> {
                         inflated_size += file.size();
 
                         if found_text.is_none() {
-                            file.file.read_exact(&mut header)?;
+                            file.file.read_exact(&mut header).map_err(|e| {
+                                Eu4ErrorKind::ZipInflation {
+                                    name: file.name,
+                                    source: e,
+                                }
+                            })?;
                             found_text = Some(is_text(&header).is_some())
                         }
                     }
 
                     match found_text {
-                        None => Err(Eu4ErrorKind::UnknownHeader.into()),
+                        None => Err(Eu4ErrorKind::ZipHeader.into()),
                         Some(is_text) => Ok(Eu4File {
                             kind: FileKind::Zip(Eu4Zip {
                                 archive: eu4_files.into_zip(),
@@ -206,7 +229,7 @@ impl<'a> Eu4File<'a> {
                     }
                 }
                 Err(ZipError::InvalidArchive(_)) => Err(Eu4ErrorKind::UnknownHeader.into()),
-                Err(e) => Err(Eu4Error::new(Eu4ErrorKind::ZipCentralDirectory(e))),
+                Err(e) => Err(Eu4ErrorKind::ZipArchive(e).into()),
             }
         }
     }
@@ -377,9 +400,12 @@ impl<'a, 'b> Eu4SaveDeserializer<'a, 'b> {
             }
             FileKind::Binary(x) => {
                 let data = Eu4Binary::from_raw(x)?;
+                let mut des = data.deserializer();
+                des.builder = self.builder;
+
                 Ok(Eu4Save {
-                    meta: self.builder.from_tape(&data.tape, resolver)?,
-                    game: self.builder.from_tape(&data.tape, resolver)?,
+                    meta: des.build(resolver)?,
+                    game: des.build(resolver)?,
                 })
             }
             FileKind::Zip(zip) => {
@@ -394,9 +420,11 @@ impl<'a, 'b> Eu4SaveDeserializer<'a, 'b> {
                     })
                 } else {
                     let data = Eu4Binary::from_raw(&zip_sink)?;
+                    let mut des = data.deserializer();
+                    des.builder = self.builder;
                     Ok(Eu4Save {
-                        meta: self.builder.from_tape(&data.tape, resolver)?,
-                        game: self.builder.from_tape(&data.tape, resolver)?,
+                        meta: des.build(resolver)?,
+                        game: des.build(resolver)?,
                     })
                 }
             }
@@ -503,6 +531,16 @@ pub enum Eu4FileEntryName {
     Ai,
 }
 
+impl Display for Eu4FileEntryName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Eu4FileEntryName::Meta => write!(f, "meta"),
+            Eu4FileEntryName::Gamestate => write!(f, "gamestate"),
+            Eu4FileEntryName::Ai => write!(f, "ai"),
+        }
+    }
+}
+
 /// An individual entry of an EU4 file
 ///
 /// An entry could be the entire file if the input was a plaintext or a binary
@@ -574,7 +612,7 @@ impl<'a> Eu4Text<'a> {
     }
 
     pub(crate) fn from_raw(data: &'a [u8]) -> Result<Self, Eu4Error> {
-        let tape = TextTape::from_slice(data)?;
+        let tape = TextTape::from_slice(data).map_err(Eu4ErrorKind::Parse)?;
         Ok(Eu4Text { tape })
     }
 
@@ -586,7 +624,9 @@ impl<'a> Eu4Text<'a> {
     where
         T: Deserialize<'a>,
     {
-        TextDeserializer::from_windows1252_tape(&self.tape).map_err(|e| e.into())
+        let result = TextDeserializer::from_windows1252_tape(&self.tape)
+            .map_err(Eu4ErrorKind::Deserialize)?;
+        Ok(result)
     }
 }
 
@@ -603,7 +643,7 @@ impl<'a> Eu4Binary<'a> {
     }
 
     pub(crate) fn from_raw(data: &'a [u8]) -> Result<Self, Eu4Error> {
-        let tape = BinaryTape::from_slice(data)?;
+        let tape = BinaryTape::from_slice(data).map_err(Eu4ErrorKind::Parse)?;
         Ok(Eu4Binary { tape })
     }
 
@@ -640,9 +680,19 @@ impl<'a, 'b> Eu4BinaryDeserializer<'a, 'b> {
         R: TokenResolver,
         T: Deserialize<'a>,
     {
-        self.builder
+        let result = self
+            .builder
             .from_tape(self.tape, resolver)
-            .map_err(|e| e.into())
+            .map_err(|e| match e.kind() {
+                jomini::ErrorKind::Deserialize(e2) => match e2.kind() {
+                    &jomini::DeserializeErrorKind::UnknownToken { token_id } => {
+                        Eu4ErrorKind::UnknownToken { token_id }
+                    }
+                    _ => Eu4ErrorKind::Deserialize(e),
+                },
+                _ => Eu4ErrorKind::Deserialize(e),
+            })?;
+        Ok(result)
     }
 }
 

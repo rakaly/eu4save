@@ -19,6 +19,7 @@ jomini =  { version = "0.19", features = ["json"] }
 once_cell = "1"
 zip = { version =  "0.6", default-features = false, features = ["deflate"] }
 serde = { version = "1", features = ["derive"] }
+thiserror = "1"
 
 [dev-dependencies]
 attohttpc = "0.19"
