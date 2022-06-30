@@ -17,9 +17,7 @@ fn main() {
 
         let mut line = String::new();
         while reader.read_line(&mut line).unwrap() != 0 {
-            let mut splits = line.splitn(2, ' ');
-            let token_val = splits.next().unwrap();
-            let token_s = splits.next().unwrap();
+            let (token_val, token_s) = line.split_once(' ').unwrap();
             writeln!(writer, "{} => Some(\"{}\"),", token_val, token_s.trim()).unwrap();
             line.clear();
         }

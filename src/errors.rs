@@ -1,5 +1,5 @@
-use zip::result::ZipError;
 use crate::file::Eu4FileEntryName;
+use zip::result::ZipError;
 
 /// An EU4 Error
 #[derive(thiserror::Error, Debug)]
