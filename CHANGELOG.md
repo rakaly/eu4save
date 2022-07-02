@@ -1,3 +1,16 @@
+## v0.7.0 - 2022-07-02
+
+- Saves can be converted into JSON
+- One can deserialize and melt a save without parsing the save again
+- Saves can be deserialized into arbitrary structures
+- Using binary tokens from `EU4_IRONMAN_TOKENS` is no longer implicit
+  and must use `EnvTokens`
+- The inflated size of a save is exposed instead of hard capping it at
+  200 MB
+- Parsing via a `Read + Seek` (and an anonymous memory mapped file as
+  storage for inflated contents) has been dropped in favor of parsing
+  directly from a byte slice.
+
 ## v0.6.2 - 2022-04-29
 
 - Update zip dependency to latest
