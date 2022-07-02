@@ -390,45 +390,14 @@ impl<'a, 'b> Eu4SaveDeserializer<'a, 'b> {
     where
         R: TokenResolver,
     {
-        match &self.file.kind {
-            FileKind::Text(x) => {
-                let data = Eu4Text::from_raw(x)?;
-                Ok(Eu4Save {
-                    meta: data.deserialize()?,
-                    game: data.deserialize()?,
-                })
-            }
-            FileKind::Binary(x) => {
-                let data = Eu4Binary::from_raw(x)?;
-                let mut des = data.deserializer();
-                des.builder = self.builder;
-
-                Ok(Eu4Save {
-                    meta: des.build(resolver)?,
-                    game: des.build(resolver)?,
-                })
-            }
-            FileKind::Zip(zip) => {
-                let mut zip_sink = Vec::new();
-                zip.read_to_end(&mut zip_sink)?;
-
-                if zip.is_text {
-                    let data = Eu4Text::from_raw(&zip_sink)?;
-                    Ok(Eu4Save {
-                        meta: data.deserialize()?,
-                        game: data.deserialize()?,
-                    })
-                } else {
-                    let data = Eu4Binary::from_raw(&zip_sink)?;
-                    let mut des = data.deserializer();
-                    des.builder = self.builder;
-                    Ok(Eu4Save {
-                        meta: des.build(resolver)?,
-                        game: des.build(resolver)?,
-                    })
-                }
-            }
+        let mut zip_sink = Vec::new();
+        let parsed_file = self.file.parse(&mut zip_sink)?;
+        let mut des = parsed_file.deserializer();
+        if let Eu4DeserializerKind::Binary(x) = &mut des.kind {
+            x.builder = self.builder;
         }
+
+        Eu4Save::from_deserializer(&des, resolver)
     }
 }
 

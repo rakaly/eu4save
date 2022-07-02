@@ -1,5 +1,7 @@
-use crate::de::*;
+use crate::file::Eu4Deserializer;
+use crate::{de::*, Eu4Error};
 use crate::{CountryTag, Eu4Date, ProvinceId};
+use jomini::binary::TokenResolver;
 use jomini::JominiDeserialize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -45,6 +47,17 @@ pub struct Eu4Save {
 
     #[cfg_attr(feature = "serialize", serde(flatten))]
     pub game: GameState,
+}
+
+impl Eu4Save {
+    pub fn from_deserializer<R>(deser: &Eu4Deserializer, resolver: &R) -> Result<Self, Eu4Error>
+    where
+        R: TokenResolver,
+    {
+        let meta = deser.build(resolver)?;
+        let game = deser.build(resolver)?;
+        Ok(Eu4Save { meta, game })
+    }
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
