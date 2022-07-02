@@ -4,16 +4,6 @@ use jomini::JominiDeserialize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Deserialize)]
-#[cfg_attr(feature = "serialize", derive(Serialize))]
-pub struct Eu4SaveMeta {
-    #[serde(flatten)]
-    pub meta: Meta,
-
-    #[serde(flatten)]
-    pub game: Option<GameState>,
-}
-
 #[derive(Debug, Clone, JominiDeserialize, Serialize)]
 pub struct Meta {
     pub campaign_id: String,
@@ -47,13 +37,13 @@ pub struct ModName {
     pub name: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Eu4Save {
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serialize", serde(flatten))]
     pub meta: Meta,
 
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serialize", serde(flatten))]
     pub game: GameState,
 }
 
