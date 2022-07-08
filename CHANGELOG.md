@@ -1,3 +1,7 @@
+## v0.7.1 - 2022-07-08
+
+- Empty EU4_IRONMAN_TOKENS same as unset
+
 ## v0.7.0 - 2022-07-02
 
 - Saves can be converted into JSON
