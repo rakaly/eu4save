@@ -9,18 +9,21 @@ fn main() {
     writeln!(writer, "match token {{").unwrap();
 
     println!("cargo:rerun-if-env-changed=EU4_IRONMAN_TOKENS");
-    if let Ok(v) = env::var("EU4_IRONMAN_TOKENS") {
-        println!("cargo:rustc-cfg=ironman");
-        println!("cargo:rerun-if-changed={}", v);
-        let file = File::open(&v).unwrap();
-        let mut reader = BufReader::new(file);
+    match env::var("EU4_IRONMAN_TOKENS") {
+        Ok(v) if !v.is_empty() => {
+            println!("cargo:rustc-cfg=ironman");
+            println!("cargo:rerun-if-changed={}", v);
+            let file = File::open(&v).unwrap();
+            let mut reader = BufReader::new(file);
 
-        let mut line = String::new();
-        while reader.read_line(&mut line).unwrap() != 0 {
-            let (token_val, token_s) = line.split_once(' ').unwrap();
-            writeln!(writer, "{} => Some(\"{}\"),", token_val, token_s.trim()).unwrap();
-            line.clear();
+            let mut line = String::new();
+            while reader.read_line(&mut line).unwrap() != 0 {
+                let (token_val, token_s) = line.split_once(' ').unwrap();
+                writeln!(writer, "{} => Some(\"{}\"),", token_val, token_s.trim()).unwrap();
+                line.clear();
+            }
         }
+        _ => {}
     }
 
     writeln!(writer, "_ => None,").unwrap();
