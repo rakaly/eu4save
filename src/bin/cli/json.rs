@@ -1,10 +1,11 @@
+use std::error::Error;
+
 use eu4save::{
     file::{Eu4FileEntryName, Eu4ParsedFile, Eu4ParsedFileKind, Eu4Text},
     models::SavegameVersion,
     EnvTokens, Eu4File,
 };
 use serde::Deserialize;
-use std::env;
 
 #[derive(Deserialize)]
 struct MyMeta {
@@ -28,9 +29,8 @@ fn parsed_file_to_json(file: &Eu4ParsedFile) -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
-    let data = std::fs::read(&args[1]).unwrap();
+pub fn run(file_path: &str) -> Result<(), Box<dyn Error>> {
+    let data = std::fs::read(file_path).unwrap();
 
     let file = Eu4File::from_slice(&data)?;
     let mut entries = file.entries();

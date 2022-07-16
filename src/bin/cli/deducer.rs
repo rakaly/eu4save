@@ -1,6 +1,5 @@
 use eu4save::{CountryTag, EnvTokens, Eu4File};
-use std::env;
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, fmt::Display, error::Error};
 
 #[derive(Debug)]
 struct Deduce<N> {
@@ -46,9 +45,8 @@ where
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
-    let data = std::fs::read(&args[1])?;
+pub fn run(file_path: &str) -> Result<(), Box<dyn Error>> {
+    let data = std::fs::read(file_path)?;
     let file = Eu4File::from_slice(&data)?;
     let save = file.deserializer().build_save(&EnvTokens)?;
     deduce_vec(

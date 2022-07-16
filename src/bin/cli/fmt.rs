@@ -1,12 +1,11 @@
 use jomini::{TextTape, TextWriterBuilder};
 use std::{
-    env,
+    error::Error,
     io::{stdout, BufWriter, Write},
 };
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let file_data = std::fs::read(&args[1]).unwrap();
+pub fn run(file_path: &str) -> Result<(), Box<dyn Error>> {
+    let file_data = std::fs::read(file_path).unwrap();
     let header = b"EU4txt";
     if file_data.len() < header.len() {
         eprintln!("can only format plain eu4 file");
@@ -27,4 +26,6 @@ fn main() {
     writer.write_tape(&tape).unwrap();
     let mut buf_stdout = writer.into_inner();
     buf_stdout.flush().unwrap();
+
+    Ok(())
 }
