@@ -271,6 +271,7 @@ pub struct Province {
     pub ub: bool,
     #[jomini(alias = "colonysize")]
     pub colony_size: Option<f32>,
+    pub change_culture_construction: Option<ChangeCultureConstruction>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -323,6 +324,20 @@ pub enum ProvinceEventValue {
     Bool(bool),
     Object,
     Array,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct ChangeCultureConstruction {
+    pub start_date: Eu4Date,
+    pub total: u32,
+    pub original_total: u32,
+    pub progress: f32,
+    pub date: Eu4Date,
+    pub power: f32,
+    pub envoy: i32,
+    pub country: CountryTag,
+    pub culture: String,
 }
 
 #[derive(Debug, Clone, JominiDeserialize, Default)]
