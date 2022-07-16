@@ -38,6 +38,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                 let mut base_tax = None;
                 let mut base_production = None;
                 let mut base_manpower = None;
+                let mut religion = None;
                 let mut events = Vec::new();
                 let mut other = HashMap::new();
 
@@ -47,6 +48,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                         "base_tax" => base_tax = map.next_value()?,
                         "base_production" => base_production = map.next_value()?,
                         "base_manpower" => base_manpower = map.next_value()?,
+                        "religion" => religion = map.next_value()?,
                         x => {
                             if let Ok(date) = Eu4Date::parse(x) {
                                 let event = map.next_value()?;
@@ -63,6 +65,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                     base_tax,
                     base_production,
                     base_manpower,
+                    religion,
                     events,
                     other,
                 })

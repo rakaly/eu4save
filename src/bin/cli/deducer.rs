@@ -1,5 +1,5 @@
 use eu4save::{CountryTag, EnvTokens, Eu4File};
-use std::{collections::HashSet, fmt::Display, error::Error};
+use std::{collections::HashSet, error::Error, fmt::Display};
 
 #[derive(Debug)]
 struct Deduce<N> {

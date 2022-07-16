@@ -62,6 +62,7 @@ impl<'de> Deserialize<'de> for CountryEvents {
                             CountryEvent::ChangedCountryMapColorFrom(map.next_value()?)
                         }
                         "changed_tag_from" => CountryEvent::ChangedTagFrom(map.next_value()?),
+                        "religion" => CountryEvent::Religion(map.next_value()?),
                         _ => continue, /*panic!("unknown: {}", &key)*/
                     };
 

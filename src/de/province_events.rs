@@ -46,6 +46,7 @@ impl<'de> Deserialize<'de> for ProvinceEvents {
                         "base_tax" => ProvinceEvent::BaseTax(map.next_value()?),
                         "base_manpower" => ProvinceEvent::BaseManpower(map.next_value()?),
                         "base_production" => ProvinceEvent::BaseProduction(map.next_value()?),
+                        "religion" => ProvinceEvent::Religion(map.next_value()?),
                         _ => ProvinceEvent::KV((key.to_string(), map.next_value()?)),
                     };
 

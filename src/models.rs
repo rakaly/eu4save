@@ -287,6 +287,7 @@ pub struct ProvinceHistory {
     pub base_tax: Option<f32>,
     pub base_production: Option<f32>,
     pub base_manpower: Option<f32>,
+    pub religion: Option<String>,
     pub other: HashMap<String, ProvinceEventValue>,
     pub events: Vec<(Eu4Date, ProvinceEvents)>,
 }
@@ -303,6 +304,7 @@ pub enum ProvinceEvent {
     BaseTax(f32),
     BaseProduction(f32),
     BaseManpower(f32),
+    Religion(String),
     KV((String, ProvinceEventValue)),
 }
 
@@ -475,6 +477,7 @@ pub struct CountryHistory {
     pub government: Option<String>,
     pub technology_group: Option<String>,
     pub primary_culture: Option<String>,
+    pub religion: Option<String>,
     pub add_government_reform: Vec<String>,
     pub events: Vec<(Eu4Date, CountryEvents)>,
 }
@@ -499,6 +502,7 @@ pub enum CountryEvent {
     ChangedTagFrom(CountryTag),
     Leader(Leader),
     RemoveAcceptedCulture(String),
+    Religion(String),
 }
 
 impl CountryEvent {
