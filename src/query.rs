@@ -211,6 +211,16 @@ pub struct NationEvent {
     pub kind: NationEventKind,
 }
 
+impl NationEvent {
+    pub fn as_tag_switch(&self) -> Option<(Eu4Date, CountryTag)> {
+        if let NationEventKind::TagSwitch(to) = self.kind {
+            Some((self.date, to))
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum NationEventKind {
     TagSwitch(CountryTag),
@@ -1134,7 +1144,7 @@ fn war_participants(save: &Eu4Save, tag_resolver: &TagResolver) -> Vec<ResolvedW
                         let stored_tag = tag_resolver.resolve(*x, *date);
                         tags.push(ResolvedWarParticipant {
                             tag: *x,
-                            stored: stored_tag,
+                            stored: stored_tag.map(|x| x.stored).unwrap_or(*x),
                         });
                     }
                     _ => {}

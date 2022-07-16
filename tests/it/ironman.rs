@@ -420,7 +420,10 @@ ironman_test!(
         assert_eq!(&histories, &trycone_expected_histories());
         let tag_resolver = query.tag_resolver(&nation_events);
         assert_eq!(
-            tag_resolver.resolve("IRE".parse().unwrap(), Eu4Date::from_ymd(1529, 3, 1)),
+            tag_resolver
+                .resolve("IRE".parse().unwrap(), Eu4Date::from_ymd(1529, 3, 1))
+                .unwrap()
+                .stored,
             "GBR".parse().unwrap()
         );
 
