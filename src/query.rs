@@ -196,7 +196,7 @@ pub struct ReligionLookup {
     religions: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ReligionIndex(NonZeroU16);
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
