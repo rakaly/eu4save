@@ -123,10 +123,14 @@ impl<'a> TagResolverDated<'a> {
 
     /// See [TagResolver::resolve](crate::TagResolver::resolve)
     pub fn resolve(&self, tag: CountryTag, date: Eu4Date) -> Option<TagData> {
-        self.inner
-            .resolve_nation(tag, date)
-            .and_then(|x| self.filter_events(x))
-            .map(|(current, stored)| TagData { current, stored })
+        self.inner.resolve_nation(tag, date).map(|x| {
+            self.filter_events(x)
+                .map(|(current, stored)| TagData { current, stored })
+                .unwrap_or_else(|| TagData {
+                    current: x.initial,
+                    stored: x.stored,
+                })
+        })
     }
 
     /// See [TagResolver::initial](crate::TagResolver::initial)
@@ -287,5 +291,17 @@ mod tests {
             .unwrap();
         assert_eq!(x.current, mongol);
         assert_eq!(x.stored, hre);
+
+        // provinces conquered before tag switch should resolve
+        let almaty = resolver
+            .resolve(oirat, "1445.08.03".parse().unwrap())
+            .unwrap();
+        assert_eq!(almaty.current, hre);
+        assert_eq!(almaty.stored, hre);
+
+        let dated = resolver.at("1447.03.11".parse().unwrap());
+        let almaty = dated.resolve(oirat, "1445.08.03".parse().unwrap()).unwrap();
+        assert_eq!(almaty.current, oirat);
+        assert_eq!(almaty.stored, hre);
     }
 }
