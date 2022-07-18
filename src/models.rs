@@ -71,6 +71,8 @@ pub struct GameState {
     pub military_hegemon: Option<Hegemon>,
     pub naval_hegemon: Option<Hegemon>,
     pub economic_hegemon: Option<Hegemon>,
+    #[jomini(default, deserialize_with = "deserialize_vec_pair")]
+    pub religions: Vec<(String, ReligionGameState)>,
     pub religion_instance_data: HashMap<String, ReligionInstanceDatum>,
     pub empire: Option<HRE>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
@@ -148,6 +150,13 @@ pub struct CountryState {
 pub struct Hegemon {
     pub country: CountryTag,
     pub progress: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct ReligionGameState {
+    #[serde(default)]
+    pub amount_of_provinces: i32,
 }
 
 #[derive(Debug, Clone, Deserialize)]

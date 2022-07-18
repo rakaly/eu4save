@@ -8,7 +8,10 @@ use crate::{
 use crate::{CountryTag, Eu4Date, PdsDate};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    num::NonZeroU16,
+};
 
 #[derive(Debug)]
 pub struct AnnualLedgers {
@@ -176,6 +179,25 @@ pub struct ProvinceOwnerChange {
     pub tag: CountryTag,
     pub date: Eu4Date,
 }
+
+pub struct ProvinceReligions {
+    pub initial: Vec<Option<ReligionIndex>>,
+    pub changes: Vec<ProvinceReligionChange>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ProvinceReligionChange {
+    pub province: ProvinceId,
+    pub religion: ReligionIndex,
+    pub date: Eu4Date,
+}
+
+pub struct ReligionLookup {
+    religions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ReligionIndex(NonZeroU16);
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Player {
@@ -448,6 +470,22 @@ impl Query {
     /// Aggregate when lands changed hands
     pub fn province_owners(&self) -> ProvinceOwners {
         province_owners(&self.save)
+    }
+
+    pub fn province_religions(&self, lookup: &ReligionLookup) -> ProvinceReligions {
+        province_religions(&self.save, lookup)
+    }
+
+    pub fn religion_lookup(&self) -> ReligionLookup {
+        let mut religions = self
+            .save
+            .game
+            .religions
+            .iter()
+            .map(|(key, _religion)| key.clone())
+            .collect::<Vec<_>>();
+        religions.sort_unstable();
+        ReligionLookup { religions }
     }
 
     /// Return the starting country in single player playthroughs. If playing in multiplayer or if
@@ -1226,4 +1264,59 @@ fn players(save: &Eu4Save) -> Vec<Player> {
     }
 
     players
+}
+
+fn province_religions(save: &Eu4Save, lookup: &ReligionLookup) -> ProvinceReligions {
+    let mut initial = vec![None; save.game.provinces.len() + 1];
+    let mut religions = vec![None; save.game.provinces.len() + 1];
+    let mut changes = Vec::with_capacity(save.game.provinces.len());
+    for (&id, province) in &save.game.provinces {
+        let prov_id = usize::from(id.as_u16());
+        let init = province
+            .history
+            .religion
+            .as_ref()
+            .and_then(|x| lookup.index(x));
+
+        initial[prov_id] = init;
+        religions[prov_id] = init;
+
+        for (date, events) in &province.history.events {
+            for event in &events.0 {
+                if let ProvinceEvent::Religion(new_religion) = event {
+                    if let Some(new_religion_index) = lookup.index(new_religion) {
+                        let old_religion = religions[prov_id].replace(new_religion_index);
+                        if old_religion.map_or(true, |x| new_religion_index != x) {
+                            changes.push(ProvinceReligionChange {
+                                date: *date,
+                                province: id,
+                                religion: new_religion_index,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    changes.sort_by_key(|x| (x.date, x.province));
+
+    ProvinceReligions { initial, changes }
+}
+
+impl ReligionLookup {
+    pub fn index(&self, religion: &String) -> Option<ReligionIndex> {
+        use std::convert::TryFrom;
+        self.religions
+            .binary_search(religion)
+            .ok()
+            .and_then(|x| u16::try_from(x).ok())
+            .map(|x| x + 1)
+            .and_then(NonZeroU16::new)
+            .map(ReligionIndex)
+    }
+
+    pub fn resolve(&self, index: ReligionIndex) -> &str {
+        self.religions[usize::from(index.0.get() - 1)].as_str()
+    }
 }
