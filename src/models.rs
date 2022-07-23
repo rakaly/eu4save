@@ -341,6 +341,7 @@ pub struct ChangeCultureConstruction {
     pub start_date: Eu4Date,
     pub total: u32,
     pub original_total: u32,
+    #[serde(default)]
     pub progress: f32,
     pub date: Eu4Date,
     pub power: f32,
