@@ -866,6 +866,33 @@ fn default_true() -> bool {
 pub struct Diplomacy {
     #[jomini(duplicated, default, alias = "dependency")]
     pub dependencies: Vec<DiplomacyDependency>,
+
+    #[jomini(duplicated, default, alias = "alliance")]
+    pub alliances: Vec<DiplomacyRelationship>,
+
+    #[jomini(duplicated, default, alias = "royal_marriage")]
+    pub royal_marriages: Vec<DiplomacyRelationship>,
+
+    #[jomini(duplicated, default, alias = "warning")]
+    pub warnings: Vec<DiplomacyRelationship>,
+
+    #[jomini(duplicated, default, alias = "subsidies")]
+    pub subsidies: Vec<DiplomacySubsidy>,
+
+    #[jomini(duplicated, default, alias = "guarantee")]
+    pub guarantees: Vec<DiplomacyRelationship>,
+
+    #[jomini(duplicated, default, alias = "transfer_trade_power")]
+    pub transfer_trade_powers: Vec<DiplomacyTransferTradePower>,
+
+    #[jomini(duplicated, default, alias = "war_reparations")]
+    pub war_reparations: Vec<DiplomacyRelationship>,
+
+    #[jomini(duplicated, default, alias = "steer_trade")]
+    pub steer_trades: Vec<DiplomacyRelationship>,
+
+    #[jomini(duplicated, default, alias = "condottieri")]
+    pub condottieris: Vec<DiplomacyCondottieri>,
 }
 
 #[derive(Debug, Clone, JominiDeserialize, Serialize)]
@@ -877,4 +904,53 @@ pub struct DiplomacyDependency {
     #[jomini(default)]
     pub end_date: Option<Eu4Date>,
     pub subject_type: String,
+}
+
+#[derive(Debug, Clone, JominiDeserialize, Serialize)]
+pub struct DiplomacyRelationship {
+    pub first: CountryTag,
+    pub second: CountryTag,
+    #[jomini(default)]
+    pub start_date: Option<Eu4Date>,
+    #[jomini(default)]
+    pub end_date: Option<Eu4Date>,
+    #[jomini(default)]
+    pub is_enforced: bool,
+}
+
+#[derive(Debug, Clone, JominiDeserialize, Serialize)]
+pub struct DiplomacySubsidy {
+    pub first: CountryTag,
+    pub second: CountryTag,
+    #[jomini(default)]
+    pub start_date: Option<Eu4Date>,
+    #[jomini(default)]
+    pub amount: f32,
+    #[jomini(default)]
+    pub duration: u16,
+}
+
+#[derive(Debug, Clone, JominiDeserialize, Serialize)]
+pub struct DiplomacyTransferTradePower {
+    pub first: CountryTag,
+    pub second: CountryTag,
+    #[jomini(default)]
+    pub start_date: Option<Eu4Date>,
+    #[jomini(default)]
+    pub is_enforced: bool,
+    #[jomini(default)]
+    pub amount: f32,
+}
+
+#[derive(Debug, Clone, JominiDeserialize, Serialize)]
+pub struct DiplomacyCondottieri {
+    pub first: CountryTag,
+    pub second: CountryTag,
+    #[jomini(default)]
+    pub start_date: Option<Eu4Date>,
+    pub unit: ObjId,
+    #[jomini(default)]
+    pub amount: f32,
+    #[jomini(default)]
+    pub participation: f32,
 }
