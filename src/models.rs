@@ -868,8 +868,7 @@ pub struct Diplomacy {
     pub dependencies: Vec<DiplomacyDependency>,
 }
 
-#[derive(Debug, Clone, JominiDeserialize)]
-#[cfg_attr(feature = "serialize", derive(Serialize))]
+#[derive(Debug, Clone, JominiDeserialize, Serialize)]
 pub struct DiplomacyDependency {
     pub first: CountryTag,
     pub second: CountryTag,
