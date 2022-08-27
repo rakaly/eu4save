@@ -504,7 +504,12 @@ impl Query {
             return None;
         }
 
-        first.map(|x| x.history.initial)
+        first
+            .map(|x| x.history.initial)
+            .or_else(|| match histories {
+                [player] => Some(player.history.initial),
+                _ => None,
+            })
     }
 
     pub fn tag_resolver(&self, nation_events: &[NationEvents]) -> TagResolver {
