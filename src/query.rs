@@ -491,10 +491,20 @@ impl Query {
     /// Return the starting country in single player playthroughs. If playing in multiplayer or if
     /// the starting country can't be determined then none is returned.
     pub fn starting_country(&self, histories: &[PlayerHistory]) -> Option<CountryTag> {
-        match histories {
-            [player] => Some(player.history.initial),
-            _ => None,
+        let mut preexisting = histories.iter().filter(|x| {
+            !x.history
+                .events
+                .first()
+                .map_or(false, |x| x.kind == NationEventKind::Appeared)
+        });
+        let first = preexisting.next();
+        let second = preexisting.next();
+
+        if second.is_some() {
+            return None;
         }
+
+        first.map(|x| x.history.initial)
     }
 
     pub fn tag_resolver(&self, nation_events: &[NationEvents]) -> TagResolver {
