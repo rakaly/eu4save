@@ -1,8 +1,7 @@
 use eu4save::{EnvTokens, Eu4File, FailedResolveStrategy};
 use std::{error::Error, io::Write};
 
-pub fn run(file_path: &str) -> Result<(), Box<dyn Error>> {
-    let file_data = std::fs::read(file_path)?;
+pub fn run(file_data: &[u8]) -> Result<(), Box<dyn Error>> {
     let file = Eu4File::from_slice(&file_data)?;
     let mut zip_sink = Vec::new();
     let parsed_file = file.parse(&mut zip_sink)?;

@@ -1,8 +1,7 @@
 use eu4save::{EnvTokens, Eu4File, PdsDate};
 use std::error::Error;
 
-pub fn run(file_path: &str) -> Result<(), Box<dyn Error>> {
-    let file_data = std::fs::read(file_path)?;
+pub fn run(file_data: &[u8]) -> Result<(), Box<dyn Error>> {
     let file = Eu4File::from_slice(&file_data)?;
     let save = file.deserializer().build_save(&EnvTokens)?;
 
