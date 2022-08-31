@@ -10,7 +10,7 @@ use std::{
     fmt::Display,
     io::{Cursor, Read},
 };
-use zip::{read::ZipFile, result::ZipError};
+use zip::result::ZipError;
 
 const TXT_HEADER: &[u8] = b"EU4txt";
 const BIN_HEADER: &[u8] = b"EU4bin";
@@ -33,21 +33,34 @@ fn is_bin(data: &[u8]) -> Option<&[u8]> {
     }
 }
 
+struct Eu4ZipFilesIter {
+    meta_index: Option<VerifiedIndex>,
+    gamestate_index: Option<VerifiedIndex>,
+    ai_index: Option<VerifiedIndex>,
+}
+
+impl Iterator for Eu4ZipFilesIter {
+    type Item = VerifiedIndex;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.meta_index
+            .take()
+            .or_else(|| self.gamestate_index.take())
+            .or_else(|| self.ai_index.take())
+    }
+}
+
 #[derive(Debug, Clone)]
 struct Eu4Zip<'a> {
-    archive: zip::ZipArchive<Cursor<&'a [u8]>>,
+    archive: Eu4ZipFiles<'a>,
     is_text: bool,
     inflated_size: usize,
 }
 
 impl<'a> Eu4Zip<'a> {
-    fn files(&self) -> Eu4ZipFiles<'a> {
-        Eu4ZipFiles::new(self.archive.clone())
-    }
-
     fn read_to_end(&self, zip_sink: &'a mut Vec<u8>) -> Result<(), Eu4Error> {
-        let mut files = self.files();
-        while let Some(mut file) = files.next_file() {
+        for index in self.archive.files() {
+            let file = self.archive.retrieve_file(index);
             file.read_to_end(zip_sink)?;
         }
 
@@ -57,21 +70,39 @@ impl<'a> Eu4Zip<'a> {
 
 #[derive(Debug, Clone, Copy)]
 struct VerifiedIndex {
+    data_start: usize,
+    data_end: usize,
     index: usize,
     name: Eu4FileEntryName,
     size: usize,
 }
 
+impl VerifiedIndex {
+    fn is_text(&self, zip: &mut zip::ZipArchive<Cursor<&[u8]>>) -> Result<bool, Eu4Error> {
+        let mut header = [0; TXT_HEADER.len()];
+
+        let mut file = zip.by_index(self.index).expect("file to exist");
+
+        file.read_exact(&mut header)
+            .map_err(|e| Eu4ErrorKind::ZipInflation {
+                name: self.name,
+                source: e,
+            })?;
+
+        Ok(is_text(&header).is_some())
+    }
+}
+
 #[derive(Debug, Clone)]
 struct Eu4ZipFiles<'a> {
-    archive: zip::ZipArchive<Cursor<&'a [u8]>>,
+    archive: &'a [u8],
     meta_index: Option<VerifiedIndex>,
     gamestate_index: Option<VerifiedIndex>,
     ai_index: Option<VerifiedIndex>,
 }
 
 impl<'a> Eu4ZipFiles<'a> {
-    pub fn new(mut archive: zip::ZipArchive<Cursor<&'a [u8]>>) -> Self {
+    pub fn new(archive: &mut zip::ZipArchive<Cursor<&'a [u8]>>, data: &'a [u8]) -> Self {
         let mut meta_index = None;
         let mut gamestate_index = None;
         let mut ai_index = None;
@@ -79,27 +110,26 @@ impl<'a> Eu4ZipFiles<'a> {
         for index in 0..archive.len() {
             if let Ok(file) = archive.by_index(index) {
                 let size = file.size() as usize;
-                match file.name() {
-                    "meta" => {
-                        meta_index = Some(VerifiedIndex {
-                            name: Eu4FileEntryName::Meta,
-                            index,
-                            size,
-                        })
+                let data_start = file.data_start() as usize;
+                let data_end = data_start + file.compressed_size() as usize;
+
+                let index = Eu4ZipFiles::strong_name(file.name()).map(|name| VerifiedIndex {
+                    name,
+                    data_start,
+                    data_end,
+                    index,
+                    size,
+                });
+
+                match index {
+                    Some(x) if x.name == Eu4FileEntryName::Meta => {
+                        meta_index = Some(x);
                     }
-                    "gamestate" => {
-                        gamestate_index = Some(VerifiedIndex {
-                            name: Eu4FileEntryName::Gamestate,
-                            index,
-                            size,
-                        })
+                    Some(x) if x.name == Eu4FileEntryName::Gamestate => {
+                        gamestate_index = Some(x);
                     }
-                    "ai" => {
-                        ai_index = Some(VerifiedIndex {
-                            name: Eu4FileEntryName::Ai,
-                            index,
-                            size,
-                        })
+                    Some(x) if x.name == Eu4FileEntryName::Ai => {
+                        ai_index = Some(x);
                     }
                     _ => {}
                 }
@@ -107,63 +137,90 @@ impl<'a> Eu4ZipFiles<'a> {
         }
 
         Self {
-            archive,
+            archive: data,
             meta_index,
             gamestate_index,
             ai_index,
         }
     }
 
-    pub fn retrieve_file(&mut self, index: VerifiedIndex) -> Eu4ZipFile {
-        let file = self.archive.by_index(index.index).unwrap();
+    fn strong_name(s: &str) -> Option<Eu4FileEntryName> {
+        match s {
+            "meta" => Some(Eu4FileEntryName::Meta),
+            "gamestate" => Some(Eu4FileEntryName::Gamestate),
+            "ai" => Some(Eu4FileEntryName::Ai),
+            _ => None,
+        }
+    }
+
+    pub fn retrieve_file(&self, index: VerifiedIndex) -> Eu4ZipFile {
+        let raw = &self.archive[index.data_start..index.data_end];
         Eu4ZipFile {
-            file,
+            raw,
+            size: index.size,
             name: index.name,
         }
     }
 
-    pub fn next_index(&mut self) -> Option<VerifiedIndex> {
-        self.meta_index
-            .take()
-            .or_else(|| self.gamestate_index.take())
-            .or_else(|| self.ai_index.take())
-    }
-
-    pub fn next_file(&mut self) -> Option<Eu4ZipFile> {
-        self.next_index().map(move |i| self.retrieve_file(i))
-    }
-
-    pub fn into_zip(self) -> zip::ZipArchive<Cursor<&'a [u8]>> {
-        self.archive
+    fn files(&self) -> Eu4ZipFilesIter {
+        Eu4ZipFilesIter {
+            meta_index: self.meta_index,
+            gamestate_index: self.gamestate_index,
+            ai_index: self.ai_index,
+        }
     }
 }
 
 struct Eu4ZipFile<'a> {
-    file: ZipFile<'a>,
+    raw: &'a [u8],
+    size: usize,
     name: Eu4FileEntryName,
 }
 
+enum ZipInnerError {
+    Inflate,
+    Size,
+}
+
 impl<'a> Eu4ZipFile<'a> {
-    fn internal_read_to_end(&mut self, buf: &mut Vec<u8>) -> std::io::Result<usize> {
-        let mut header = [0; TXT_HEADER.len()];
-        self.file.read_exact(&mut header)?;
-        buf.reserve(self.size());
-        self.file.read_to_end(buf)
+    fn internal_read_to_end(&self, buf: &mut Vec<u8>) -> Result<(), ZipInnerError> {
+        let start_len = buf.len();
+        buf.resize(start_len + self.size(), 0);
+        let body = &mut buf[start_len..];
+
+        #[cfg(feature = "miniz_oxide")]
+        let written = miniz_oxide::inflate::decompress_slice_iter_to_slice(
+            body,
+            std::iter::once(self.raw),
+            false,
+            false,
+        )
+        .map_err(|_| ZipInnerError::Inflate)?;
+
+        #[cfg(feature = "libdeflater")]
+        let written = libdeflater::Decompressor::new()
+            .deflate_decompress(self.raw, body)
+            .map_err(|_| ZipInnerError::Inflate)?;
+
+        if written != self.size() {
+            return Err(ZipInnerError::Size);
+        }
+
+        body.copy_within(TXT_HEADER.len().., 0);
+        buf.truncate(start_len + self.size() - TXT_HEADER.len());
+        Ok(())
     }
 
-    pub fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize, Eu4Error> {
-        let res = self
-            .internal_read_to_end(buf)
-            .map_err(|e| Eu4ErrorKind::ZipInflation {
-                name: self.name,
-                source: e,
-            })?;
-
-        Ok(res)
+    pub fn read_to_end(&self, buf: &mut Vec<u8>) -> Result<(), Eu4Error> {
+        self.internal_read_to_end(buf).map_err(|e| match e {
+            ZipInnerError::Inflate => Eu4ErrorKind::ZipInflationRaw { name: self.name },
+            ZipInnerError::Size => Eu4ErrorKind::ZipInflationSize { name: self.name },
+        })?;
+        Ok(())
     }
 
     pub fn size(&self) -> usize {
-        self.file.size() as usize
+        self.size
     }
 }
 
@@ -198,22 +255,15 @@ impl<'a> Eu4File<'a> {
             let cursor = Cursor::new(data);
             let zip_attempt = zip::ZipArchive::new(cursor);
             match zip_attempt {
-                Ok(zip) => {
+                Ok(mut zip) => {
                     let mut inflated_size = 0;
-                    let mut header = [0; TXT_HEADER.len()];
                     let mut found_text = None;
-                    let mut eu4_files = Eu4ZipFiles::new(zip);
-                    while let Some(mut file) = eu4_files.next_file() {
-                        inflated_size += file.size();
+                    let eu4_files = Eu4ZipFiles::new(&mut zip, data);
+                    for file in eu4_files.files() {
+                        inflated_size += file.size;
 
                         if found_text.is_none() {
-                            file.file.read_exact(&mut header).map_err(|e| {
-                                Eu4ErrorKind::ZipInflation {
-                                    name: file.name,
-                                    source: e,
-                                }
-                            })?;
-                            found_text = Some(is_text(&header).is_some())
+                            found_text = Some(file.is_text(&mut zip)?);
                         }
                     }
 
@@ -221,7 +271,7 @@ impl<'a> Eu4File<'a> {
                         None => Err(Eu4ErrorKind::ZipHeader.into()),
                         Some(is_text) => Ok(Eu4File {
                             kind: FileKind::Zip(Eu4Zip {
-                                archive: eu4_files.into_zip(),
+                                archive: eu4_files,
                                 is_text,
                                 inflated_size,
                             }),
@@ -317,7 +367,8 @@ impl<'a> Eu4File<'a> {
             },
             FileKind::Zip(x) => Eu4FileEntries {
                 kind: Eu4FileEntriesKind::Zip {
-                    files: x.files(),
+                    files: Box::new(x.clone()),
+                    iter: x.archive.files(),
                     is_text: x.is_text,
                 },
             },
@@ -442,7 +493,8 @@ enum Eu4FileEntriesKind<'a> {
     },
     Zip {
         is_text: bool,
-        files: Eu4ZipFiles<'a>,
+        files: Box<Eu4Zip<'a>>,
+        iter: Eu4ZipFilesIter,
     },
 }
 
@@ -466,17 +518,19 @@ impl<'a> Eu4FileEntries<'a> {
                     kind: Eu4FileEntryKind::Binary(data),
                 })
             }
-            Eu4FileEntriesKind::Zip { files, is_text } => {
-                files.next_index().map(|index| Eu4FileEntry {
-                    kind: {
-                        Eu4FileEntryKind::Zip {
-                            files: files.clone(),
-                            is_text: *is_text,
-                            index,
-                        }
-                    },
-                })
-            }
+            Eu4FileEntriesKind::Zip {
+                files,
+                iter,
+                is_text,
+            } => iter.next().map(|index| Eu4FileEntry {
+                kind: {
+                    Eu4FileEntryKind::Zip {
+                        files: files.clone(),
+                        is_text: *is_text,
+                        index,
+                    }
+                },
+            }),
             _ => None,
         }
     }
@@ -486,7 +540,7 @@ enum Eu4FileEntryKind<'a> {
     Text(&'a [u8]),
     Binary(&'a [u8]),
     Zip {
-        files: Eu4ZipFiles<'a>,
+        files: Box<Eu4Zip<'a>>,
         index: VerifiedIndex,
         is_text: bool,
     },
@@ -551,8 +605,7 @@ impl<'a> Eu4FileEntry<'a> {
                 is_text,
                 index,
             } => {
-                let mut zip = files.clone();
-                let mut file = zip.retrieve_file(*index);
+                let file = files.archive.retrieve_file(*index);
                 file.read_to_end(zip_sink)?;
                 if *is_text {
                     Ok(Eu4ParsedFile {
