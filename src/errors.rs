@@ -37,6 +37,12 @@ pub enum Eu4ErrorKind {
         source: std::io::Error,
     },
 
+    #[error("unable to inflate raw zip entry: {name}")]
+    ZipInflationRaw { name: Eu4FileEntryName },
+
+    #[error("unexpected size when inflating zip entry: {name}")]
+    ZipInflationSize { name: Eu4FileEntryName },
+
     #[error("unknown header found in zip entry. Must be EU4txt or EU4bin")]
     ZipHeader,
 
