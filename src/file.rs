@@ -30,6 +30,7 @@ fn is_bin(data: &[u8]) -> Option<&[u8]> {
     }
 }
 
+#[derive(Debug)]
 struct Eu4ZipFilesIter {
     meta_index: Option<VerifiedIndex>,
     gamestate_index: Option<VerifiedIndex>,
@@ -99,11 +100,10 @@ impl<'a> Eu4ZipFiles<'a> {
         let mut ai_index = None;
 
         for index in 0..archive.len() {
-            if let Ok(file) = archive.by_index(index) {
+            if let Ok(file) = archive.by_index_raw(index) {
                 let size = file.size() as usize;
                 let data_start = file.data_start() as usize;
                 let data_end = data_start + file.compressed_size() as usize;
-
                 let index = Eu4ZipFiles::strong_name(file.name()).map(|name| VerifiedIndex {
                     name,
                     data_start,
