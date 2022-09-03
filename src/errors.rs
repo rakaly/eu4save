@@ -29,16 +29,8 @@ pub enum Eu4ErrorKind {
     #[error("unable to parse as zip: {0}")]
     ZipArchive(#[from] ZipError),
 
-    #[error("unable to inflate zip entry: {name}: {source}")]
-    ZipInflation {
-        name: Eu4FileEntryName,
-
-        #[source]
-        source: std::io::Error,
-    },
-
-    #[error("unable to inflate raw zip entry: {name}")]
-    ZipInflationRaw { name: Eu4FileEntryName },
+    #[error("unable to inflate zip entry: {name}")]
+    ZipInflation { name: Eu4FileEntryName },
 
     #[error("unexpected size when inflating zip entry: {name}")]
     ZipInflationSize { name: Eu4FileEntryName },

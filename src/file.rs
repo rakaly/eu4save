@@ -80,7 +80,7 @@ impl VerifiedIndex {
         let raw = &data[self.data_start..self.data_end];
         match inflate(raw, &mut header) {
             Ok(_) | Err(ZipInnerError::InsufficientSpace) => Ok(is_text(&header).is_some()),
-            Err(_) => Err(Eu4ErrorKind::ZipInflationRaw { name: self.name }.into()),
+            Err(_) => Err(Eu4ErrorKind::ZipInflation { name: self.name }.into()),
         }
     }
 }
@@ -218,7 +218,7 @@ impl<'a> Eu4ZipFile<'a> {
 
     pub fn read_to_end(&self, buf: &mut Vec<u8>) -> Result<(), Eu4Error> {
         self.internal_read_to_end(buf).map_err(|e| match e {
-            ZipInnerError::Inflate => Eu4ErrorKind::ZipInflationRaw { name: self.name },
+            ZipInnerError::Inflate => Eu4ErrorKind::ZipInflation { name: self.name },
             _ => Eu4ErrorKind::ZipInflationSize { name: self.name },
         })?;
         Ok(())

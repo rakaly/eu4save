@@ -250,7 +250,7 @@ pub enum NationEventKind {
     Annexed,
 }
 
-#[derive(Debug, PartialEq, Eq,  Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct LedgerPoint {
     pub tag: CountryTag,
     pub year: u16,
@@ -504,12 +504,10 @@ impl Query {
             return None;
         }
 
-        first
-            .map(|x| x.history.initial)
-            .or(match histories {
-                [player] => Some(player.history.initial),
-                _ => None,
-            })
+        first.map(|x| x.history.initial).or(match histories {
+            [player] => Some(player.history.initial),
+            _ => None,
+        })
     }
 
     pub fn tag_resolver(&self, nation_events: &[NationEvents]) -> TagResolver {
