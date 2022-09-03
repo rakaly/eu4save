@@ -189,13 +189,13 @@ impl<'a> Eu4ZipFile<'a> {
         let body = &mut buf[start_len..];
 
         #[cfg(all(feature = "miniz", not(feature = "libdeflate")))]
-        let written = miniz_oxide::inflate::decompress_slice_iter_to_slice(
+        let written = { let res = miniz_oxide::inflate::decompress_slice_iter_to_slice(
             body,
             std::iter::once(self.raw),
             false,
             false,
         )
-        .map_err(|_| ZipInnerError::Inflate)?;
+        .map_err(|_| ZipInnerError::Inflate)?; panic!("EEK"); res};
 
         #[cfg(feature = "libdeflate")]
         let written = libdeflater::Decompressor::new()
