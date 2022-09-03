@@ -197,7 +197,7 @@ impl<'a> Eu4ZipFile<'a> {
         )
         .map_err(|_| ZipInnerError::Inflate)?;
 
-        #[cfg(feature = "libdeflater")]
+        #[cfg(feature = "libdeflate")]
         let written = libdeflater::Decompressor::new()
             .deflate_decompress(self.raw, body)
             .map_err(|_| ZipInnerError::Inflate)?;

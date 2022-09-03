@@ -13,6 +13,7 @@ categories = ["parsing"]
 
 [features]
 default = ["miniz_oxide"]
+libdeflate = ["libdeflater/freestanding"]
 serialize = []
 
 [dependencies]
