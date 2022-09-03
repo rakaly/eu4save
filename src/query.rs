@@ -141,20 +141,20 @@ pub struct CountryManaSpend {
     pub add_tribal_land: i32,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum BuildingConstruction {
     Constructed,
     Destroyed,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct BuildingEvent<'a> {
     pub building: &'a str,
     pub date: Eu4Date,
     pub action: BuildingConstruction,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct PlayerHistory {
     pub history: NationEvents,
 
@@ -173,7 +173,7 @@ pub struct ProvinceOwners {
     pub changes: Vec<ProvinceOwnerChange>,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct ProvinceOwnerChange {
     pub province: ProvinceId,
     pub tag: CountryTag,
@@ -185,7 +185,7 @@ pub struct ProvinceReligions {
     pub changes: Vec<ProvinceReligionChange>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ProvinceReligionChange {
     pub province: ProvinceId,
     pub religion: ReligionIndex,
@@ -266,7 +266,7 @@ pub struct ResolvedWarParticipant {
     pub stored: CountryTag,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct ResolvedWarParticipants {
     pub war: String,
     pub participants: Vec<ResolvedWarParticipant>,
@@ -1321,7 +1321,6 @@ fn province_religions(save: &Eu4Save, lookup: &ReligionLookup) -> ProvinceReligi
 
 impl ReligionLookup {
     pub fn index(&self, religion: &String) -> Option<ReligionIndex> {
-        use std::convert::TryFrom;
         self.religions
             .binary_search(religion)
             .ok()

@@ -2,7 +2,7 @@ use eu4save::{models, EnvTokens, Eu4File};
 use std::{error::Error, time::Instant};
 
 pub fn run(data: &[u8]) -> Result<(), Box<dyn Error>> {
-    let file = Eu4File::from_slice(&data)?;
+    let file = Eu4File::from_slice(data)?;
     let mut sink = Vec::new();
 
     let start = Instant::now();
