@@ -12,7 +12,8 @@ keywords = ["eu4", "ironman"]
 categories = ["parsing"]
 
 [features]
-default = ["miniz_oxide"]
+default = ["miniz"]
+miniz = ["miniz_oxide"]
 libdeflate = ["libdeflater/freestanding"]
 serialize = []
 
