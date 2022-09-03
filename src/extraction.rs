@@ -1,7 +1,7 @@
 use std::fmt;
 
 /// Describes the format of the save before decoding
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Encoding {
     /// Plaintext
     Text,

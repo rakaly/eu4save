@@ -199,13 +199,13 @@ pub struct ReligionLookup {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ReligionIndex(NonZeroU16);
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct Player {
     pub name: String,
     pub tag: CountryTag,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct NationEvents {
     /// The initial starting tag for a country. In a TYR -> IRE -> GBR run,
     /// this would be TYR
@@ -227,7 +227,7 @@ pub struct NationEvents {
     pub events: Vec<NationEvent>,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct NationEvent {
     pub date: Eu4Date,
     pub kind: NationEventKind,
@@ -243,21 +243,21 @@ impl NationEvent {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub enum NationEventKind {
     TagSwitch(CountryTag),
     Appeared,
     Annexed,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq,  Clone, Serialize)]
 pub struct LedgerPoint {
     pub tag: CountryTag,
     pub year: u16,
     pub value: i32,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct ResolvedWarParticipant {
     /// The tag as it appears in the war history
     pub tag: CountryTag,
@@ -506,7 +506,7 @@ impl Query {
 
         first
             .map(|x| x.history.initial)
-            .or_else(|| match histories {
+            .or(match histories {
                 [player] => Some(player.history.initial),
                 _ => None,
             })
@@ -760,7 +760,7 @@ impl Query {
     pub fn country_income_breakdown(&self, country: &Country) -> CountryIncomeLedger {
         let ledger = &country.ledger.lastmonthincometable;
         CountryIncomeLedger {
-            taxation: *ledger.get(0).unwrap_or(&0.0),
+            taxation: *ledger.first().unwrap_or(&0.0),
             production: *ledger.get(1).unwrap_or(&0.0),
             trade: *ledger.get(2).unwrap_or(&0.0),
             gold: *ledger.get(3).unwrap_or(&0.0),
@@ -815,7 +815,7 @@ impl Query {
 
     fn expense_ledger_breakdown(&self, ledger: &[f32]) -> CountryExpenseLedger {
         CountryExpenseLedger {
-            advisor_maintenance: *ledger.get(0).unwrap_or(&0.0),
+            advisor_maintenance: *ledger.first().unwrap_or(&0.0),
             interest: *ledger.get(1).unwrap_or(&0.0),
             state_maintenance: *ledger.get(2).unwrap_or(&0.0),
             subsidies: *ledger.get(4).unwrap_or(&0.0),

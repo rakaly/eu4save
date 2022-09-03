@@ -97,7 +97,7 @@ pub struct GameState {
     pub diplomacy: Diplomacy,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SavegameVersion {
     pub first: u16,
     pub second: u16,
@@ -186,14 +186,14 @@ pub struct HRE {
     pub electors: Vec<CountryTag>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 pub enum TaxManpowerModifier {
     Historical,
     Random,
     Equal,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 pub enum GameDifficulty {
     VeryEasy,
     Easy,

@@ -30,7 +30,7 @@ fn parsed_file_to_json(file: &Eu4ParsedFile) -> Result<(), Box<dyn std::error::E
 }
 
 pub fn run(data: &[u8]) -> Result<(), Box<dyn Error>> {
-    let file = Eu4File::from_slice(&data)?;
+    let file = Eu4File::from_slice(data)?;
     let mut entries = file.entries();
     let mut zip_sink = Vec::new();
     while let Some(entry) = entries.next_entry() {

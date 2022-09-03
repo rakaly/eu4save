@@ -46,7 +46,7 @@ where
 }
 
 pub fn run(data: &[u8]) -> Result<(), Box<dyn Error>> {
-    let file = Eu4File::from_slice(&data)?;
+    let file = Eu4File::from_slice(data)?;
     let save = file.deserializer().build_save(&EnvTokens)?;
     deduce_vec(
         save.game
