@@ -6,10 +6,7 @@ use jomini::{
     BinaryDeserializer, BinaryTape, TextDeserializer, TextTape, Windows1252Encoding,
 };
 use serde::Deserialize;
-use std::{
-    fmt::Display,
-    io::{Cursor, Read},
-};
+use std::{fmt::Display, io::Cursor};
 use zip::result::ZipError;
 
 const TXT_HEADER: &[u8] = b"EU4txt";
@@ -33,6 +30,7 @@ fn is_bin(data: &[u8]) -> Option<&[u8]> {
     }
 }
 
+#[derive(Debug)]
 struct Eu4ZipFilesIter {
     meta_index: Option<VerifiedIndex>,
     gamestate_index: Option<VerifiedIndex>,
@@ -72,24 +70,18 @@ impl<'a> Eu4Zip<'a> {
 struct VerifiedIndex {
     data_start: usize,
     data_end: usize,
-    index: usize,
     name: Eu4FileEntryName,
     size: usize,
 }
 
 impl VerifiedIndex {
-    fn is_text(&self, zip: &mut zip::ZipArchive<Cursor<&[u8]>>) -> Result<bool, Eu4Error> {
+    fn is_text(&self, data: &[u8]) -> Result<bool, Eu4Error> {
         let mut header = [0; TXT_HEADER.len()];
-
-        let mut file = zip.by_index(self.index).expect("file to exist");
-
-        file.read_exact(&mut header)
-            .map_err(|e| Eu4ErrorKind::ZipInflation {
-                name: self.name,
-                source: e,
-            })?;
-
-        Ok(is_text(&header).is_some())
+        let raw = &data[self.data_start..self.data_end];
+        match inflate(raw, &mut header) {
+            Ok(_) | Err(ZipInnerError::InsufficientSpace) => Ok(is_text(&header).is_some()),
+            Err(_) => Err(Eu4ErrorKind::ZipInflationRaw { name: self.name }.into()),
+        }
     }
 }
 
@@ -108,16 +100,14 @@ impl<'a> Eu4ZipFiles<'a> {
         let mut ai_index = None;
 
         for index in 0..archive.len() {
-            if let Ok(file) = archive.by_index(index) {
+            if let Ok(file) = archive.by_index_raw(index) {
                 let size = file.size() as usize;
                 let data_start = file.data_start() as usize;
                 let data_end = data_start + file.compressed_size() as usize;
-
                 let index = Eu4ZipFiles::strong_name(file.name()).map(|name| VerifiedIndex {
                     name,
                     data_start,
                     data_end,
-                    index,
                     size,
                 });
 
@@ -171,14 +161,42 @@ impl<'a> Eu4ZipFiles<'a> {
     }
 }
 
+#[cfg(all(feature = "miniz", not(feature = "libdeflate")))]
+fn inflate(raw: &[u8], out: &mut [u8]) -> Result<usize, ZipInnerError> {
+    let written = miniz_oxide::inflate::decompress_slice_iter_to_slice(
+        out,
+        std::iter::once(raw),
+        false,
+        false,
+    )
+    .map_err(|e| match e {
+        miniz_oxide::inflate::TINFLStatus::HasMoreOutput => ZipInnerError::InsufficientSpace,
+        _ => ZipInnerError::Inflate,
+    })?;
+    Ok(written)
+}
+
+#[cfg(feature = "libdeflate")]
+fn inflate(raw: &[u8], out: &mut [u8]) -> Result<usize, ZipInnerError> {
+    let written = libdeflater::Decompressor::new()
+        .deflate_decompress(raw, out)
+        .map_err(|e| match e {
+            libdeflater::DecompressionError::BadData => ZipInnerError::Inflate,
+            libdeflater::DecompressionError::InsufficientSpace => ZipInnerError::InsufficientSpace,
+        })?;
+    Ok(written)
+}
+
 struct Eu4ZipFile<'a> {
     raw: &'a [u8],
     size: usize,
     name: Eu4FileEntryName,
 }
 
+#[derive(Debug)]
 enum ZipInnerError {
     Inflate,
+    InsufficientSpace,
     Size,
 }
 
@@ -187,20 +205,7 @@ impl<'a> Eu4ZipFile<'a> {
         let start_len = buf.len();
         buf.resize(start_len + self.size(), 0);
         let body = &mut buf[start_len..];
-
-        #[cfg(feature = "miniz_oxide")]
-        let written = miniz_oxide::inflate::decompress_slice_iter_to_slice(
-            body,
-            std::iter::once(self.raw),
-            false,
-            false,
-        )
-        .map_err(|_| ZipInnerError::Inflate)?;
-
-        #[cfg(feature = "libdeflate")]
-        let written = libdeflater::Decompressor::new()
-            .deflate_decompress(self.raw, body)
-            .map_err(|_| ZipInnerError::Inflate)?;
+        let written = inflate(self.raw, body)?;
 
         if written != self.size() {
             return Err(ZipInnerError::Size);
@@ -214,7 +219,7 @@ impl<'a> Eu4ZipFile<'a> {
     pub fn read_to_end(&self, buf: &mut Vec<u8>) -> Result<(), Eu4Error> {
         self.internal_read_to_end(buf).map_err(|e| match e {
             ZipInnerError::Inflate => Eu4ErrorKind::ZipInflationRaw { name: self.name },
-            ZipInnerError::Size => Eu4ErrorKind::ZipInflationSize { name: self.name },
+            _ => Eu4ErrorKind::ZipInflationSize { name: self.name },
         })?;
         Ok(())
     }
@@ -263,7 +268,7 @@ impl<'a> Eu4File<'a> {
                         inflated_size += file.size;
 
                         if found_text.is_none() {
-                            found_text = Some(file.is_text(&mut zip)?);
+                            found_text = Some(file.is_text(data)?);
                         }
                     }
 
