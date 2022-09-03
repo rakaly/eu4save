@@ -219,6 +219,13 @@ fn test_inheritance_values() {
 }
 
 #[test]
+fn test_oda() {
+    let data = utils::request("oda.eu4");
+    let file = Eu4File::from_slice(&data).unwrap();
+    let _save = file.deserializer().build_save(&EnvTokens).unwrap();
+}
+
+#[test]
 fn test_roundtrip_melt() {
     let data = utils::request("kandy2.bin.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
