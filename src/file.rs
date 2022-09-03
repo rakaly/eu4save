@@ -188,7 +188,7 @@ impl<'a> Eu4ZipFile<'a> {
         buf.resize(start_len + self.size(), 0);
         let body = &mut buf[start_len..];
 
-        #[cfg(feature = "miniz_oxide")]
+        #[cfg(all(feature = "miniz", not(feature = "libdeflate")))]
         let written = miniz_oxide::inflate::decompress_slice_iter_to_slice(
             body,
             std::iter::once(self.raw),
