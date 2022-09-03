@@ -188,14 +188,16 @@ impl<'a> Eu4ZipFile<'a> {
         buf.resize(start_len + self.size(), 0);
         let body = &mut buf[start_len..];
 
+        // If someone enables both features, assume they want libdeflate.
+        // Otherwise we'd inflate the data twice!
         #[cfg(all(feature = "miniz", not(feature = "libdeflate")))]
-        let written = { let res = miniz_oxide::inflate::decompress_slice_iter_to_slice(
+        let written = miniz_oxide::inflate::decompress_slice_iter_to_slice(
             body,
             std::iter::once(self.raw),
             false,
             false,
         )
-        .map_err(|_| ZipInnerError::Inflate)?; panic!("EEK"); res};
+        .map_err(|_| ZipInnerError::Inflate)?;
 
         #[cfg(feature = "libdeflate")]
         let written = libdeflater::Decompressor::new()
