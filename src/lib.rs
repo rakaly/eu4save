@@ -65,6 +65,7 @@ for inspiration.
 
 mod country_tag;
 mod de;
+mod deflate;
 mod dlc;
 mod errors;
 mod eu4date;

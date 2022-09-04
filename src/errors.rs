@@ -1,4 +1,4 @@
-use crate::file::Eu4FileEntryName;
+use crate::deflate::ZipInflationError;
 use zip::result::ZipError;
 
 /// An EU4 Error
@@ -29,11 +29,11 @@ pub enum Eu4ErrorKind {
     #[error("unable to parse as zip: {0}")]
     ZipArchive(#[from] ZipError),
 
-    #[error("unable to inflate zip entry: {name}")]
-    ZipInflation { name: Eu4FileEntryName },
+    #[error("unable to inflate zip entry: {msg}")]
+    ZipBadData { msg: String },
 
-    #[error("unexpected size when inflating zip entry: {name}")]
-    ZipInflationSize { name: Eu4FileEntryName },
+    #[error("early eof, only able to write {written} bytes")]
+    ZipEarlyEof { written: usize },
 
     #[error("unknown header found in zip entry. Must be EU4txt or EU4bin")]
     ZipHeader,
@@ -61,6 +61,15 @@ pub enum Eu4ErrorKind {
 
     #[error("expected the binary integer: {0} to be parsed as a date")]
     InvalidDate(i32),
+}
+
+impl From<ZipInflationError> for Eu4ErrorKind {
+    fn from(x: ZipInflationError) -> Self {
+        match x {
+            ZipInflationError::BadData { msg } => Eu4ErrorKind::ZipBadData { msg },
+            ZipInflationError::EarlyEof { written } => Eu4ErrorKind::ZipEarlyEof { written },
+        }
+    }
 }
 
 #[cfg(test)]
