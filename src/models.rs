@@ -367,9 +367,6 @@ pub struct Country {
     pub previous_country_tags: Vec<CountryTag>,
     pub name: Option<String>,
     pub government_rank: i32,
-    pub subject_focus: i32,
-    pub trade_mission: f32,
-    pub blockade_mission: f32,
     pub continent: Vec<i32>,
     pub institutions: Vec<i32>,
     pub capital: ProvinceId,
@@ -611,13 +608,12 @@ pub struct Leader {
 pub struct MercenaryCompany {
     pub id: ObjId,
     pub tag: String,
-    pub progress: bool,
-    pub manpower: f32,
-    pub starting_manpower: f32,
+    pub manpower: Option<f32>,
+    pub starting_manpower: Option<f32>,
     pub leader: Option<Leader>,
     pub unit: Option<ObjId>,
-    pub hiring_date: Eu4Date,
-    pub disband_date: Eu4Date,
+    pub hiring_date: Option<Eu4Date>,
+    pub disband_date: Option<Eu4Date>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
