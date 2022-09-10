@@ -471,6 +471,22 @@ pub struct Country {
     pub leaders: Vec<ObjId>,
     #[jomini(duplicated, alias = "previous_monarch")]
     pub previous_monarchs: Vec<ObjId>,
+    pub government: Option<CountryGovernment>,
+}
+
+#[derive(Debug, Clone, JominiDeserialize, Default)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct CountryGovernment {
+    pub government: String,
+    pub reform_stack: CountryGovernmentReforms,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct CountryGovernmentReforms {
+    pub reforms: Vec<String>,
+    #[serde(default)]
+    pub history: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
