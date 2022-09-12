@@ -1,3 +1,10 @@
+## v0.8.0 - 2022-09-12
+
+- Update to 2021 edition
+- Update to 1.34 data model
+- Add default more efficient miniz inflation
+- Add libdeflate inflation feature
+
 ## v0.7.1 - 2022-07-08
 
 - Empty EU4_IRONMAN_TOKENS same as unset
