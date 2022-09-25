@@ -141,6 +141,7 @@ pub struct TradeCompanyInvestment {
 #[derive(Debug, Clone, JominiDeserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct CountryState {
+    #[jomini(default)]
     pub prosperity: f32,
     pub country: CountryTag,
 }
