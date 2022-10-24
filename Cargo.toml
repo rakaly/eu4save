@@ -18,7 +18,7 @@ libdeflate = ["libdeflater/freestanding"]
 serialize = []
 
 [dependencies]
-jomini =  { version = "0.19", features = ["json"] }
+jomini =  { version = "0.20", features = ["json"] }
 once_cell = "1"
 zip = { version =  "0.6", default-features = false }
 serde = { version = "1", features = ["derive"] }

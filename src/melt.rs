@@ -244,10 +244,6 @@ where
                 depth += 1;
                 wtr.write_object_start()?;
             }
-            BinaryToken::HiddenObject(_) => {
-                depth += 1;
-                wtr.write_hidden_object_start()?;
-            }
             BinaryToken::Array(_) => {
                 depth += 1;
                 wtr.write_array_start()?;
@@ -439,6 +435,14 @@ where
                     }
                 },
             },
+
+            // Tokens below are not found in EU4 saves, but we handle them anyways.
+            BinaryToken::MixedContainer => {
+                wtr.start_mixed_mode();
+            }
+            BinaryToken::Equal => {
+                wtr.write_operator(jomini::text::Operator::Equal)?;
+            }
             BinaryToken::Rgb(color) => {
                 wtr.write_header(b"rgb")?;
                 wtr.write_array_start()?;
