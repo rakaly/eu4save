@@ -36,18 +36,16 @@ jobs:
           os: windows-latest
           rust: stable
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Cache eu4 saves
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: assets/saves
         key: assets/saves
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{ matrix.rust }}
-        profile: minimal
-        override: true
 
     - name: Build
       run: cargo build --all --verbose
