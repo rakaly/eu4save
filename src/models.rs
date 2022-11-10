@@ -235,6 +235,7 @@ pub struct Province {
     pub previous_controller: Option<CountryTag>,
     #[jomini(default)]
     pub cores: Vec<CountryTag>,
+    pub territorial_core: Option<CountryTag>,
     #[jomini(default)]
     pub claims: Vec<CountryTag>,
     pub institutions: Vec<f32>,
@@ -282,6 +283,11 @@ pub struct Province {
     #[jomini(alias = "colonysize")]
     pub colony_size: Option<f32>,
     pub change_culture_construction: Option<ChangeCultureConstruction>,
+    pub centralize_state_construction: Option<CentralizeStateConstruction>,
+    #[jomini(default)]
+    pub num_centralize_state: i32,
+    #[jomini(default)]
+    pub expand_infrastructure: i32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -349,6 +355,16 @@ pub struct ChangeCultureConstruction {
     pub envoy: i32,
     pub country: CountryTag,
     pub culture: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct CentralizeStateConstruction {
+    pub start_date: Eu4Date,
+    #[serde(default)]
+    pub progress: f32,
+    pub date: Eu4Date,
+    pub country: CountryTag,
 }
 
 #[derive(Debug, Clone, JominiDeserialize, Default)]
