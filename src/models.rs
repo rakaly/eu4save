@@ -235,7 +235,8 @@ pub struct Province {
     pub previous_controller: Option<CountryTag>,
     #[jomini(default)]
     pub cores: Vec<CountryTag>,
-    pub territorial_core: Option<CountryTag>,
+    #[jomini(duplicated)] // thank lambda for this
+    pub territorial_core: Vec<CountryTag>,
     #[jomini(default)]
     pub claims: Vec<CountryTag>,
     pub institutions: Vec<f32>,
