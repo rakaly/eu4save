@@ -280,6 +280,8 @@ macro_rules! ironman_test {
                     .on_failed_resolve(FailedResolveStrategy::Error)
                     .melt(&EnvTokens)
                     .unwrap();
+
+                    assert!(eq(melted.data(), entries_melted.data()), "melted entries did not match");
                 }
 
                 let meta: Meta = parsed_file
