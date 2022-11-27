@@ -6,6 +6,7 @@ use jomini::{
 };
 use std::{collections::HashSet, io::Cursor};
 
+#[derive(Debug)]
 struct QuoteMode {
     kind: QuoteKind,
     idx: usize,
@@ -108,9 +109,9 @@ impl<'a, 'b> Eu4Melter<'a, 'b> {
         }
     }
 
-    pub(crate) fn get_token(&self, idx: usize) -> Option<&BinaryToken> {
+    pub(crate) fn get_token(&self, idx: usize) -> Option<(&BinaryToken, usize)> {
         match &self.kind {
-            Eu4MelterKind::Single(x) => x.tokens().get(idx),
+            Eu4MelterKind::Single(x) => x.tokens().get(idx).map(|x| (x, 0)),
             Eu4MelterKind::Multiple {
                 meta,
                 gamestate,
@@ -120,45 +121,26 @@ impl<'a, 'b> Eu4Melter<'a, 'b> {
 
                 let meta_len = meta.tape().tokens().len();
                 if idx < meta_len {
-                    return meta.tape().tokens().get(idx);
+                    return meta.tape().tokens().get(idx).map(|x| (x, 0));
                 }
                 idx -= meta_len;
 
                 let gamestate_len = gamestate.tape().tokens().len();
                 if idx < gamestate_len {
-                    return gamestate.tape().tokens().get(idx);
+                    return gamestate.tape().tokens().get(idx).map(|x| (x, meta_len));
                 }
                 idx -= gamestate_len;
-                ai.tape().tokens().get(idx)
+                ai.tape()
+                    .tokens()
+                    .get(idx)
+                    .map(|x| (x, meta_len + gamestate_len))
             }
         }
     }
 
     pub(crate) fn skip_value_idx(&self, token_idx: usize) -> usize {
-        let offset = match &self.kind {
-            Eu4MelterKind::Single(_) => 0,
-            Eu4MelterKind::Multiple {
-                meta, gamestate, ..
-            } => {
-                let mut idx = token_idx;
-
-                let meta_len = meta.tape().tokens().len();
-                if idx < meta_len {
-                    0
-                } else {
-                    idx -= meta_len;
-                    let gamestate_len = gamestate.tape().tokens().len();
-                    if idx < gamestate_len {
-                        meta_len
-                    } else {
-                        gamestate_len
-                    }
-                }
-            }
-        };
-
         self.get_token(token_idx + 1)
-            .map(|next_token| match next_token {
+            .map(|(next_token, offset)| match next_token {
                 BinaryToken::Object(end) | BinaryToken::Array(end) => offset + end + 1,
                 _ => token_idx + 2,
             })
@@ -238,7 +220,7 @@ where
     let mut queued_checksum: Option<Scalar> = None;
     let flavor = Eu4Flavor::new();
 
-    while let Some(token) = melter.get_token(token_idx) {
+    while let Some((token, offset)) = melter.get_token(token_idx) {
         match token {
             BinaryToken::Object(_) => {
                 depth += 1;
@@ -251,7 +233,7 @@ where
             BinaryToken::End(x) => {
                 depth -= 1;
 
-                if *x == quote_mode.idx {
+                if *x + offset == quote_mode.idx {
                     quote_mode.clear();
                 }
 
@@ -320,7 +302,7 @@ where
                     if skip && wtr.expecting_key() {
                         let next = melter.get_token(token_idx + 1);
                         if id == "checksum" {
-                            if let Some(BinaryToken::Quoted(s)) = next {
+                            if let Some((BinaryToken::Quoted(s), _)) = next {
                                 queued_checksum = Some(*s);
                             }
                         };

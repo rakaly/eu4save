@@ -261,6 +261,27 @@ macro_rules! ironman_test {
                     .unwrap();
                 assert!(!melted.data().is_empty());
 
+                // Test to make sure that melting via entries matches melting via a single file
+                {
+                let mut entries = file.entries();
+                let mut meta_zip = Vec::new();
+                let meta_entry = entries.next_entry().unwrap().parse(&mut meta_zip).unwrap();
+                let meta_file = meta_entry.as_binary().unwrap();
+
+                let mut game_zip = Vec::new();
+                let game_entry = entries.next_entry().unwrap().parse(&mut game_zip).unwrap();
+                let game_file = game_entry.as_binary().unwrap();
+
+                let mut ai_zip = Vec::new();
+                let ai_entry = entries.next_entry().unwrap().parse(&mut ai_zip).unwrap();
+                let ai_file = ai_entry.as_binary().unwrap();
+
+                let entries_melted = eu4save::Eu4Melter::from_entries(&meta_file, &game_file, &ai_file)
+                    .on_failed_resolve(FailedResolveStrategy::Error)
+                    .melt(&EnvTokens)
+                    .unwrap();
+                }
+
                 let meta: Meta = parsed_file
                     .deserializer()
                     .on_failed_resolve(FailedResolveStrategy::Error)
@@ -1023,3 +1044,13 @@ ironman_test!(
         assertions(m)
     }
 );
+
+fn eq(a: &[u8], b: &[u8]) -> bool {
+    for (ai, bi) in a.iter().zip(b.iter()) {
+        if ai != bi {
+            return false;
+        }
+    }
+
+    a.len() == b.len()
+}
