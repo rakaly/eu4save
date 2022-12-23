@@ -610,7 +610,7 @@ impl<'data> Eu4Binary<'data> {
             .and_then(Self::from_raw)
     }
 
-    pub(crate) fn from_raw(data: &'data [u8]) -> Result<Self, Eu4Error> {
+    pub fn from_raw(data: &'data [u8]) -> Result<Self, Eu4Error> {
         let tape = BinaryTape::from_slice(data).map_err(Eu4ErrorKind::Parse)?;
         Ok(Eu4Binary { tape })
     }
