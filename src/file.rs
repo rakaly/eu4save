@@ -568,7 +568,7 @@ impl<'a> Eu4Text<'a> {
             .and_then(Self::from_raw)
     }
 
-    pub(crate) fn from_raw(data: &'a [u8]) -> Result<Self, Eu4Error> {
+    pub fn from_raw(data: &'a [u8]) -> Result<Self, Eu4Error> {
         let tape = TextTape::from_slice(data).map_err(Eu4ErrorKind::Parse)?;
         Ok(Eu4Text { tape })
     }
