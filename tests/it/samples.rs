@@ -309,6 +309,21 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+pub fn parse_overflowing_losses() -> Result<(), Box<dyn Error>> {
+    let data = utils::request("losses.eu4");
+    let file = Eu4File::from_slice(&data)?;
+    let save = file.deserializer().build_save(&EnvTokens)?;
+    let country_negative_loss = save
+        .game
+        .countries
+        .iter()
+        .any(|(_, c)| c.losses.members.iter().any(|l| l.is_negative()));
+    assert!(country_negative_loss);
+
+    Ok(())
+}
+
+#[test]
 fn test_missing_leader_activation_save() -> Result<(), Box<dyn Error>> {
     let data = utils::request("skan-cb25b0.eu4.zip");
     let reader = Cursor::new(&data[..]);

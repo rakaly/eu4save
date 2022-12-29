@@ -814,7 +814,7 @@ pub struct WarParticipant {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct WarParticipantLosses {
     #[serde(default)]
-    pub members: Vec<u32>,
+    pub members: Vec<i32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -880,7 +880,7 @@ pub struct BattleSide {
     pub galley: u32,
     #[serde(default)]
     pub transport: u32,
-    pub losses: u32,
+    pub losses: i32,
     pub country: CountryTag,
 
     #[serde(deserialize_with = "empty_string_is_none")]
