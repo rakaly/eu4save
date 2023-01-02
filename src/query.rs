@@ -864,12 +864,7 @@ impl Query {
     }
 
     fn mana_spent_indexed(&self, data: &[(i32, i32)]) -> CountryManaSpend {
-        let offset = if self.save().meta.savegame_version.second >= 31 {
-            1
-        } else {
-            0
-        };
-
+        let offset = i32::from(self.save().meta.savegame_version.second >= 31);
         let force_march = find_index(8, data) + find_index(45, data);
         CountryManaSpend {
             buy_idea: find_index(0, data),

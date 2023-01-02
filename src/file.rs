@@ -262,7 +262,10 @@ impl<'a> Eu4File<'a> {
     }
 
     /// A convenience method for creating [`Eu4Save`](crate::models::Eu4Save)
-    pub fn parse_save<R>(&self, resolver: &R) -> Result<Eu4Save, Eu4Error> where R: TokenResolver {
+    pub fn parse_save<R>(&self, resolver: &R) -> Result<Eu4Save, Eu4Error>
+    where
+        R: TokenResolver,
+    {
         let mut zip_sink = Vec::new();
         let parsed_file = self.parse(&mut zip_sink)?;
         let des = parsed_file.deserializer(resolver);
