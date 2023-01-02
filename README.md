@@ -5,17 +5,13 @@
 EU4 Save is a library to ergonomically work with EU4 saves (ironman + mp).
 
 ```rust
-use eu4save::{Eu4Extractor, Encoding, CountryTag};
-use std::io::Cursor;
-
+use eu4save::{Eu4File, Encoding, CountryTag, EnvTokens};
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
-let (save, encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
-assert_eq!(encoding, Encoding::TextZip);
-assert_eq!(save.meta.player, CountryTag::from("ENG"));
+let file = Eu4File::from_slice(&data)?;
+let save = file.parse_save(&EnvTokens)?;
+assert_eq!(file.encoding(), Encoding::TextZip);
+assert_eq!(save.meta.player, "ENG".parse()?);
 ```
-
-`Eu4Extractor` will deserialize both plaintext (used for mods, multiplayer,
-non-ironman saves) and binary (ironman) encoded saves into the same structure.
 
 ## Querying
 
@@ -34,12 +30,12 @@ To help solve questions like these, the `Query` API was created
 
 ```rust
 use eu4save::{Eu4Extractor, Encoding, CountryTag, query::Query};
-use std::io::Cursor;
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
-let (save, _encoding) = Eu4Extractor::extract_save(Cursor::new(&data[..]))?;
+let file = Eu4File::from_slice(&data)?;
+let save = file.parse_save(&EnvTokens)?;
 let save_query = Query::from_save(save);
-let trade = save_query.save().game.countries.get(&CountryTag::from("ENG"))
+let trade = save_query.country(&"ENG".parse()?)
     .map(|country| save_query.country_income_breakdown(country))
     .map(|income| income.trade);
 assert_eq!(Some(17.982), trade);

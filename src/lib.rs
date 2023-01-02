@@ -29,7 +29,6 @@ To help solve questions like these, the `Query` API was created
 
 ```rust
 use eu4save::{Eu4File, Encoding, CountryTag, EnvTokens, query::Query};
-use std::io::Cursor;
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let file = Eu4File::from_slice(&data)?;
