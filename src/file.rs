@@ -1,7 +1,7 @@
 //! Parsing and deserializing EU4 save files
 use crate::{flavor::Eu4Flavor, models::Eu4Save, Encoding, Eu4Error, Eu4ErrorKind, Eu4Melter};
 use jomini::{
-    binary::{BinaryDeserializerBuilder, FailedResolveStrategy, TokenResolver},
+    binary::{FailedResolveStrategy, TokenResolver},
     text::ObjectReader,
     BinaryDeserializer, BinaryTape, TextDeserializer, TextTape, Windows1252Encoding,
 };
@@ -262,11 +262,11 @@ impl<'a> Eu4File<'a> {
     }
 
     /// A convenience method for creating [`Eu4Save`](crate::models::Eu4Save)
-    pub fn deserializer(&self) -> Eu4SaveDeserializer {
-        Eu4SaveDeserializer {
-            file: self,
-            builder: BinaryDeserializer::builder_flavor(Eu4Flavor::new()),
-        }
+    pub fn parse_save<R>(&self, resolver: &R) -> Result<Eu4Save, Eu4Error> where R: TokenResolver {
+        let mut zip_sink = Vec::new();
+        let parsed_file = self.parse(&mut zip_sink)?;
+        let des = parsed_file.deserializer(resolver);
+        Eu4Save::from_deserializer(&des)
     }
 
     /// Parses the entire file
@@ -343,11 +343,11 @@ pub enum Eu4ParsedFileKind<'a> {
 }
 
 /// An EU4 file that has been parsed
-pub struct Eu4ParsedFile<'a> {
-    kind: Eu4ParsedFileKind<'a>,
+pub struct Eu4ParsedFile<'data> {
+    kind: Eu4ParsedFileKind<'data>,
 }
 
-impl<'a> Eu4ParsedFile<'a> {
+impl<'data> Eu4ParsedFile<'data> {
     /// Returns the file as text
     pub fn as_text(&self) -> Option<&Eu4Text> {
         match &self.kind {
@@ -370,56 +370,35 @@ impl<'a> Eu4ParsedFile<'a> {
     }
 
     /// Prepares the file for deserialization into a custom structure
-    pub fn deserializer(&self) -> Eu4Deserializer {
+    pub fn deserializer<'b, RES>(&'b self, resolver: &'b RES) -> Eu4Deserializer<'data, 'b, RES>
+    where
+        RES: TokenResolver,
+    {
         match &self.kind {
             Eu4ParsedFileKind::Text(x) => Eu4Deserializer {
-                kind: Eu4DeserializerKind::Text(x),
+                kind: Eu4DeserializerKind::Text(x.deserializer()),
             },
             Eu4ParsedFileKind::Binary(x) => Eu4Deserializer {
-                kind: Eu4DeserializerKind::Binary(x.deserializer()),
+                kind: Eu4DeserializerKind::Binary(x.deserializer(resolver)),
             },
         }
     }
 }
 
-/// A deserializer for an [Eu4Save](crate::models::Eu4Save)
-pub struct Eu4SaveDeserializer<'a, 'b> {
-    file: &'b Eu4File<'a>,
-    builder: BinaryDeserializerBuilder<Eu4Flavor>,
-}
-
-impl<'a, 'b> Eu4SaveDeserializer<'a, 'b> {
-    pub fn on_failed_resolve(&mut self, strategy: FailedResolveStrategy) -> &mut Self {
-        self.builder.on_failed_resolve(strategy);
-        self
-    }
-
-    pub fn build_save<R>(self, resolver: &'a R) -> Result<Eu4Save, Eu4Error>
-    where
-        R: TokenResolver,
-    {
-        let mut zip_sink = Vec::new();
-        let parsed_file = self.file.parse(&mut zip_sink)?;
-        let mut des = parsed_file.deserializer();
-        if let Eu4DeserializerKind::Binary(x) = &mut des.kind {
-            x.builder = self.builder;
-        }
-
-        Eu4Save::from_deserializer(&des, resolver)
-    }
-}
-
-enum Eu4DeserializerKind<'a, 'b> {
-    Text(&'b Eu4Text<'a>),
-    Binary(Eu4BinaryDeserializer<'a, 'b>),
+pub(crate) enum Eu4DeserializerKind<'data, 'tape, RES> {
+    Text(Eu4TextDeserializer<'data, 'tape>),
+    Binary(Eu4BinaryDeserializer<'data, 'tape, RES>),
 }
 
 /// A deserializer for custom structures
-pub struct Eu4Deserializer<'a, 'b> {
-    kind: Eu4DeserializerKind<'a, 'b>,
+pub struct Eu4Deserializer<'data, 'tape, RES> {
+    pub(crate) kind: Eu4DeserializerKind<'data, 'tape, RES>,
 }
 
-impl<'a, 'b> Eu4Deserializer<'a, 'b> {
+impl<'data, 'tape, RES> Eu4Deserializer<'data, 'tape, RES>
+where
+    RES: TokenResolver,
+{
     pub fn on_failed_resolve(&mut self, strategy: FailedResolveStrategy) -> &mut Self {
         if let Eu4DeserializerKind::Binary(x) = &mut self.kind {
             x.on_failed_resolve(strategy);
@@ -427,15 +406,11 @@ impl<'a, 'b> Eu4Deserializer<'a, 'b> {
         self
     }
 
-    pub fn build<T, R>(&self, resolver: &'a R) -> Result<T, Eu4Error>
+    pub fn deserialize<T>(&self) -> Result<T, Eu4Error>
     where
-        R: TokenResolver,
-        T: Deserialize<'a>,
+        T: Deserialize<'data>,
     {
-        match &self.kind {
-            Eu4DeserializerKind::Text(x) => x.deserialize(),
-            Eu4DeserializerKind::Binary(x) => x.build(resolver),
-        }
+        T::deserialize(self)
     }
 }
 
@@ -599,29 +574,40 @@ impl<'a> Eu4Text<'a> {
         self.tape.windows1252_reader()
     }
 
+    pub fn deserializer(&self) -> Eu4TextDeserializer {
+        Eu4TextDeserializer {
+            deser: TextDeserializer::from_windows1252_tape(&self.tape),
+        }
+    }
+}
+
+/// Deserializes binary data into custom structures
+pub struct Eu4TextDeserializer<'data, 'tape> {
+    pub(crate) deser: TextDeserializer<'tape, 'data, Windows1252Encoding>,
+}
+
+impl<'de, 'tape> Eu4TextDeserializer<'de, 'tape> {
     pub fn deserialize<T>(&self) -> Result<T, Eu4Error>
     where
-        T: Deserialize<'a>,
+        T: Deserialize<'de>,
     {
-        let result = TextDeserializer::from_windows1252_tape(&self.tape)
-            .map_err(Eu4ErrorKind::Deserialize)?;
-        Ok(result)
+        T::deserialize(self)
     }
 }
 
 /// A parsed EU4 binary document
-pub struct Eu4Binary<'a> {
-    tape: BinaryTape<'a>,
+pub struct Eu4Binary<'data> {
+    tape: BinaryTape<'data>,
 }
 
-impl<'a> Eu4Binary<'a> {
-    pub fn from_slice(data: &'a [u8]) -> Result<Self, Eu4Error> {
+impl<'data> Eu4Binary<'data> {
+    pub fn from_slice(data: &'data [u8]) -> Result<Self, Eu4Error> {
         is_bin(data)
             .ok_or_else(|| Eu4ErrorKind::UnknownHeader.into())
             .and_then(Self::from_raw)
     }
 
-    pub(crate) fn from_raw(data: &'a [u8]) -> Result<Self, Eu4Error> {
+    pub(crate) fn from_raw(data: &'data [u8]) -> Result<Self, Eu4Error> {
         let tape = BinaryTape::from_slice(data).map_err(Eu4ErrorKind::Parse)?;
         Ok(Eu4Binary { tape })
     }
@@ -630,48 +616,39 @@ impl<'a> Eu4Binary<'a> {
         &self.tape
     }
 
-    pub fn deserializer<'b>(&'b self) -> Eu4BinaryDeserializer<'a, 'b> {
-        Eu4BinaryDeserializer {
-            builder: BinaryDeserializer::builder_flavor(Eu4Flavor::new()),
-            tape: &self.tape,
-        }
+    pub fn deserializer<'b, RES>(
+        &'b self,
+        resolver: &'b RES,
+    ) -> Eu4BinaryDeserializer<'data, 'b, RES>
+    where
+        RES: TokenResolver,
+    {
+        let deser =
+            BinaryDeserializer::builder_flavor(Eu4Flavor::new()).from_tape(&self.tape, resolver);
+        Eu4BinaryDeserializer { deser }
     }
 
-    pub fn melter<'b>(&'b self) -> Eu4Melter<'a, 'b> {
+    pub fn melter<'b>(&'b self) -> Eu4Melter<'data, 'b> {
         Eu4Melter::new(&self.tape)
     }
 }
 
 /// Deserializes binary data into custom structures
-pub struct Eu4BinaryDeserializer<'a, 'b> {
-    builder: BinaryDeserializerBuilder<Eu4Flavor>,
-    tape: &'b BinaryTape<'a>,
+pub struct Eu4BinaryDeserializer<'data, 'tape, RES> {
+    pub(crate) deser: BinaryDeserializer<'tape, 'data, 'tape, RES, Eu4Flavor>,
 }
 
-impl<'a, 'b> Eu4BinaryDeserializer<'a, 'b> {
+impl<'de, 'tape, RES: TokenResolver> Eu4BinaryDeserializer<'de, 'tape, RES> {
     pub fn on_failed_resolve(&mut self, strategy: FailedResolveStrategy) -> &mut Self {
-        self.builder.on_failed_resolve(strategy);
+        self.deser.on_failed_resolve(strategy);
         self
     }
 
-    pub fn build<T, R>(&self, resolver: &'a R) -> Result<T, Eu4Error>
+    pub fn deserialize<T>(&self) -> Result<T, Eu4Error>
     where
-        R: TokenResolver,
-        T: Deserialize<'a>,
+        T: Deserialize<'de>,
     {
-        let result = self
-            .builder
-            .from_tape(self.tape, resolver)
-            .map_err(|e| match e.kind() {
-                jomini::ErrorKind::Deserialize(e2) => match e2.kind() {
-                    &jomini::DeserializeErrorKind::UnknownToken { token_id } => {
-                        Eu4ErrorKind::UnknownToken { token_id }
-                    }
-                    _ => Eu4ErrorKind::Deserialize(e),
-                },
-                _ => Eu4ErrorKind::Deserialize(e),
-            })?;
-        Ok(result)
+        T::deserialize(self)
     }
 }
 
@@ -739,7 +716,7 @@ mod tests {
             if let Some(Eu4FileEntryName::Meta) = entry.name() {
                 let data = entry.parse(&mut sink).unwrap();
                 let text = data.as_text().unwrap();
-                let actual: MyMeta = text.deserialize().unwrap();
+                let actual: MyMeta = text.deserializer().deserialize().unwrap();
                 assert_eq!(actual.date, "1463.5.28");
 
                 let out = text.reader().json().to_string();
@@ -766,7 +743,7 @@ mod tests {
         let mut sink = Vec::new();
         let eu4 = file.parse(&mut sink).unwrap();
         let text = eu4.as_text().unwrap();
-        let actual: MySave = text.deserialize().unwrap();
+        let actual: MySave = text.deserializer().deserialize().unwrap();
         assert_eq!(actual.date, "1463.5.28");
         assert_eq!(actual.speed, 2);
         assert_eq!(actual.base, 4636);
@@ -787,7 +764,7 @@ mod tests {
         let mut sink = Vec::new();
         let eu4 = file.parse(&mut sink).unwrap();
         let resolver: HashMap<u16, &str> = HashMap::new();
-        let actual: MySave = eu4.deserializer().build(&resolver).unwrap();
+        let actual: MySave = eu4.deserializer(&resolver).deserialize().unwrap();
         assert_eq!(actual.date, "1463.5.28");
         assert_eq!(actual.speed, 2);
         assert_eq!(actual.base, 4636);

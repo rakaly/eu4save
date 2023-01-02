@@ -6,7 +6,7 @@ use eu4save::{Eu4File, Encoding, CountryTag, EnvTokens};
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let file = Eu4File::from_slice(&data)?;
-let save = file.deserializer().build_save(&EnvTokens)?;
+let save = file.parse_save(&EnvTokens)?;
 assert_eq!(file.encoding(), Encoding::TextZip);
 assert_eq!(save.meta.player, "ENG".parse()?);
 # Ok::<(), Box<dyn std::error::Error>>(())
@@ -33,7 +33,7 @@ use std::io::Cursor;
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let file = Eu4File::from_slice(&data)?;
-let save = file.deserializer().build_save(&EnvTokens)?;
+let save = file.parse_save(&EnvTokens)?;
 let save_query = Query::from_save(save);
 let trade = save_query.country(&"ENG".parse()?)
     .map(|country| save_query.country_income_breakdown(country))

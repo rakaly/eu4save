@@ -21,7 +21,7 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     zip_file.read_to_end(&mut buffer)?;
 
     let file = Eu4File::from_slice(&buffer)?;
-    let save = file.deserializer().build_save(&EnvTokens)?;
+    let save = file.parse_save(&EnvTokens)?;
 
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "ENG".parse()?);
@@ -86,7 +86,7 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
 fn test_eu4_compressed_text() -> Result<(), Box<dyn Error>> {
     let data = utils::request("eng.txt.compressed.eu4");
     let file = Eu4File::from_slice(&data)?;
-    let save = file.deserializer().build_save(&EnvTokens)?;
+    let save = file.parse_save(&EnvTokens)?;
     assert_eq!(file.encoding(), Encoding::TextZip);
     assert_eq!(save.meta.player, "ENG".parse()?);
 
@@ -102,7 +102,7 @@ fn test_eu4_compressed_text_raw() -> Result<(), Box<dyn Error>> {
     assert_eq!(meta_entry.name(), Some(Eu4FileEntryName::Meta));
     let mut zip_sink = Vec::new();
     let meta_parsed = meta_entry.parse(&mut zip_sink)?;
-    let meta: Meta = meta_parsed.deserializer().build(&EnvTokens)?;
+    let meta: Meta = meta_parsed.deserializer(&EnvTokens).deserialize()?;
     assert_eq!(file.encoding(), Encoding::TextZip);
     assert_eq!(meta.player, "ENG".parse()?);
     Ok(())
@@ -112,7 +112,7 @@ fn test_eu4_compressed_text_raw() -> Result<(), Box<dyn Error>> {
 pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let data = utils::request("mp_Uesugi.eu4");
     let file = Eu4File::from_slice(&data)?;
-    let save = file.deserializer().build_save(&EnvTokens)?;
+    let save = file.parse_save(&EnvTokens)?;
     assert!(save.meta.multiplayer);
 
     let query = Query::from_save(save);
@@ -312,7 +312,7 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
 pub fn parse_overflowing_losses() -> Result<(), Box<dyn Error>> {
     let data = utils::request("losses.eu4");
     let file = Eu4File::from_slice(&data)?;
-    let save = file.deserializer().build_save(&EnvTokens)?;
+    let save = file.parse_save(&EnvTokens)?;
     let country_negative_loss = save
         .game
         .countries
@@ -333,7 +333,7 @@ fn test_missing_leader_activation_save() -> Result<(), Box<dyn Error>> {
     zip_file.read_to_end(&mut buffer)?;
 
     let file = Eu4File::from_slice(&buffer)?;
-    let save = file.deserializer().build_save(&EnvTokens)?;
+    let save = file.parse_save(&EnvTokens)?;
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "NED".parse()?);
 
@@ -364,7 +364,7 @@ fn test_handle_heavily_nested_events() {
     // fires. https://eu4.paradoxwikis.com/English_events#Symposium
     let data = utils::request("HashMP_Game56_S7End.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let _save = file.deserializer().build_save(&EnvTokens).unwrap();
+    let _save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::TextZip);
 }
 
@@ -377,7 +377,7 @@ fn test_paperman_text() -> Result<(), Box<dyn Error>> {
     let mut buffer = Vec::with_capacity(0);
     zip_file.read_to_end(&mut buffer)?;
     let file = Eu4File::from_slice(&buffer).unwrap();
-    let save = file.deserializer().build_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "GER".parse()?);
     Ok(())
@@ -387,5 +387,5 @@ fn test_paperman_text() -> Result<(), Box<dyn Error>> {
 fn fix_crash_on_long_country_tag_debug_mode() {
     let data = include_bytes!("fixtures/crash1.bin");
     let file = Eu4File::from_slice(data).unwrap();
-    let _save = file.deserializer().build_save(&EnvTokens);
+    let _save = file.parse_save(&EnvTokens);
 }

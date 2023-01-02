@@ -36,7 +36,7 @@ pub fn run(data: &[u8]) -> Result<(), Box<dyn Error>> {
     while let Some(entry) = entries.next_entry() {
         if matches!(entry.name(), Some(Eu4FileEntryName::Meta) | None) {
             let parsed_file = entry.parse(&mut zip_sink)?;
-            let meta: MyMeta = parsed_file.deserializer().build(&EnvTokens)?;
+            let meta: MyMeta = parsed_file.deserializer(&EnvTokens).deserialize()?;
 
             if meta.savegame_version.second < 29 {
                 println!("detected save game earlier than 1.29");

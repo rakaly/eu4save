@@ -16,8 +16,8 @@ fn run(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let _meta: Result<eu4save::models::Meta, _> = parsed_file.deserializer().build(&EnvTokens);
-    let _game: Result<eu4save::models::GameState, _> = parsed_file.deserializer().build(&EnvTokens);
+    let _meta: Result<eu4save::models::Meta, _> = parsed_file.deserializer(&EnvTokens).deserialize();
+    let _game: Result<eu4save::models::GameState, _> = parsed_file.deserializer(&EnvTokens).deserialize();
 
     Ok(())
 }

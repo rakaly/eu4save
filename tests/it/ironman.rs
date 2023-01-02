@@ -18,7 +18,7 @@ use paste::paste;
 fn test_eu4_bin() {
     let data = utils::request("ragusa2.bin.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let save = file.deserializer().build_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "CRO".parse().unwrap());
 
@@ -52,7 +52,7 @@ fn test_eu4_bin() {
 fn test_eu4_kandy_bin() {
     let data = utils::request("kandy2.bin.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let save = file.deserializer().build_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "BHA".parse().unwrap());
 
@@ -153,8 +153,8 @@ fn test_eu4_same_campaign_id() {
     let data2 = utils::request("ita2_later.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
     let file2 = Eu4File::from_slice(&data2).unwrap();
-    let save = file.deserializer().build_save(&EnvTokens).unwrap();
-    let save2 = file2.deserializer().build_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&EnvTokens).unwrap();
+    let save2 = file2.parse_save(&EnvTokens).unwrap();
     assert_eq!(save.meta.campaign_id, save2.meta.campaign_id);
     assert!(save.meta.date < save2.meta.date);
 }
@@ -163,7 +163,7 @@ fn test_eu4_same_campaign_id() {
 fn test_eu4_ita1() {
     let data = utils::request("ita1.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let save = file.deserializer().build_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "ITA".parse().unwrap());
     let settings = &save.game.gameplay_settings.options;
@@ -203,7 +203,7 @@ fn test_eu4_ita1() {
 fn test_inheritance_values() {
     let data = utils::request("patch132.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let save = file.deserializer().build_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&EnvTokens).unwrap();
     let query = Query::from_save(save);
 
     let inherit = query.inherit(&query.save_country(&"WUR".parse().unwrap()).unwrap());
@@ -233,7 +233,7 @@ fn test_roundtrip_melt() {
         .unwrap();
 
     let file = Eu4File::from_slice(out.data()).unwrap();
-    let save = file.deserializer().build_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "BHA".parse().unwrap());
 }
@@ -285,14 +285,14 @@ macro_rules! ironman_test {
                 }
 
                 let meta: Meta = parsed_file
-                    .deserializer()
+                    .deserializer(&EnvTokens)
                     .on_failed_resolve(FailedResolveStrategy::Error)
-                    .build(&EnvTokens)
+                    .deserialize()
                     .unwrap();
                 let game: GameState = parsed_file
-                    .deserializer()
+                    .deserializer(&EnvTokens)
                     .on_failed_resolve(FailedResolveStrategy::Error)
-                    .build(&EnvTokens)
+                    .deserialize()
                     .unwrap();
                 let save = Eu4Save { meta, game };
 

@@ -1,6 +1,7 @@
 mod alternating_key_values;
 mod country_events;
 mod country_history;
+mod deserializers;
 mod gameplay_settings;
 mod leader_kind;
 mod province_event_value;

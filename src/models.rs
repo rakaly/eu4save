@@ -50,12 +50,12 @@ pub struct Eu4Save {
 }
 
 impl Eu4Save {
-    pub fn from_deserializer<R>(deser: &Eu4Deserializer, resolver: &R) -> Result<Self, Eu4Error>
+    pub fn from_deserializer<RES>(deser: &Eu4Deserializer<RES>) -> Result<Self, Eu4Error>
     where
-        R: TokenResolver,
+        RES: TokenResolver,
     {
-        let meta = deser.build(resolver)?;
-        let game = deser.build(resolver)?;
+        let meta = deser.deserialize()?;
+        let game = deser.deserialize()?;
         Ok(Eu4Save { meta, game })
     }
 }
