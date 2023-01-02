@@ -10,8 +10,8 @@ pub fn run(data: &[u8]) -> Result<(), Box<dyn Error>> {
     let after_parse = Instant::now();
     println!("parse: {}ms", after_parse.duration_since(start).as_millis());
 
-    let game: models::GameState = parsed.deserializer().build(&EnvTokens)?;
-    let meta: models::Meta = parsed.deserializer().build(&EnvTokens)?;
+    let game: models::GameState = parsed.deserializer(&EnvTokens).deserialize()?;
+    let meta: models::Meta = parsed.deserializer(&EnvTokens).deserialize()?;
     let save = models::Eu4Save { game, meta };
     let after_de = Instant::now();
     println!(

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::deflate::ZipInflationError;
 use zip::result::ZipError;
 
@@ -44,8 +46,11 @@ pub enum Eu4ErrorKind {
     #[error("unable to parse due to: {0}")]
     Parse(#[source] jomini::Error),
 
+    #[error("unable to deserialize due to: {msg}. This shouldn't occur as this is a deserializer wrapper")]
+    DeserializeImpl { msg: String },
+
     #[error("unable to deserialize due to: {0}")]
-    Deserialize(#[source] jomini::Error),
+    Deserialize(#[from] jomini::DeserializeError),
 
     #[error("error while writing output: {0}")]
     Writer(#[source] jomini::Error),
@@ -69,6 +74,14 @@ impl From<ZipInflationError> for Eu4ErrorKind {
             ZipInflationError::BadData { msg } => Eu4ErrorKind::ZipBadData { msg },
             ZipInflationError::EarlyEof { written } => Eu4ErrorKind::ZipEarlyEof { written },
         }
+    }
+}
+
+impl serde::de::Error for Eu4Error {
+    fn custom<T: fmt::Display>(msg: T) -> Self {
+        Eu4Error::new(Eu4ErrorKind::DeserializeImpl {
+            msg: msg.to_string(),
+        })
     }
 }
 

@@ -3,7 +3,7 @@ use std::error::Error;
 
 pub fn run(file_data: &[u8]) -> Result<(), Box<dyn Error>> {
     let file = Eu4File::from_slice(file_data)?;
-    let save = file.deserializer().build_save(&EnvTokens)?;
+    let save = file.parse_save(&EnvTokens)?;
 
     println!("date,tag,prestige");
     for (tag, country) in &save.game.countries {
