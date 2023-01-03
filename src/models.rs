@@ -496,6 +496,7 @@ pub struct Country {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct CountryGovernment {
     pub government: String,
+    #[jomini(default)]
     pub reform_stack: CountryGovernmentReforms,
 }
 
@@ -653,7 +654,8 @@ pub struct MercenaryCompany {
 #[derive(Debug, Clone, Deserialize, Default)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct CountryColors {
-    pub revolutionary_colors: Option<Vec<u8>>,
+    #[serde(default, deserialize_with = "deserialize_vec_overflow_byte")]
+    pub revolutionary_colors: Vec<u8>,
     #[serde(default, deserialize_with = "deserialize_vec_overflow_byte")]
     pub map_color: Vec<u8>,
     #[serde(default, deserialize_with = "deserialize_vec_overflow_byte")]
