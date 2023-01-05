@@ -352,6 +352,7 @@ pub struct ChangeCultureConstruction {
     #[serde(default)]
     pub progress: f32,
     pub date: Eu4Date,
+    #[serde(default)]
     pub power: f32,
     pub envoy: i32,
     pub country: CountryTag,
@@ -591,11 +592,11 @@ pub struct Monarch {
     pub name: String,
     pub country: CountryTag,
     #[serde(alias = "DIP")]
-    pub dip: u16,
+    pub dip: i16,
     #[serde(alias = "ADM")]
-    pub adm: u16,
+    pub adm: i16,
     #[serde(alias = "MIL")]
-    pub mil: u16,
+    pub mil: i16,
     #[serde(default, deserialize_with = "deserialize_token_bool")]
     pub regent: bool,
     #[serde(default)]
