@@ -294,8 +294,10 @@ pub struct Inheritance {
     pub end_t1_year: i16,
     pub start_t2_year: i16,
     pub end_t2_year: i16,
+    pub t_value: u8,
     pub inheritance_value: u8,
     pub subtotal: i64,
+    pub heretic_offset: i32,
     pub calculations: Vec<Calculation>,
 }
 
@@ -514,7 +516,7 @@ impl Query {
         TagResolver::create(nation_events)
     }
 
-    fn inherit_subtotal(&self, country: &SaveCountry) -> (i64, Vec<Calculation>) {
+    fn inherit_subtotal(&self, country: &SaveCountry) -> (i64, Vec<Calculation>, i64) {
         let hre_ruler = self
             .save()
             .game
@@ -580,18 +582,18 @@ impl Query {
             + provinces
             + country.id as i64;
 
-        (raw, calculations)
+        (raw, calculations, papacy_id)
     }
 
     pub fn inherit(&self, country: &SaveCountry) -> Inheritance {
-        let (subtotal, calculations) = self.inherit_subtotal(country);
+        let (subtotal, calculations, papacy_id) = self.inherit_subtotal(country);
 
         let year = i64::from(self.save().meta.date.year());
-        let inheritance_value = (subtotal + year) % 100;
+        let t_value = (subtotal + year) % 100;
 
-        let t0_mod = (0 - inheritance_value) % 100;
-        let t1_mod = (75 - inheritance_value) % 100;
-        let t2_mod = (80 - inheritance_value) % 100;
+        let t0_mod = (0 - t_value) % 100;
+        let t1_mod = (75 - t_value) % 100;
+        let t2_mod = (80 - t_value) % 100;
 
         // end date < year => +100
         // end date > year + 100 => -100
@@ -601,13 +603,20 @@ impl Query {
 
         let t2_offset = if year + t2_mod + 19 < year { 100 } else { 0 };
 
-        // dbg!((century, t0_offset, t0_mod));
         let start_t0_year = year + t0_mod + t0_offset;
         let end_t0_year = year + t0_mod + t0_offset + 74;
         let start_t1_year = year + t1_mod + t1_offset;
         let end_t1_year = year + t1_mod + t1_offset + 4;
         let start_t2_year = year + t2_mod + t2_offset;
         let end_t2_year = year + t2_mod + t2_offset + 19;
+
+        let is_catholic = country
+            .country
+            .religion
+            .as_ref()
+            .map_or(false, |x| x == "catholic");
+        let heretic_offset = i64::from(is_catholic) * papacy_id;
+        let inheritance_value = (subtotal + year - heretic_offset) % 100;
 
         Inheritance {
             start_t0_year: start_t0_year as i16,
@@ -616,7 +625,9 @@ impl Query {
             end_t1_year: end_t1_year as i16,
             start_t2_year: start_t2_year as i16,
             end_t2_year: end_t2_year as i16,
+            t_value: t_value as u8,
             inheritance_value: inheritance_value as u8,
+            heretic_offset: heretic_offset as i32,
             subtotal,
             calculations,
         }
