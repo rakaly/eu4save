@@ -69,6 +69,7 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     let inherit = query.inherit(&query.save_country(&"ENG".parse().unwrap()).unwrap());
 
     assert_eq!(inherit.subtotal, 6836);
+    assert_eq!(inherit.t_value, 80);
     assert_eq!(inherit.inheritance_value, 80);
     assert_eq!(inherit.start_t0_year, 1464);
     assert_eq!(inherit.end_t0_year, 1538);

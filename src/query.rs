@@ -615,7 +615,7 @@ impl Query {
             .religion
             .as_ref()
             .map_or(false, |x| x == "catholic");
-        let heretic_offset = i64::from(is_catholic) * papacy_id;
+        let heretic_offset = i64::from(!is_catholic) * papacy_id;
         let inheritance_value = (subtotal + year - heretic_offset) % 100;
 
         Inheritance {
