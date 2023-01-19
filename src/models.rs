@@ -435,6 +435,8 @@ pub struct Country {
     pub dominant_culture: Option<String>,
     #[jomini(duplicated, alias = "accepted_culture")]
     pub accepted_cultures: Vec<String>,
+    #[jomini(duplicated, alias = "blessing")]
+    pub blessings: Vec<String>,
     pub religion: Option<String>,
     pub dominant_religion: Option<String>,
     pub technology_group: Option<String>,
