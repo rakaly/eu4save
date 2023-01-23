@@ -562,13 +562,15 @@ pub struct Eu4Text<'a> {
 }
 
 impl<'a> Eu4Text<'a> {
+    /// Parse EU4 text data that has the "EU4txt" header
     pub fn from_slice(data: &'a [u8]) -> Result<Self, Eu4Error> {
         is_text(data)
             .ok_or_else(|| Eu4ErrorKind::UnknownHeader.into())
             .and_then(Self::from_raw)
     }
 
-    pub(crate) fn from_raw(data: &'a [u8]) -> Result<Self, Eu4Error> {
+    /// Parse headerless EU4 text data
+    pub fn from_raw(data: &'a [u8]) -> Result<Self, Eu4Error> {
         let tape = TextTape::from_slice(data).map_err(Eu4ErrorKind::Parse)?;
         Ok(Eu4Text { tape })
     }
@@ -604,13 +606,15 @@ pub struct Eu4Binary<'data> {
 }
 
 impl<'data> Eu4Binary<'data> {
+    /// Parse EU4 binary data that has the "EU4bin" header
     pub fn from_slice(data: &'data [u8]) -> Result<Self, Eu4Error> {
         is_bin(data)
             .ok_or_else(|| Eu4ErrorKind::UnknownHeader.into())
             .and_then(Self::from_raw)
     }
 
-    pub(crate) fn from_raw(data: &'data [u8]) -> Result<Self, Eu4Error> {
+    /// Parse headerless EU4 binary data
+    pub fn from_raw(data: &'data [u8]) -> Result<Self, Eu4Error> {
         let tape = BinaryTape::from_slice(data).map_err(Eu4ErrorKind::Parse)?;
         Ok(Eu4Binary { tape })
     }
