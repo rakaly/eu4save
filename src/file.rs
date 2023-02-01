@@ -471,6 +471,18 @@ impl<'a> Eu4FileEntries<'a> {
     }
 }
 
+impl<'data> From<Eu4Text<'data>> for Eu4ParsedFile<'data> {
+    fn from(value: Eu4Text<'data>) -> Self {
+        Eu4ParsedFile { kind: Eu4ParsedFileKind::Text(value) }
+    }
+}
+
+impl<'data> From<Eu4Binary<'data>> for Eu4ParsedFile<'data> {
+    fn from(value: Eu4Binary<'data>) -> Self {
+        Eu4ParsedFile { kind: Eu4ParsedFileKind::Binary(value) }
+    }
+}
+
 enum Eu4FileEntryKind<'a> {
     Text(&'a [u8]),
     Binary(&'a [u8]),
