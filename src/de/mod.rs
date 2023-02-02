@@ -17,7 +17,7 @@ mod yes_map;
 pub(crate) use alternating_key_values::*;
 pub(crate) use token_bool::*;
 pub(crate) use vec_overflow_byte::*;
-pub(crate) use vec_pair::*;
+pub use vec_pair::*;
 pub(crate) use yes_map::*;
 
 use serde::{Deserialize, Deserializer};

@@ -2,7 +2,7 @@ use serde::{de, Deserialize, Deserializer};
 use std::fmt;
 use std::marker::PhantomData;
 
-pub(crate) fn deserialize_vec_pair<'de, D, K, V>(deserializer: D) -> Result<Vec<(K, V)>, D::Error>
+pub fn deserialize_vec_pair<'de, D, K, V>(deserializer: D) -> Result<Vec<(K, V)>, D::Error>
 where
     D: Deserializer<'de>,
     K: Deserialize<'de>,

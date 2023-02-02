@@ -63,7 +63,7 @@ for inspiration.
 */
 
 mod country_tag;
-mod de;
+pub mod de;
 mod deflate;
 mod dlc;
 mod errors;
