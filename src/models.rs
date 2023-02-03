@@ -657,12 +657,12 @@ pub struct MercenaryCompany {
 #[derive(Debug, Clone, Deserialize, Default)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct CountryColors {
-    #[serde(default, deserialize_with = "deserialize_vec_overflow_byte")]
-    pub revolutionary_colors: Vec<u8>,
-    #[serde(default, deserialize_with = "deserialize_vec_overflow_byte")]
-    pub map_color: Vec<u8>,
-    #[serde(default, deserialize_with = "deserialize_vec_overflow_byte")]
-    pub country_color: Vec<u8>,
+    #[serde(default, deserialize_with = "deserialize_list_overflow_byte")]
+    pub revolutionary_colors: [u8; 3],
+    #[serde(default, deserialize_with = "deserialize_list_overflow_byte")]
+    pub map_color: [u8; 3],
+    #[serde(default, deserialize_with = "deserialize_list_overflow_byte")]
+    pub country_color: [u8; 3],
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
