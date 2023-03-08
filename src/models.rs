@@ -6,12 +6,14 @@ use jomini::JominiDeserialize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub type Eu4Chars = compact_str::CompactString;
+
 #[derive(Debug, Clone, JominiDeserialize, Serialize)]
 pub struct Meta {
-    pub campaign_id: String,
-    pub save_game: String,
+    pub campaign_id: Eu4Chars,
+    pub save_game: Eu4Chars,
     pub player: CountryTag,
-    pub displayed_country_name: String,
+    pub displayed_country_name: Eu4Chars,
     pub campaign_length: i32,
     pub date: Eu4Date,
     #[jomini(default)]
@@ -21,13 +23,13 @@ pub struct Meta {
     pub multiplayer: bool,
     pub not_observer: bool,
     #[jomini(default)]
-    pub dlc_enabled: Vec<String>,
+    pub dlc_enabled: Vec<Eu4Chars>,
     #[jomini(default)]
-    pub mod_enabled: Vec<String>,
+    pub mod_enabled: Vec<Eu4Chars>,
     #[jomini(default)]
     pub mods_enabled_names: Vec<ModName>,
     #[jomini(take_last)]
-    pub checksum: String,
+    pub checksum: Eu4Chars,
     pub savegame_version: SavegameVersion,
     #[jomini(default)]
     pub is_random_new_world: bool,
@@ -35,8 +37,8 @@ pub struct Meta {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ModName {
-    pub filename: String,
-    pub name: String,
+    pub filename: Eu4Chars,
+    pub name: Eu4Chars,
 }
 
 #[derive(Debug, Clone)]
@@ -64,16 +66,16 @@ impl Eu4Save {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct GameState {
     #[jomini(default)]
-    pub players_countries: Vec<String>,
-    pub current_age: String,
+    pub players_countries: Vec<Eu4Chars>,
+    pub current_age: Eu4Chars,
     pub start_date: Eu4Date,
-    pub map_area_data: HashMap<String, MapAreaDatum>,
+    pub map_area_data: HashMap<Eu4Chars, MapAreaDatum>,
     pub military_hegemon: Option<Hegemon>,
     pub naval_hegemon: Option<Hegemon>,
     pub economic_hegemon: Option<Hegemon>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
-    pub religions: Vec<(String, ReligionGameState)>,
-    pub religion_instance_data: HashMap<String, ReligionInstanceDatum>,
+    pub religions: Vec<(Eu4Chars, ReligionGameState)>,
+    pub religion_instance_data: HashMap<Eu4Chars, ReligionInstanceDatum>,
     pub empire: Option<HRE>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
     pub countries: Vec<(CountryTag, Country)>,
@@ -104,7 +106,7 @@ pub struct SavegameVersion {
     pub third: u16,
     #[serde(alias = "forth")]
     pub fourth: u16,
-    pub name: String,
+    pub name: Eu4Chars,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -125,7 +127,7 @@ pub struct MapAreaDatum {
 #[derive(Debug, Clone, JominiDeserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct MapAreaState {
-    pub area: String,
+    pub area: Eu4Chars,
     #[jomini(duplicated, alias = "country_state")]
     pub country_states: Vec<CountryState>,
 }
@@ -135,7 +137,7 @@ pub struct MapAreaState {
 pub struct TradeCompanyInvestment {
     pub tag: CountryTag,
     #[jomini(default)]
-    pub investments: Vec<String>,
+    pub investments: Vec<Eu4Chars>,
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
@@ -182,7 +184,7 @@ pub struct Papacy {
 pub struct HRE {
     pub emperor: Option<CountryTag>,
     #[jomini(duplicated, alias = "passed_reform")]
-    pub passed_reforms: Vec<String>,
+    pub passed_reforms: Vec<Eu4Chars>,
     #[jomini(default)]
     pub electors: Vec<CountryTag>,
 }
@@ -228,8 +230,8 @@ pub struct LedgerDatum {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Province {
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
-    pub flags: Vec<(String, Eu4Date)>,
-    pub name: String,
+    pub flags: Vec<(Eu4Chars, Eu4Date)>,
+    pub name: Eu4Chars,
     pub owner: Option<CountryTag>,
     pub controller: Option<CountryTag>,
     pub previous_controller: Option<CountryTag>,
@@ -240,16 +242,16 @@ pub struct Province {
     #[jomini(default)]
     pub claims: Vec<CountryTag>,
     pub institutions: Vec<f32>,
-    pub trade: Option<String>,
-    pub original_culture: Option<String>,
-    pub culture: Option<String>,
-    pub religion: Option<String>,
-    pub original_religion: Option<String>,
-    pub trade_goods: Option<String>,
+    pub trade: Option<Eu4Chars>,
+    pub original_culture: Option<Eu4Chars>,
+    pub culture: Option<Eu4Chars>,
+    pub religion: Option<Eu4Chars>,
+    pub original_religion: Option<Eu4Chars>,
+    pub trade_goods: Option<Eu4Chars>,
     #[jomini(default, deserialize_with = "deserialize_alternating_key_values")]
     pub country_improve_count: HashMap<CountryTag, i32>,
     #[jomini(default)]
-    pub latent_trade_goods: Vec<String>,
+    pub latent_trade_goods: Vec<Eu4Chars>,
     #[jomini(default)]
     pub devastation: f32,
     #[jomini(default)]
@@ -258,7 +260,7 @@ pub struct Province {
     pub base_production: f32,
     #[jomini(default)]
     pub base_manpower: f32,
-    pub capital: Option<String>,
+    pub capital: Option<Eu4Chars>,
     #[jomini(default)]
     pub local_autonomy: f32,
     #[jomini(default)]
@@ -272,9 +274,9 @@ pub struct Province {
     #[jomini(default, deserialize_with = "deserialize_token_bool")]
     pub hre: bool,
     #[jomini(default, deserialize_with = "deserialize_yes_map")]
-    pub buildings: HashMap<String, bool>,
+    pub buildings: HashMap<Eu4Chars, bool>,
     #[jomini(default)]
-    pub building_builders: HashMap<String, CountryTag>,
+    pub building_builders: HashMap<Eu4Chars, CountryTag>,
     #[jomini(default, duplicated, alias = "modifier")]
     pub modifiers: Vec<Modifier>,
     #[jomini(default)]
@@ -294,7 +296,7 @@ pub struct Province {
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Modifier {
-    pub modifier: String,
+    pub modifier: Eu4Chars,
     pub date: Eu4Date,
 }
 
@@ -305,8 +307,8 @@ pub struct ProvinceHistory {
     pub base_tax: Option<f32>,
     pub base_production: Option<f32>,
     pub base_manpower: Option<f32>,
-    pub religion: Option<String>,
-    pub other: HashMap<String, ProvinceEventValue>,
+    pub religion: Option<Eu4Chars>,
+    pub other: HashMap<Eu4Chars, ProvinceEventValue>,
     pub events: Vec<(Eu4Date, ProvinceEvents)>,
 }
 
@@ -322,8 +324,8 @@ pub enum ProvinceEvent {
     BaseTax(f32),
     BaseProduction(f32),
     BaseManpower(f32),
-    Religion(String),
-    KV((String, ProvinceEventValue)),
+    Religion(Eu4Chars),
+    KV((Eu4Chars, ProvinceEventValue)),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -335,7 +337,7 @@ pub struct ControllerEvent {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub enum ProvinceEventValue {
-    String(String),
+    String(Eu4Chars),
     Float(f32),
     Int(i32),
     Bool(bool),
@@ -356,7 +358,7 @@ pub struct ChangeCultureConstruction {
     pub power: f32,
     pub envoy: i32,
     pub country: CountryTag,
-    pub culture: String,
+    pub culture: Eu4Chars,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -384,7 +386,7 @@ pub struct Country {
     pub history: CountryHistory,
     #[jomini(duplicated)]
     pub previous_country_tags: Vec<CountryTag>,
-    pub name: Option<String>,
+    pub name: Option<Eu4Chars>,
     pub government_rank: i32,
     pub continent: Vec<i32>,
     pub institutions: Vec<i32>,
@@ -427,20 +429,20 @@ pub struct Country {
     #[jomini(default)]
     pub church: Option<CountryChurch>,
     pub initialized_rivals: bool,
-    pub national_focus: Option<String>,
+    pub national_focus: Option<Eu4Chars>,
     pub recalculate_strategy: bool,
     pub colors: CountryColors,
     pub dirty_colony: bool,
-    pub primary_culture: Option<String>,
-    pub dominant_culture: Option<String>,
+    pub primary_culture: Option<Eu4Chars>,
+    pub dominant_culture: Option<Eu4Chars>,
     #[jomini(duplicated, alias = "accepted_culture")]
-    pub accepted_cultures: Vec<String>,
+    pub accepted_cultures: Vec<Eu4Chars>,
     #[jomini(duplicated, alias = "blessing")]
-    pub blessings: Vec<String>,
-    pub religion: Option<String>,
-    pub dominant_religion: Option<String>,
-    pub technology_group: Option<String>,
-    pub unit_type: Option<String>,
+    pub blessings: Vec<Eu4Chars>,
+    pub religion: Option<Eu4Chars>,
+    pub dominant_religion: Option<Eu4Chars>,
+    pub technology_group: Option<Eu4Chars>,
+    pub unit_type: Option<Eu4Chars>,
     pub tribute_type: Option<i32>,
     pub technology: CountryTechnology,
     pub ledger: CountryLedger,
@@ -451,11 +453,11 @@ pub struct Country {
     #[jomini(default)]
     pub subjects: Vec<CountryTag>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
-    pub flags: Vec<(String, Eu4Date)>,
+    pub flags: Vec<(Eu4Chars, Eu4Date)>,
     pub highest_possible_fort: Option<i32>,
     pub transfer_home_bonus: f32,
     #[jomini(duplicated, alias = "enemy")]
-    pub enemies: Vec<String>,
+    pub enemies: Vec<Eu4Chars>,
     #[jomini(default)]
     pub current_power_projection: f32,
     #[jomini(default)]
@@ -472,9 +474,9 @@ pub struct Country {
     #[jomini(default)]
     pub num_of_total_ports: i32,
     #[jomini(default)]
-    pub completed_missions: Vec<String>,
+    pub completed_missions: Vec<Eu4Chars>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
-    pub active_idea_groups: Vec<(String, u8)>,
+    pub active_idea_groups: Vec<(Eu4Chars, u8)>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
     pub adm_spent_indexed: Vec<(i32, i32)>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
@@ -498,7 +500,7 @@ pub struct Country {
 #[derive(Debug, Clone, JominiDeserialize, Default)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct CountryGovernment {
-    pub government: String,
+    pub government: Eu4Chars,
     #[jomini(default)]
     pub reform_stack: CountryGovernmentReforms,
 }
@@ -506,9 +508,9 @@ pub struct CountryGovernment {
 #[derive(Debug, Clone, Deserialize, Default)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct CountryGovernmentReforms {
-    pub reforms: Vec<String>,
+    pub reforms: Vec<Eu4Chars>,
     #[serde(default)]
-    pub history: Vec<String>,
+    pub history: Vec<Eu4Chars>,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -534,11 +536,11 @@ pub struct CountryLedger {
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct CountryHistory {
-    pub government: Option<String>,
-    pub technology_group: Option<String>,
-    pub primary_culture: Option<String>,
-    pub religion: Option<String>,
-    pub add_government_reform: Vec<String>,
+    pub government: Option<Eu4Chars>,
+    pub technology_group: Option<Eu4Chars>,
+    pub primary_culture: Option<Eu4Chars>,
+    pub religion: Option<Eu4Chars>,
+    pub add_government_reform: Vec<Eu4Chars>,
     pub events: Vec<(Eu4Date, CountryEvents)>,
 }
 
@@ -556,13 +558,13 @@ pub enum CountryEvent {
     Queen(Monarch),
     Union(u32),
     Capital(u32),
-    ChangedCountryNameFrom(String),
-    ChangedCountryAdjectiveFrom(String),
+    ChangedCountryNameFrom(Eu4Chars),
+    ChangedCountryAdjectiveFrom(Eu4Chars),
     ChangedCountryMapColorFrom(Vec<u8>),
     ChangedTagFrom(CountryTag),
     Leader(Leader),
-    RemoveAcceptedCulture(String),
-    Religion(String),
+    RemoveAcceptedCulture(Eu4Chars),
+    Religion(Eu4Chars),
 }
 
 impl CountryEvent {
@@ -591,7 +593,7 @@ impl CountryEvent {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Monarch {
     pub id: ObjId,
-    pub name: String,
+    pub name: Eu4Chars,
     pub country: CountryTag,
     #[serde(alias = "DIP")]
     pub dip: i16,
@@ -602,12 +604,12 @@ pub struct Monarch {
     #[serde(default, deserialize_with = "deserialize_token_bool")]
     pub regent: bool,
     #[serde(default)]
-    pub culture: Option<String>,
+    pub culture: Option<Eu4Chars>,
     #[serde(default)]
-    pub religion: Option<String>,
+    pub religion: Option<Eu4Chars>,
     pub birth_date: Eu4Date,
     #[serde(default, deserialize_with = "deserialize_vec_pair")]
-    pub personalities: Vec<(String, String)>,
+    pub personalities: Vec<(Eu4Chars, Eu4Chars)>,
     pub leader_id: Option<ObjId>,
     pub leader: Option<Leader>,
 }
@@ -622,7 +624,7 @@ pub enum LeaderKind {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Leader {
-    pub name: String,
+    pub name: Eu4Chars,
     #[serde(alias = "type")]
     pub kind: LeaderKind,
     #[serde(default)]
@@ -634,7 +636,7 @@ pub struct Leader {
     #[serde(default)]
     pub siege: u16,
     pub monarch_id: Option<ObjId>,
-    pub personality: Option<String>,
+    pub personality: Option<Eu4Chars>,
 
     // While activation and id can be none, it is so rare that there
     // is a test case for it to prevent regression.
@@ -645,7 +647,7 @@ pub struct Leader {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MercenaryCompany {
     pub id: ObjId,
-    pub tag: String,
+    pub tag: Eu4Chars,
     pub manpower: Option<f32>,
     pub starting_manpower: Option<f32>,
     pub leader: Option<Leader>,
@@ -670,14 +672,14 @@ pub struct CountryColors {
 pub struct CountryChurch {
     pub power: f32,
     #[jomini(duplicated, alias = "aspect")]
-    pub aspects: Vec<String>,
+    pub aspects: Vec<Eu4Chars>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Loan {
     pub id: ObjId,
-    pub lender: String,
+    pub lender: Eu4Chars,
     pub interest: f32,
     #[serde(default)]
     pub fixed_interest: bool,
@@ -691,7 +693,7 @@ pub struct Loan {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Estate {
     #[serde(alias = "type")]
-    pub _type: String,
+    pub _type: Eu4Chars,
     pub loyalty: f32,
     #[serde(default)]
     pub territory: f32,
@@ -712,12 +714,12 @@ pub struct CountryTechnology {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Army {
     pub id: ObjId,
-    pub name: String,
+    pub name: Eu4Chars,
     pub location: ProvinceId,
     #[jomini(duplicated, alias = "regiment")]
     pub regiments: Vec<Regiment>,
     pub movement_progress_last_updated: Eu4Date,
-    pub graphical_culture: String,
+    pub graphical_culture: Eu4Chars,
     #[jomini(default)]
     pub main_army: bool,
     #[jomini(default)]
@@ -730,14 +732,14 @@ pub struct Army {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Navy {
     pub id: ObjId,
-    pub name: String,
+    pub name: Eu4Chars,
     pub location: ProvinceId,
     pub previous: Option<ProvinceId>,
     pub previous_war: Option<i32>,
     #[jomini(duplicated, alias = "ship")]
     pub ships: Vec<Ship>,
     pub movement_progress_last_updated: Eu4Date,
-    pub graphical_culture: String,
+    pub graphical_culture: Eu4Chars,
     pub active_fraction_last_month: f32,
     #[jomini(default)]
     pub attrition: bool,
@@ -749,10 +751,10 @@ pub struct Navy {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Ship {
     pub id: ObjId,
-    pub name: String,
+    pub name: Eu4Chars,
     pub home: ProvinceId,
     #[serde(alias = "type")]
-    pub _type: String,
+    pub _type: Eu4Chars,
     pub morale: f32,
     #[serde(default = "default_strength")]
     pub strength: f32,
@@ -769,10 +771,10 @@ pub struct ObjId {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Regiment {
     pub id: ObjId,
-    pub name: String,
+    pub name: Eu4Chars,
     pub home: ProvinceId,
     #[serde(alias = "type")]
-    pub _type: String,
+    pub _type: Eu4Chars,
     pub morale: f32,
     #[serde(default)]
     pub drill: f32,
@@ -787,7 +789,7 @@ fn default_strength() -> f32 {
 #[derive(Debug, Clone, JominiDeserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct ActiveWar {
-    pub name: String,
+    pub name: Eu4Chars,
     pub history: WarHistory,
     #[jomini(duplicated, default)]
     pub participants: Vec<WarParticipant>,
@@ -798,7 +800,7 @@ pub struct ActiveWar {
 #[derive(Debug, Clone, JominiDeserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct PreviousWar {
-    pub name: String,
+    pub name: Eu4Chars,
     pub history: WarHistory,
     #[jomini(duplicated, default)]
     pub participants: Vec<WarParticipant>,
@@ -826,16 +828,16 @@ pub struct WarParticipantLosses {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct WarGoal {
     #[serde(alias = "type")]
-    pub _type: String,
-    pub casus_belli: String,
+    pub _type: Eu4Chars,
+    pub casus_belli: Eu4Chars,
 }
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct WarHistory {
-    pub name: Option<String>,
+    pub name: Option<Eu4Chars>,
     pub war_goal: Option<WarGoal>,
-    pub succession: Option<String>,
+    pub succession: Option<Eu4Chars>,
     pub events: Vec<(Eu4Date, WarEvents)>,
 }
 
@@ -856,7 +858,7 @@ pub enum WarEvent {
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Battle {
-    pub name: String,
+    pub name: Eu4Chars,
     pub location: ProvinceId,
     #[serde(alias = "result", deserialize_with = "deserialize_token_bool")]
     pub attacker_won: bool,
@@ -889,7 +891,7 @@ pub struct BattleSide {
     pub country: CountryTag,
 
     #[serde(deserialize_with = "empty_string_is_none")]
-    pub commander: Option<String>,
+    pub commander: Option<Eu4Chars>,
 }
 
 fn default_true() -> bool {
@@ -938,7 +940,7 @@ pub struct DiplomacyDependency {
     pub start_date: Option<Eu4Date>,
     #[jomini(default)]
     pub end_date: Option<Eu4Date>,
-    pub subject_type: String,
+    pub subject_type: Eu4Chars,
 }
 
 #[derive(Debug, Clone, JominiDeserialize, Serialize)]

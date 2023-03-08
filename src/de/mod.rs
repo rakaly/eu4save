@@ -19,14 +19,14 @@ pub(crate) use list_overflow_byte::*;
 pub(crate) use token_bool::*;
 pub use vec_pair::*;
 pub(crate) use yes_map::*;
-
 use serde::{Deserialize, Deserializer};
+use crate::models::Eu4Chars;
 
-pub(crate) fn empty_string_is_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+pub(crate) fn empty_string_is_none<'de, D>(deserializer: D) -> Result<Option<Eu4Chars>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let s = String::deserialize(deserializer)?;
+    let s = Eu4Chars::deserialize(deserializer)?;
     if s.is_empty() {
         Ok(None)
     } else {

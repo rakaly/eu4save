@@ -1,3 +1,4 @@
+use crate::models::Eu4Chars;
 use crate::{models::ProvinceHistory, Eu4Date};
 use serde::{de, Deserialize, Deserializer};
 use std::collections::HashMap;
@@ -54,7 +55,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                                 let event = map.next_value()?;
                                 events.push((date, event));
                             } else {
-                                other.insert(key.to_string(), map.next_value()?);
+                                other.insert(Eu4Chars::from(key), map.next_value()?);
                             }
                         }
                     }

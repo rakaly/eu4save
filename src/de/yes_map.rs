@@ -1,17 +1,18 @@
 use serde::{de, Deserializer};
 use std::collections::HashMap;
 use std::fmt;
+use crate::models::Eu4Chars;
 
 pub(crate) fn deserialize_yes_map<'de, D>(
     deserializer: D,
-) -> Result<HashMap<String, bool>, D::Error>
+) -> Result<HashMap<Eu4Chars, bool>, D::Error>
 where
     D: Deserializer<'de>,
 {
     struct YesMapVisitor;
 
     impl<'de> de::Visitor<'de> for YesMapVisitor {
-        type Value = HashMap<String, bool>;
+        type Value = HashMap<Eu4Chars, bool>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str("a yes map")
@@ -26,7 +27,7 @@ where
                 HashMap::new()
             };
 
-            while let Some(key) = map.next_key::<String>()? {
+            while let Some(key) = map.next_key::<Eu4Chars>()? {
                 let _: de::IgnoredAny = map.next_value()?;
                 values.insert(key, true);
             }
