@@ -307,12 +307,8 @@ pub struct ProvinceHistory {
     pub base_manpower: Option<f32>,
     pub religion: Option<String>,
     pub other: HashMap<String, ProvinceEventValue>,
-    pub events: Vec<(Eu4Date, ProvinceEvents)>,
+    pub events: Vec<(Eu4Date, ProvinceEvent)>,
 }
-
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize))]
-pub struct ProvinceEvents(pub Vec<ProvinceEvent>);
 
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]

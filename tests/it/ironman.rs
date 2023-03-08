@@ -116,7 +116,6 @@ fn test_eu4_kandy_bin() {
         .history
         .events
         .iter()
-        .flat_map(|(date, events)| events.0.iter().map(move |event| (date.clone(), event)))
         .filter_map(|(date, event)| match event {
             ProvinceEvent::KV((key, value)) => Some((date, key, value)),
             _ => None,

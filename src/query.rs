@@ -970,8 +970,11 @@ impl Query {
             }
         });
 
-        let over_time = province.history.events.iter().flat_map(|(date, events)| {
-            events.0.iter().filter_map(move |event| match event {
+        let over_time = province
+            .history
+            .events
+            .iter()
+            .filter_map(|(date, event)| match event {
                 ProvinceEvent::KV((key, value)) => {
                     let constructed = if let ProvinceEventValue::Bool(x) = value {
                         if buildings.contains(key) {
@@ -994,8 +997,7 @@ impl Query {
                     })
                 }
                 _ => None,
-            })
-        });
+            });
 
         initial_buildings.chain(over_time).collect()
     }
@@ -1221,22 +1223,20 @@ fn province_owners(save: &Eu4Save) -> ProvinceOwners {
         initial[usize::from(id.as_u16())] = province.history.owner;
         owners[usize::from(id.as_u16())] = province.history.owner;
 
-        for (date, events) in &province.history.events {
-            for event in &events.0 {
-                if let ProvinceEvent::Owner(new_owner) = *event {
-                    // Check to make sure the province really changed hands. Exclude
-                    // change owner events if the owner didn't change hands.
-                    // In the trycone save, Leinster is listed as the new owner of
-                    // Laighin in 1444.11.12 even though they already owned it
-                    let prov_id = usize::from(id.as_u16());
-                    let old_owner = owners[prov_id].replace(new_owner);
-                    if old_owner.map_or(true, |x| new_owner != x) {
-                        changes.push(ProvinceOwnerChange {
-                            date: *date,
-                            province: id,
-                            tag: new_owner,
-                        });
-                    }
+        for (date, event) in &province.history.events {
+            if let ProvinceEvent::Owner(new_owner) = *event {
+                // Check to make sure the province really changed hands. Exclude
+                // change owner events if the owner didn't change hands.
+                // In the trycone save, Leinster is listed as the new owner of
+                // Laighin in 1444.11.12 even though they already owned it
+                let prov_id = usize::from(id.as_u16());
+                let old_owner = owners[prov_id].replace(new_owner);
+                if old_owner.map_or(true, |x| new_owner != x) {
+                    changes.push(ProvinceOwnerChange {
+                        date: *date,
+                        province: id,
+                        tag: new_owner,
+                    });
                 }
             }
         }
@@ -1295,18 +1295,16 @@ fn province_religions(save: &Eu4Save, lookup: &ReligionLookup) -> ProvinceReligi
         initial[prov_id] = init;
         religions[prov_id] = init;
 
-        for (date, events) in &province.history.events {
-            for event in &events.0 {
-                if let ProvinceEvent::Religion(new_religion) = event {
-                    if let Some(new_religion_index) = lookup.index(new_religion) {
-                        let old_religion = religions[prov_id].replace(new_religion_index);
-                        if old_religion.map_or(true, |x| new_religion_index != x) {
-                            changes.push(ProvinceReligionChange {
-                                date: *date,
-                                province: id,
-                                religion: new_religion_index,
-                            });
-                        }
+        for (date, event) in &province.history.events {
+            if let ProvinceEvent::Religion(new_religion) = event {
+                if let Some(new_religion_index) = lookup.index(new_religion) {
+                    let old_religion = religions[prov_id].replace(new_religion_index);
+                    if old_religion.map_or(true, |x| new_religion_index != x) {
+                        changes.push(ProvinceReligionChange {
+                            date: *date,
+                            province: id,
+                            religion: new_religion_index,
+                        });
                     }
                 }
             }

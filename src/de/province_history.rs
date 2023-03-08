@@ -1,3 +1,4 @@
+use crate::models::{ProvinceEvent, ProvinceEventValue};
 use crate::{models::ProvinceHistory, Eu4Date};
 use serde::{de, Deserialize, Deserializer};
 use std::collections::HashMap;
@@ -51,10 +52,13 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                         "religion" => religion = map.next_value()?,
                         x => {
                             if let Ok(date) = Eu4Date::parse(x) {
-                                let event = map.next_value()?;
-                                events.push((date, event));
-                            } else {
-                                other.insert(key.to_string(), map.next_value()?);
+                                let seed = ExtendVec {
+                                    date,
+                                    events: &mut events,
+                                };
+                                map.next_value_seed(seed)?;
+                            } else if let x @ ProvinceEventValue::Bool(_) = map.next_value()? {
+                                other.insert(key.to_string(), x);
                             }
                         }
                     }
@@ -73,5 +77,78 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
         }
 
         deserializer.deserialize_map(ProvinceHistoryVisitor)
+    }
+}
+
+// https://docs.rs/serde/latest/serde/de/trait.DeserializeSeed.html
+struct ExtendVec<'a> {
+    date: Eu4Date,
+    events: &'a mut Vec<(Eu4Date, ProvinceEvent)>,
+}
+
+impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ExtendVecVisitor<'a> {
+            date: Eu4Date,
+            events: &'a mut Vec<(Eu4Date, ProvinceEvent)>,
+        }
+
+        impl<'de, 'a> de::Visitor<'de> for ExtendVecVisitor<'a> {
+            type Value = ();
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                write!(formatter, "province events")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                // Hmm empty object
+                let abc = seq.next_element::<&str>()?;
+                if abc.is_some() {
+                    return Err(de::Error::custom("unexpected sequence!"));
+                }
+
+                Ok(())
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                while let Some(key) = map.next_key::<&str>()? {
+                    let val = match key {
+                        "owner" => ProvinceEvent::Owner(map.next_value()?),
+                        "controller" => ProvinceEvent::Controller(map.next_value()?),
+                        "base_tax" => ProvinceEvent::BaseTax(map.next_value()?),
+                        "base_manpower" => ProvinceEvent::BaseManpower(map.next_value()?),
+                        "base_production" => ProvinceEvent::BaseProduction(map.next_value()?),
+                        "religion" => ProvinceEvent::Religion(map.next_value()?),
+                        _ => {
+                            if let x @ ProvinceEventValue::Bool(_) = map.next_value()? {
+                                ProvinceEvent::KV((key.to_string(), x))
+                            } else {
+                                continue;
+                            }
+                        }
+                    };
+
+                    self.events.push((self.date, val));
+                }
+
+                Ok(())
+            }
+        }
+
+        deserializer.deserialize_map(ExtendVecVisitor {
+            date: self.date,
+            events: self.events,
+        })
     }
 }

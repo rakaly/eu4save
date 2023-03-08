@@ -6,7 +6,6 @@ mod gameplay_settings;
 mod leader_kind;
 mod list_overflow_byte;
 mod province_event_value;
-mod province_events;
 mod province_history;
 mod token_bool;
 mod vec_pair;
