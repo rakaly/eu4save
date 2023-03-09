@@ -1031,11 +1031,9 @@ fn nation_events(save: &Eu4Save, province_owners: &ProvinceOwners) -> Vec<Nation
         let tag = *tag;
         let mut country_tag_switches = Vec::new();
 
-        for (date, events) in &country.history.events {
-            for event in &events.0 {
-                if let CountryEvent::ChangedTagFrom(from) = *event {
-                    country_tag_switches.push(CountryTagSwitchFrom { date: *date, from });
-                }
+        for (date, event) in &country.history.events {
+            if let CountryEvent::ChangedTagFrom(from) = *event {
+                country_tag_switches.push(CountryTagSwitchFrom { date: *date, from });
             }
         }
 

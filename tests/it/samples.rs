@@ -342,13 +342,15 @@ fn test_missing_leader_activation_save() -> Result<(), Box<dyn Error>> {
         .countries
         .iter()
         .flat_map(|(_tag, country)| {
-            country.history.events.iter().flat_map(|(_date, events)| {
-                events.0.iter().filter_map(|event| match event {
+            country
+                .history
+                .events
+                .iter()
+                .filter_map(|(_date, event)| match event {
                     CountryEvent::Monarch(x) => x.leader.as_ref(),
                     CountryEvent::Leader(x) => Some(x),
                     _ => None,
                 })
-            })
         })
         .filter(|x| x.activation.is_none())
         .collect();

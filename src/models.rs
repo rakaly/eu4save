@@ -535,12 +535,8 @@ pub struct CountryHistory {
     pub primary_culture: Option<String>,
     pub religion: Option<String>,
     pub add_government_reform: Vec<String>,
-    pub events: Vec<(Eu4Date, CountryEvents)>,
+    pub events: Vec<(Eu4Date, CountryEvent)>,
 }
-
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize))]
-pub struct CountryEvents(pub Vec<CountryEvent>);
 
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
