@@ -42,6 +42,8 @@ impl<'de> Deserialize<'de> for CountryHistory {
                 let mut religion = None;
                 let mut add_government_reform = Vec::new();
                 let mut events = Vec::new();
+                let hint = map.size_hint().unwrap_or_default();
+                let estimate = hint.max(8);
 
                 while let Some(key) = map.next_key::<&str>()? {
                     match key {
@@ -54,6 +56,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                             if let Ok(date) = Eu4Date::parse(x) {
                                 let seed = ExtendVec {
                                     date,
+                                    estimate,
                                     events: &mut events,
                                 };
                                 map.next_value_seed(seed)?;
@@ -62,7 +65,6 @@ impl<'de> Deserialize<'de> for CountryHistory {
                     }
                 }
 
-                events.shrink_to_fit();
                 Ok(CountryHistory {
                     government,
                     technology_group,
@@ -81,6 +83,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
 // https://docs.rs/serde/latest/serde/de/trait.DeserializeSeed.html
 struct ExtendVec<'a> {
     date: Eu4Date,
+    estimate: usize,
     events: &'a mut Vec<(Eu4Date, CountryEvent)>,
 }
 
@@ -93,6 +96,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
     {
         struct ExtendVecVisitor<'a> {
             date: Eu4Date,
+            estimate: usize,
             events: &'a mut Vec<(Eu4Date, CountryEvent)>,
         }
 
@@ -149,7 +153,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
 
                     // Most countries tend to have 32 around events
                     if self.events.is_empty() {
-                        self.events.reserve(64);
+                        self.events.reserve(self.estimate);
                     }
 
                     self.events.push((self.date, val));
@@ -161,6 +165,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
 
         deserializer.deserialize_map(ExtendVecVisitor {
             date: self.date,
+            estimate: self.estimate,
             events: self.events,
         })
     }

@@ -42,7 +42,9 @@ impl<'de> Deserialize<'de> for WarHistory {
                 let mut name = None;
                 let mut war_goal = None;
                 let mut succession = None;
-                let mut events = Vec::new();
+                let hint = map.size_hint().unwrap_or_default();
+                let estimate = hint.max(8);
+                let mut events = Vec::with_capacity(estimate);
 
                 while let Some(key) = map.next_key::<&str>()? {
                     match key {
@@ -60,7 +62,6 @@ impl<'de> Deserialize<'de> for WarHistory {
                     }
                 }
 
-                events.shrink_to_fit();
                 Ok(WarHistory {
                     name,
                     war_goal,
@@ -127,11 +128,6 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                             return Err(de::Error::custom(format!("unknown battle key: {}", &key)))
                         }
                     };
-
-                    // Most countries tend to have 16 around events
-                    if self.events.is_empty() {
-                        self.events.reserve(24);
-                    }
 
                     self.events.push((self.date, val));
                 }

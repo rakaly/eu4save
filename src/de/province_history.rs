@@ -42,6 +42,8 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                 let mut religion = None;
                 let mut events = Vec::new();
                 let mut other = HashMap::new();
+                let hint = map.size_hint().unwrap_or_default();
+                let estimate = (hint * 3 / 4) + 8;
 
                 while let Some(key) = map.next_key::<&str>()? {
                     match key {
@@ -54,6 +56,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                             if let Ok(date) = Eu4Date::parse(x) {
                                 let seed = ExtendVec {
                                     date,
+                                    estimate,
                                     events: &mut events,
                                 };
                                 map.next_value_seed(seed)?;
@@ -84,6 +87,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
 // https://docs.rs/serde/latest/serde/de/trait.DeserializeSeed.html
 struct ExtendVec<'a> {
     date: Eu4Date,
+    estimate: usize,
     events: &'a mut Vec<(Eu4Date, ProvinceEvent)>,
 }
 
@@ -96,6 +100,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
     {
         struct ExtendVecVisitor<'a> {
             date: Eu4Date,
+            estimate: usize,
             events: &'a mut Vec<(Eu4Date, ProvinceEvent)>,
         }
 
@@ -144,7 +149,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                     // provinces that have events is 32 though this tends to be
                     // dominated by outliers with the median being around 20
                     if self.events.is_empty() {
-                        self.events.reserve(64);
+                        self.events.reserve(self.estimate);
                     }
 
                     self.events.push((self.date, val));
@@ -156,6 +161,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
 
         deserializer.deserialize_map(ExtendVecVisitor {
             date: self.date,
+            estimate: self.estimate,
             events: self.events,
         })
     }
