@@ -64,6 +64,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                     }
                 }
 
+                events.shrink_to_fit();
                 Ok(ProvinceHistory {
                     owner,
                     base_tax,
@@ -138,6 +139,13 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                             }
                         }
                     };
+
+                    // Across a couple saves, the average number of events for
+                    // provinces that have events is 32 though this tends to be
+                    // dominated by outliers with the median being around 20
+                    if self.events.is_empty() {
+                        self.events.reserve(64);
+                    }
 
                     self.events.push((self.date, val));
                 }
