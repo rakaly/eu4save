@@ -828,12 +828,8 @@ pub struct WarHistory {
     pub name: Option<String>,
     pub war_goal: Option<WarGoal>,
     pub succession: Option<String>,
-    pub events: Vec<(Eu4Date, WarEvents)>,
+    pub events: Vec<(Eu4Date, WarEvent)>,
 }
-
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize))]
-pub struct WarEvents(pub Vec<WarEvent>);
 
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]

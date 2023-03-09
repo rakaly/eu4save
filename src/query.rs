@@ -1189,18 +1189,16 @@ fn war_participants(save: &Eu4Save, tag_resolver: &TagResolver) -> Vec<ResolvedW
         Vec::with_capacity(save.game.active_wars.len() + save.game.previous_wars.len());
     for (name, war) in wars {
         let mut tags = Vec::new();
-        for (date, events) in &war.events {
-            for event in &events.0 {
-                match event {
-                    WarEvent::AddAttacker(x) | WarEvent::AddDefender(x) => {
-                        let stored_tag = tag_resolver.resolve(*x, *date);
-                        tags.push(ResolvedWarParticipant {
-                            tag: *x,
-                            stored: stored_tag.map(|x| x.stored).unwrap_or(*x),
-                        });
-                    }
-                    _ => {}
+        for (date, event) in &war.events {
+            match event {
+                WarEvent::AddAttacker(x) | WarEvent::AddDefender(x) => {
+                    let stored_tag = tag_resolver.resolve(*x, *date);
+                    tags.push(ResolvedWarParticipant {
+                        tag: *x,
+                        stored: stored_tag.map(|x| x.stored).unwrap_or(*x),
+                    });
                 }
+                _ => {}
             }
         }
 

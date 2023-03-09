@@ -1,4 +1,7 @@
-use crate::{models::WarHistory, Eu4Date};
+use crate::{
+    models::{WarEvent, WarHistory},
+    Eu4Date,
+};
 use serde::{
     de::{self, Error},
     Deserialize, Deserializer,
@@ -48,12 +51,16 @@ impl<'de> Deserialize<'de> for WarHistory {
                         "succession" => succession = map.next_value()?,
                         x => {
                             let date = Eu4Date::parse(x).map_err(A::Error::custom)?;
-                            let event = map.next_value()?;
-                            events.push((date, event));
+                            let seed = ExtendVec {
+                                date,
+                                events: &mut events,
+                            };
+                            map.next_value_seed(seed)?;
                         }
                     }
                 }
 
+                events.shrink_to_fit();
                 Ok(WarHistory {
                     name,
                     war_goal,
@@ -64,5 +71,78 @@ impl<'de> Deserialize<'de> for WarHistory {
         }
 
         deserializer.deserialize_map(WarHistoryVisitor)
+    }
+}
+
+// https://docs.rs/serde/latest/serde/de/trait.DeserializeSeed.html
+struct ExtendVec<'a> {
+    date: Eu4Date,
+    events: &'a mut Vec<(Eu4Date, WarEvent)>,
+}
+
+impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ExtendVecVisitor<'a> {
+            date: Eu4Date,
+            events: &'a mut Vec<(Eu4Date, WarEvent)>,
+        }
+
+        impl<'de, 'a> de::Visitor<'de> for ExtendVecVisitor<'a> {
+            type Value = ();
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                write!(formatter, "province events")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                // Hmm empty object
+                let abc = seq.next_element::<&str>()?;
+                if abc.is_some() {
+                    return Err(de::Error::custom("unexpected sequence!"));
+                }
+
+                Ok(())
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                while let Some(key) = map.next_key::<&str>()? {
+                    let val = match key {
+                        "add_attacker" => WarEvent::AddAttacker(map.next_value()?),
+                        "add_defender" => WarEvent::AddDefender(map.next_value()?),
+                        "rem_attacker" => WarEvent::RemoveAttacker(map.next_value()?),
+                        "rem_defender" => WarEvent::RemoveDefender(map.next_value()?),
+                        "battle" => WarEvent::Battle(map.next_value()?),
+                        _ => {
+                            return Err(de::Error::custom(format!("unknown battle key: {}", &key)))
+                        }
+                    };
+
+                    // Most countries tend to have 16 around events
+                    if self.events.is_empty() {
+                        self.events.reserve(24);
+                    }
+
+                    self.events.push((self.date, val));
+                }
+
+                Ok(())
+            }
+        }
+
+        deserializer.deserialize_map(ExtendVecVisitor {
+            date: self.date,
+            events: self.events,
+        })
     }
 }

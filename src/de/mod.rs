@@ -8,7 +8,6 @@ mod province_event_value;
 mod province_history;
 mod token_bool;
 mod vec_pair;
-mod war_events;
 mod war_history;
 mod yes_map;
 
