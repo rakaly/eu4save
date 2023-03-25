@@ -71,6 +71,8 @@ pub struct GameState {
     pub military_hegemon: Option<Hegemon>,
     pub naval_hegemon: Option<Hegemon>,
     pub economic_hegemon: Option<Hegemon>,
+    #[jomini(duplicated, alias = "rebel_faction")]
+    pub rebel_factions: Vec<RebelFaction>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
     pub religions: Vec<(String, ReligionGameState)>,
     pub religion_instance_data: HashMap<String, ReligionInstanceDatum>,
@@ -104,6 +106,15 @@ pub struct SavegameVersion {
     pub third: u16,
     #[serde(alias = "forth")]
     pub fourth: u16,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct RebelFaction {
+    pub id: ObjId,
+    #[serde(alias = "type")]
+    pub kind: String,
     pub name: String,
 }
 
@@ -233,6 +244,7 @@ pub struct Province {
     pub owner: Option<CountryTag>,
     pub controller: Option<CountryTag>,
     pub previous_controller: Option<CountryTag>,
+    pub occupying_rebel_faction: Option<ObjId>,
     #[jomini(default)]
     pub cores: Vec<CountryTag>,
     #[jomini(duplicated)] // thank lambda for this
@@ -326,7 +338,6 @@ pub enum ProvinceEvent {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct ControllerEvent {
     pub tag: CountryTag,
-    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone)]
