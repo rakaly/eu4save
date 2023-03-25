@@ -326,6 +326,7 @@ pub enum ProvinceEvent {
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct ControllerEvent {
     pub tag: CountryTag,
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone)]
