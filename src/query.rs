@@ -306,10 +306,9 @@ pub enum TagDependency {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct OptionalInheritanceCalculation {
+pub struct HeirInheritanceCalculation {
     enabled: bool,
-    help: &'static str,
-    value: i64,
+    heir_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -321,17 +320,17 @@ pub struct CuriaInheritanceCalculation {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct HreInheritanceCalculation {
-    emperor: Option<CountryTag>,
+    emperor_tag: Option<CountryTag>,
     ruler_id: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct InheritanceCalculations {
     pub hre: HreInheritanceCalculation,
-    pub curia_controller_nation_id: CuriaInheritanceCalculation,
+    pub curia: CuriaInheritanceCalculation,
     pub nation_id: i64,
     pub ruler_id: i64,
-    pub heir_id: Option<OptionalInheritanceCalculation>,
+    pub heir: HeirInheritanceCalculation,
     pub previous_ruler_ids: i64,
     pub capital_province: i64,
     pub owned_provinces: i64,
@@ -346,22 +345,13 @@ impl InheritanceCalculations {
             + self.capital_province
             + self.owned_provinces;
 
-        let curia_offset = if self.curia_controller_nation_id.enabled {
-            self.curia_controller_nation_id.controller_id
+        let curia_offset = if self.curia.enabled {
+            self.curia.controller_id
         } else {
             0
         };
 
-        let heir_offset = if let Some(x) = self.heir_id.as_ref() {
-            if x.enabled {
-                x.value
-            } else {
-                0
-            }
-        } else {
-            0
-        };
-
+        let heir_offset = self.heir.heir_id.unwrap_or(0);
         result + curia_offset + heir_offset
     }
 }
@@ -605,7 +595,7 @@ impl Query {
             .map(|x| i64::from(x.id))
             .sum::<i64>();
 
-        let heir_id = country
+        let heir = country
             .country
             .heir
             .as_ref()
@@ -619,20 +609,15 @@ impl Query {
                     .find(|m| m.id.id == id.id)
             })
             .map(|x| {
-                let value = i64::from(x.id.id);
-                if x.birth_date.days_until(&self.save().meta.date) < 15 * 365 {
-                    OptionalInheritanceCalculation {
-                        enabled: true,
-                        value,
-                        help: "A",
-                    }
-                } else {
-                    OptionalInheritanceCalculation {
-                        enabled: false,
-                        value,
-                        help: "A",
-                    }
+                let enabled = x.birth_date.days_until(&self.save().meta.date) < 15 * 365;
+                HeirInheritanceCalculation {
+                    enabled,
+                    heir_id: Some(i64::from(x.id.id)),
                 }
+            })
+            .unwrap_or_else(|| HeirInheritanceCalculation {
+                enabled: true,
+                heir_id: None,
             });
 
         let capital_province = i64::from(country.country.capital.as_u16());
@@ -640,15 +625,15 @@ impl Query {
 
         InheritanceCalculations {
             hre: HreInheritanceCalculation {
-                emperor: hre_controller,
+                emperor_tag: hre_controller,
                 ruler_id: hre_ruler,
             },
-            curia_controller_nation_id: CuriaInheritanceCalculation {
+            curia: CuriaInheritanceCalculation {
                 enabled: is_catholic,
                 controller_tag: papacy_tag,
                 controller_id: papacy_id,
             },
-            heir_id,
+            heir,
             nation_id: country.id as i64,
             ruler_id: ruler,
             previous_ruler_ids: previous_rulers,
