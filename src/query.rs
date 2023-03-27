@@ -296,7 +296,7 @@ pub struct Inheritance {
     pub end_t2_year: i16,
     pub inheritance_value: u8,
     pub subtotal: i64,
-    pub calculations: Vec<Calculation>,
+    pub calculations: InheritanceCalculations,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -306,19 +306,63 @@ pub enum TagDependency {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Calculation {
-    pub name: String,
-    pub value: i64,
-    pub dependency: TagDependency,
+pub struct OptionalInheritanceCalculation {
+    enabled: bool,
+    help: &'static str,
+    value: i64,
 }
 
-impl Calculation {
-    pub fn new(name: &str, value: i64, dependency: TagDependency) -> Self {
-        Self {
-            name: String::from(name),
-            value,
-            dependency,
-        }
+#[derive(Debug, Clone, Serialize)]
+pub struct CuriaInheritanceCalculation {
+    enabled: bool,
+    controller_tag: CountryTag,
+    controller_id: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct HreInheritanceCalculation {
+    emperor: Option<CountryTag>,
+    ruler_id: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct InheritanceCalculations {
+    pub hre: HreInheritanceCalculation,
+    pub curia_controller_nation_id: CuriaInheritanceCalculation,
+    pub nation_id: i64,
+    pub ruler_id: i64,
+    pub heir_id: Option<OptionalInheritanceCalculation>,
+    pub previous_ruler_ids: i64,
+    pub capital_province: i64,
+    pub owned_provinces: i64,
+}
+
+impl InheritanceCalculations {
+    pub fn subtotal(&self) -> i64 {
+        let result = self.nation_id
+            + self.hre.ruler_id
+            + self.ruler_id
+            + self.previous_ruler_ids
+            + self.capital_province
+            + self.owned_provinces;
+
+        let curia_offset = if self.curia_controller_nation_id.enabled {
+            self.curia_controller_nation_id.controller_id
+        } else {
+            0
+        };
+
+        let heir_offset = if let Some(x) = self.heir_id.as_ref() {
+            if x.enabled {
+                x.value
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
+        result + curia_offset + heir_offset
     }
 }
 
@@ -514,13 +558,10 @@ impl Query {
         TagResolver::create(nation_events)
     }
 
-    fn inherit_subtotal(&self, country: &SaveCountry) -> (i64, Vec<Calculation>) {
-        let hre_ruler = self
-            .save()
-            .game
-            .empire
-            .as_ref()
-            .and_then(|x| x.emperor)
+    fn inherit_subtotal(&self, country: &SaveCountry) -> InheritanceCalculations {
+        let hre_controller = self.save().game.empire.as_ref().and_then(|x| x.emperor);
+
+        let hre_ruler = hre_controller
             .and_then(|x| self.country(&x))
             .and_then(|x| x.monarch.as_ref())
             .map(|x| i64::from(x.id))
@@ -538,6 +579,7 @@ impl Query {
             .as_ref()
             .map(|x| x.tag)
             .unwrap_or_else(|| "---".parse().unwrap());
+
         let papacy_id = papacy_controller
             .as_ref()
             .map(|x| x.id as i64)
@@ -548,7 +590,6 @@ impl Query {
             .religion
             .as_ref()
             .map_or(false, |x| x == "catholic");
-        let papacy_inherit = i64::from(is_catholic) * papacy_id;
 
         let ruler = country
             .country
@@ -564,34 +605,61 @@ impl Query {
             .map(|x| i64::from(x.id))
             .sum::<i64>();
 
-        let capital_province = i64::from(country.country.capital.as_u16());
+        let heir_id = country
+            .country
+            .heir
+            .as_ref()
+            .and_then(|id| {
+                country
+                    .country
+                    .history
+                    .events
+                    .iter()
+                    .filter_map(|(_, event)| event.as_monarch())
+                    .find(|m| m.id.id == id.id)
+            })
+            .map(|x| {
+                let value = i64::from(x.id.id);
+                if x.birth_date.days_until(&self.save().meta.date) < 15 * 365 {
+                    OptionalInheritanceCalculation {
+                        enabled: true,
+                        value,
+                        help: "A",
+                    }
+                } else {
+                    OptionalInheritanceCalculation {
+                        enabled: false,
+                        value,
+                        help: "A",
+                    }
+                }
+            });
 
+        let capital_province = i64::from(country.country.capital.as_u16());
         let provinces = i64::from(country.country.num_of_cities);
 
-        #[rustfmt::skip]
-        let calculations = vec![
-            Calculation::new("Nation ID", country.id as i64, TagDependency::Dependent(country.tag)),
-            Calculation::new("HRE Ruler ID", hre_ruler, TagDependency::Independent),
-            Calculation::new("Curia Controller Nation ID (for Catholics only)", papacy_id, TagDependency::Dependent(papacy_tag)),
-            Calculation::new("Ruler ID", ruler, TagDependency::Dependent(country.tag)),
-            Calculation::new("Previous Ruler IDs", previous_rulers, TagDependency::Dependent(country.tag)),
-            Calculation::new("Capital Province", capital_province, TagDependency::Dependent(country.tag)),
-            Calculation::new("Owned Provinces", provinces, TagDependency::Dependent(country.tag)),
-        ];
-
-        let raw = hre_ruler
-            + papacy_inherit
-            + ruler
-            + previous_rulers
-            + capital_province
-            + provinces
-            + country.id as i64;
-
-        (raw, calculations)
+        InheritanceCalculations {
+            hre: HreInheritanceCalculation {
+                emperor: hre_controller,
+                ruler_id: hre_ruler,
+            },
+            curia_controller_nation_id: CuriaInheritanceCalculation {
+                enabled: is_catholic,
+                controller_tag: papacy_tag,
+                controller_id: papacy_id,
+            },
+            heir_id,
+            nation_id: country.id as i64,
+            ruler_id: ruler,
+            previous_ruler_ids: previous_rulers,
+            capital_province,
+            owned_provinces: provinces,
+        }
     }
 
     pub fn inherit(&self, country: &SaveCountry) -> Inheritance {
-        let (subtotal, calculations) = self.inherit_subtotal(country);
+        let calculations = self.inherit_subtotal(country);
+        let subtotal = calculations.subtotal();
 
         let year = i64::from(self.save().meta.date.year());
         let inheritance_value = (subtotal + year) % 100;
