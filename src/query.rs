@@ -295,6 +295,7 @@ pub struct Inheritance {
     pub start_t2_year: i16,
     pub end_t2_year: i16,
     pub inheritance_value: u8,
+    pub pu_inheritance_value: u8,
     pub subtotal: i64,
     pub calculations: InheritanceCalculations,
 }
@@ -351,13 +352,15 @@ impl InheritanceCalculations {
             0
         };
 
-        let heir_offset = if self.heir.enabled {
+        result + curia_offset
+    }
+
+    pub fn heir_offset(&self) -> i64 {
+        if self.heir.enabled {
             self.heir.heir_id.unwrap_or(0)
         } else {
             0
-        };
-        
-        result + curia_offset + heir_offset
+        }
     }
 }
 
@@ -653,6 +656,7 @@ impl Query {
 
         let year = i64::from(self.save().meta.date.year());
         let inheritance_value = (subtotal + year) % 100;
+        let pu_inheritance_value = (subtotal + calculations.heir_offset()) % 100;
 
         let t0_mod = (0 - inheritance_value) % 100;
         let t1_mod = (75 - inheritance_value) % 100;
@@ -681,6 +685,7 @@ impl Query {
             start_t2_year: start_t2_year as i16,
             end_t2_year: end_t2_year as i16,
             inheritance_value: inheritance_value as u8,
+            pu_inheritance_value: pu_inheritance_value as u8,
             subtotal,
             calculations,
         }
