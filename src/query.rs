@@ -351,7 +351,12 @@ impl InheritanceCalculations {
             0
         };
 
-        let heir_offset = self.heir.heir_id.unwrap_or(0);
+        let heir_offset = if self.heir.enabled {
+            self.heir.heir_id.unwrap_or(0)
+        } else {
+            0
+        };
+        
         result + curia_offset + heir_offset
     }
 }
