@@ -297,6 +297,7 @@ pub struct Inheritance {
     pub inheritance_value: u8,
     pub pu_inheritance_value: u8,
     pub subtotal: i64,
+    pub pu_subtotal: i64,
     pub calculations: InheritanceCalculations,
 }
 
@@ -651,12 +652,14 @@ impl Query {
     }
 
     pub fn inherit(&self, country: &SaveCountry) -> Inheritance {
+        let year = i64::from(self.save().meta.date.year());
+
         let calculations = self.inherit_subtotal(country);
         let subtotal = calculations.subtotal();
-
-        let year = i64::from(self.save().meta.date.year());
         let inheritance_value = (subtotal + year) % 100;
-        let pu_inheritance_value = (subtotal + calculations.heir_offset()) % 100;
+
+        let pu_subtotal = subtotal + calculations.heir_offset();
+        let pu_inheritance_value = (pu_subtotal + year) % 100;
 
         let t0_mod = (0 - inheritance_value) % 100;
         let t1_mod = (75 - inheritance_value) % 100;
@@ -687,6 +690,7 @@ impl Query {
             inheritance_value: inheritance_value as u8,
             pu_inheritance_value: pu_inheritance_value as u8,
             subtotal,
+            pu_subtotal,
             calculations,
         }
     }
