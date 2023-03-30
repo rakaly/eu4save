@@ -470,6 +470,12 @@ pub struct Country {
     pub great_power_score: f32,
     #[jomini(default)]
     pub total_war_worth: u32,
+    #[jomini(default)]
+    pub army_tradition: f32,
+    #[jomini(default)]
+    pub navy_tradition: f32,
+    #[jomini(default)]
+    pub army_professionalism: f32,
     #[jomini(duplicated, alias = "army")]
     pub armies: Vec<Army>,
     #[jomini(duplicated, alias = "navy")]
