@@ -728,6 +728,7 @@ pub struct Army {
     pub regiments: Vec<Regiment>,
     pub movement_progress_last_updated: Eu4Date,
     pub graphical_culture: String,
+    pub mercenary_company: Option<ObjId>,
     #[jomini(default)]
     pub main_army: bool,
     #[jomini(default)]
