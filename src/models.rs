@@ -497,6 +497,7 @@ pub struct Country {
     pub mil_spent_indexed: Vec<(i32, i32)>,
     #[jomini(default)]
     pub losses: WarParticipantLosses,
+    #[jomini(default)]
     pub decision_seed: i32,
     #[jomini(duplicated, alias = "mercenary_company")]
     pub mercenary_companries: Vec<MercenaryCompany>,
@@ -702,6 +703,7 @@ pub struct Loan {
 pub struct Estate {
     #[serde(alias = "type")]
     pub _type: String,
+    #[serde(default)]
     pub loyalty: f32,
     #[serde(default)]
     pub territory: f32,
