@@ -311,29 +311,21 @@ impl<'a> Eu4File<'a> {
         match &self.kind {
             FileKind::Text(x) => {
                 let text = Eu4Text::from_raw(x)?;
-                Ok(Eu4ParsedFile {
-                    kind: Eu4ParsedFileKind::Text(text),
-                })
+                Ok(Eu4ParsedFile::from(text))
             }
             FileKind::Binary(x) => {
                 let binary = Eu4Binary::from_raw(x)?;
-                Ok(Eu4ParsedFile {
-                    kind: Eu4ParsedFileKind::Binary(binary),
-                })
+                Ok(Eu4ParsedFile::from(binary))
             }
             FileKind::Zip(zip) => {
                 zip.read_to_end(zip_sink)?;
 
                 if zip.is_text {
                     let text = Eu4Text::from_raw(zip_sink)?;
-                    Ok(Eu4ParsedFile {
-                        kind: Eu4ParsedFileKind::Text(text),
-                    })
+                    Ok(Eu4ParsedFile::from(text))
                 } else {
                     let binary = Eu4Binary::from_raw(zip_sink)?;
-                    Ok(Eu4ParsedFile {
-                        kind: Eu4ParsedFileKind::Binary(binary),
-                    })
+                    Ok(Eu4ParsedFile::from(binary))
                 }
             }
         }
@@ -576,12 +568,8 @@ impl<'a> Eu4FileEntry<'a> {
     /// Parse the entry into a file, while inflating the contents into the zip sink
     pub fn parse(&self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4ParsedFile<'a>, Eu4Error> {
         match &self.kind {
-            Eu4FileEntryKind::Text(x) => Ok(Eu4ParsedFile {
-                kind: Eu4ParsedFileKind::Text(Eu4Text::from_raw(x)?),
-            }),
-            Eu4FileEntryKind::Binary(x) => Ok(Eu4ParsedFile {
-                kind: Eu4ParsedFileKind::Binary(Eu4Binary::from_raw(x)?),
-            }),
+            Eu4FileEntryKind::Text(x) => Ok(Eu4ParsedFile::from(Eu4Text::from_raw(x)?)),
+            Eu4FileEntryKind::Binary(x) => Ok(Eu4ParsedFile::from(Eu4Binary::from_raw(x)?)),
             Eu4FileEntryKind::Zip {
                 files,
                 is_text,
@@ -590,13 +578,9 @@ impl<'a> Eu4FileEntry<'a> {
                 let file = files.archive.retrieve_file(*index);
                 file.read_to_end(zip_sink)?;
                 if *is_text {
-                    Ok(Eu4ParsedFile {
-                        kind: Eu4ParsedFileKind::Text(Eu4Text::from_raw(zip_sink)?),
-                    })
+                    Ok(Eu4ParsedFile::from(Eu4Text::from_raw(zip_sink)?))
                 } else {
-                    Ok(Eu4ParsedFile {
-                        kind: Eu4ParsedFileKind::Binary(Eu4Binary::from_raw(zip_sink)?),
-                    })
+                    Ok(Eu4ParsedFile::from(Eu4Binary::from_raw(zip_sink)?))
                 }
             }
         }
