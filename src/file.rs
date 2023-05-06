@@ -7,7 +7,7 @@ use jomini::{
 };
 use serde::Deserialize;
 use std::{fmt::Display, io::Cursor};
-use zip::result::ZipError;
+use zip::{result::ZipError, CompressionMethod as ZipCompressionMethod};
 
 const TXT_HEADER: &[u8] = b"EU4txt";
 const BIN_HEADER: &[u8] = b"EU4bin";
@@ -28,6 +28,13 @@ fn is_bin(data: &[u8]) -> Option<&[u8]> {
     } else {
         None
     }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+enum CompressionMethod {
+    Deflate,
+    #[cfg(feature = "zstd")]
+    Zstd,
 }
 
 #[derive(Debug)]
@@ -71,6 +78,7 @@ struct VerifiedIndex {
     data_start: usize,
     data_end: usize,
     name: Eu4FileEntryName,
+    compression: CompressionMethod,
     size: usize,
 }
 
@@ -78,8 +86,13 @@ impl VerifiedIndex {
     fn is_text(&self, data: &[u8]) -> Result<bool, Eu4Error> {
         let mut header = [0; TXT_HEADER.len()];
         let raw = &data[self.data_start..self.data_end];
-        crate::deflate::inflate_exact(raw, &mut header).map_err(Eu4ErrorKind::from)?;
 
+        let result = match self.compression {
+            CompressionMethod::Deflate => crate::deflate::inflate_exact(raw, &mut header),
+            #[cfg(feature = "zstd")]
+            CompressionMethod::Zstd => crate::deflate::zstd_inflate(raw, &mut header),
+        };
+        result.map_err(Eu4ErrorKind::from)?;
         Ok(is_text(&header).is_some())
     }
 }
@@ -93,18 +106,29 @@ struct Eu4ZipFiles<'a> {
 }
 
 impl<'a> Eu4ZipFiles<'a> {
-    pub fn new(archive: &mut zip::ZipArchive<Cursor<&'a [u8]>>, data: &'a [u8]) -> Self {
+    pub fn new(
+        archive: &mut zip::ZipArchive<Cursor<&'a [u8]>>,
+        data: &'a [u8],
+    ) -> Result<Self, Eu4Error> {
         let mut meta_index = None;
         let mut gamestate_index = None;
         let mut ai_index = None;
 
         for index in 0..archive.len() {
             if let Ok(file) = archive.by_index_raw(index) {
+                let compression = match file.compression() {
+                    ZipCompressionMethod::DEFLATE => CompressionMethod::Deflate,
+                    #[cfg(feature = "zstd")]
+                    ZipCompressionMethod::ZSTD => CompressionMethod::Zstd,
+                    _ => return Err(Eu4ErrorKind::UnknownCompression.into()),
+                };
+
                 let size = file.size() as usize;
                 let data_start = file.data_start() as usize;
                 let data_end = data_start + file.compressed_size() as usize;
                 let index = Eu4ZipFiles::strong_name(file.name()).map(|name| VerifiedIndex {
                     name,
+                    compression,
                     data_start,
                     data_end,
                     size,
@@ -125,12 +149,12 @@ impl<'a> Eu4ZipFiles<'a> {
             }
         }
 
-        Self {
+        Ok(Self {
             archive: data,
             meta_index,
             gamestate_index,
             ai_index,
-        }
+        })
     }
 
     fn strong_name(s: &str) -> Option<Eu4FileEntryName> {
@@ -146,6 +170,7 @@ impl<'a> Eu4ZipFiles<'a> {
         let raw = &self.archive[index.data_start..index.data_end];
         Eu4ZipFile {
             raw,
+            compression: index.compression,
             size: index.size,
         }
     }
@@ -162,6 +187,7 @@ impl<'a> Eu4ZipFiles<'a> {
 struct Eu4ZipFile<'a> {
     raw: &'a [u8],
     size: usize,
+    compression: CompressionMethod,
 }
 
 impl<'a> Eu4ZipFile<'a> {
@@ -169,8 +195,13 @@ impl<'a> Eu4ZipFile<'a> {
         let start_len = buf.len();
         buf.resize(start_len + self.size(), 0);
         let body = &mut buf[start_len..];
-        crate::deflate::inflate_exact(self.raw, body).map_err(Eu4ErrorKind::from)?;
+        let result = match self.compression {
+            CompressionMethod::Deflate => crate::deflate::inflate_exact(self.raw, body),
+            #[cfg(feature = "zstd")]
+            CompressionMethod::Zstd => crate::deflate::zstd_inflate(self.raw, body),
+        };
 
+        result.map_err(Eu4ErrorKind::from)?;
         body.copy_within(TXT_HEADER.len().., 0);
         buf.truncate(start_len + self.size() - TXT_HEADER.len());
         Ok(())
@@ -215,7 +246,7 @@ impl<'a> Eu4File<'a> {
                 Ok(mut zip) => {
                     let mut inflated_size = 0;
                     let mut found_text = None;
-                    let eu4_files = Eu4ZipFiles::new(&mut zip, data);
+                    let eu4_files = Eu4ZipFiles::new(&mut zip, data)?;
                     for file in eu4_files.files() {
                         inflated_size += file.size;
 

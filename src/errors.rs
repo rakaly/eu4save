@@ -43,6 +43,9 @@ pub enum Eu4ErrorKind {
     #[error("unknown header found in file. Must be EU4txt, EU4bin, or a zip file.")]
     UnknownHeader,
 
+    #[error("unrecognized zip compression method")]
+    UnknownCompression,
+
     #[error("unable to parse due to: {0}")]
     Parse(#[source] jomini::Error),
 

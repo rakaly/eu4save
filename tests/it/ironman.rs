@@ -146,6 +146,16 @@ fn test_eu4_kandy_bin() {
     );
 }
 
+#[cfg(feature = "zstd")]
+#[test]
+fn test_eu4_kandy_bin_zst() {
+    let data = utils::request("kandy2.bin.zst.eu4");
+    let file = Eu4File::from_slice(&data).unwrap();
+    let save = file.parse_save(&EnvTokens).unwrap();
+    assert_eq!(file.encoding(), Encoding::BinaryZip);
+    assert_eq!(save.meta.player, "BHA".parse().unwrap());
+}
+
 #[test]
 fn test_eu4_same_campaign_id() {
     let data = utils::request("ita2.eu4");

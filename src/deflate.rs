@@ -37,3 +37,24 @@ pub(crate) fn inflate_exact(raw: &[u8], out: &mut [u8]) -> Result<(), ZipInflati
         Err(e) => Err(ZipInflationError::BadData { msg: e.to_string() }),
     }
 }
+
+#[cfg(feature = "zstd")]
+pub(crate) fn zstd_inflate(raw: &[u8], out: &mut [u8]) -> Result<(), ZipInflationError> {
+    let mut ctx = zstd_safe::DCtx::create();
+    match ctx.decompress(out, raw) {
+        Ok(written) if written == out.len() => Ok(()),
+        Ok(written) => Err(ZipInflationError::EarlyEof { written }),
+        Err(e) => {
+            let msg = zstd_safe::get_error_name(e);
+
+            //  https://github.com/DataDog/zstd/blob/5f14d6af117fa84b37f99d4cde775e6039be6d3b/errors.go#L29
+            if msg == "Destination buffer is too small" {
+                Ok(())
+            } else {
+                Err(ZipInflationError::BadData {
+                    msg: msg.to_string(),
+                })
+            }
+        }
+    }
+}
