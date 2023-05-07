@@ -674,6 +674,8 @@ pub struct CountryColors {
     pub map_color: [u8; 3],
     #[serde(default, deserialize_with = "deserialize_list_overflow_byte")]
     pub country_color: [u8; 3],
+    #[serde(default, deserialize_with = "deserialize_list_overflow_byte_opt")]
+    pub colors: Option<[u8; 3]>,
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
