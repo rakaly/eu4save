@@ -569,7 +569,9 @@ pub enum CountryEvent {
     Capital(u32),
     ChangedCountryNameFrom(String),
     ChangedCountryAdjectiveFrom(String),
-    ChangedCountryMapColorFrom(Vec<u8>),
+    ChangedCountryMapColorFrom(
+        #[serde(default, deserialize_with = "deserialize_list_overflow_byte")] [u8; 3],
+    ),
     ChangedTagFrom(CountryTag),
     Leader(Leader),
     RemoveAcceptedCulture(String),
