@@ -4,6 +4,7 @@ mod deserializers;
 mod gameplay_settings;
 mod leader_kind;
 mod list_overflow_byte;
+mod map_pair;
 mod province_event_value;
 mod province_history;
 mod token_bool;
@@ -13,8 +14,9 @@ mod yes_map;
 
 pub(crate) use alternating_key_values::*;
 pub(crate) use list_overflow_byte::*;
+pub(crate) use map_pair::*;
 pub(crate) use token_bool::*;
-pub use vec_pair::*;
+pub(crate) use vec_pair::*;
 pub(crate) use yes_map::*;
 
 use serde::{Deserialize, Deserializer};

@@ -702,19 +702,34 @@ pub struct Loan {
     pub spawned: bool,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, JominiDeserialize, Default)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct Estate {
-    #[serde(alias = "type")]
+    #[jomini(alias = "type")]
     pub _type: String,
-    #[serde(default)]
+    #[jomini(default)]
     pub loyalty: f32,
-    #[serde(default)]
+    #[jomini(default)]
     pub territory: f32,
-    #[serde(default)]
+    #[jomini(default)]
     pub provinces: Vec<ProvinceId>,
-    #[serde(default)]
+    #[jomini(default)]
     pub active_influences: Vec<i32>,
+    #[jomini(default, duplicated, alias = "influence_modifier")]
+    pub influence_modifiers: Vec<InfluenceModifier>,
+    #[jomini(default)]
+    pub num_of_estate_agendas_completed: i32,
+    #[jomini(default, deserialize_with = "deserialize_map_pair")]
+    pub granted_privileges: Vec<(String, Eu4Date)>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct InfluenceModifier {
+    #[serde(default)]
+    pub value: f32,
+    pub desc: String,
+    pub date: Eu4Date,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
