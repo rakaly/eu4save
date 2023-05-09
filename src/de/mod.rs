@@ -16,7 +16,7 @@ pub(crate) use alternating_key_values::*;
 pub(crate) use list_overflow_byte::*;
 pub(crate) use map_pair::*;
 pub(crate) use token_bool::*;
-use vec_pair::*;
+pub use vec_pair::*;
 pub(crate) use yes_map::*;
 
 use serde::{Deserialize, Deserializer};
