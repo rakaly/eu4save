@@ -71,6 +71,7 @@ pub struct GameState {
     pub military_hegemon: Option<Hegemon>,
     pub naval_hegemon: Option<Hegemon>,
     pub economic_hegemon: Option<Hegemon>,
+    pub trade: TradeNodes,
     #[jomini(duplicated, alias = "rebel_faction")]
     pub rebel_factions: Vec<RebelFaction>,
     #[jomini(default, deserialize_with = "deserialize_vec_pair")]
@@ -97,6 +98,26 @@ pub struct GameState {
     #[jomini(alias = "gameplaysettings")]
     pub gameplay_settings: GameplaySettings,
     pub diplomacy: Diplomacy,
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct TradeNodes {
+    #[jomini(duplicated, alias = "node")]
+    pub nodes: Vec<TradeNode>,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct TradeNode {
+    pub countries: Vec<CountryTrade>,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct CountryTrade {
+    pub tag: CountryTag,
+    pub privateer_money: f32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
