@@ -2,10 +2,7 @@ use crate::{
     models::{CountryTrade, TradeNode},
     CountryTag,
 };
-use serde::{
-    de,
-    Deserialize, Deserializer,
-};
+use serde::{de, Deserialize, Deserializer};
 use std::fmt;
 
 impl<'de> Deserialize<'de> for TradeNode {
@@ -31,11 +28,11 @@ impl<'de> Deserialize<'de> for TradeNode {
                 while let Some(key) = map.next_key::<&str>()? {
                     match key {
                         "highest_power" => country_section = true,
-                        
+
                         // We need to know once the fixed fields are done as
                         // there are fields like "max" which may be accidentally
                         // interpretted as a country tag (country tag's can be
-                        // lowercase). 
+                        // lowercase).
                         x if country_section => {
                             if let Ok(tag) = CountryTag::create(x.as_bytes()) {
                                 map.next_value_seed(ExtendVec {
@@ -44,7 +41,7 @@ impl<'de> Deserialize<'de> for TradeNode {
                                 })?;
                             }
                         }
-                        _ => {} 
+                        _ => {}
                     }
                 }
 

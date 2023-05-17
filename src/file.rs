@@ -84,16 +84,20 @@ struct VerifiedIndex {
 
 impl VerifiedIndex {
     fn is_text(&self, data: &[u8]) -> Result<bool, Eu4Error> {
-        let mut header = [0; TXT_HEADER.len()];
         let raw = &data[self.data_start..self.data_end];
-
-        let result = match self.compression {
-            CompressionMethod::Deflate => crate::deflate::inflate_exact(raw, &mut header),
+        match self.compression {
+            CompressionMethod::Deflate => {
+                let mut header = [0; TXT_HEADER.len()];
+                crate::deflate::inflate_exact(raw, &mut header).map_err(Eu4ErrorKind::from)?;
+                Ok(is_text(&header).is_some())
+            }
             #[cfg(feature = "zstd")]
-            CompressionMethod::Zstd => crate::deflate::zstd_inflate(raw, &mut header),
-        };
-        result.map_err(Eu4ErrorKind::from)?;
-        Ok(is_text(&header).is_some())
+            CompressionMethod::Zstd => {
+                let mut header = vec![0; self.size];
+                crate::deflate::zstd_inflate(raw, &mut header).map_err(Eu4ErrorKind::from)?;
+                Ok(is_text(&header).is_some())
+            }
+        }
     }
 }
 
@@ -195,6 +199,7 @@ impl<'a> Eu4ZipFile<'a> {
         let start_len = buf.len();
         buf.resize(start_len + self.size(), 0);
         let body = &mut buf[start_len..];
+
         let result = match self.compression {
             CompressionMethod::Deflate => crate::deflate::inflate_exact(self.raw, body),
             #[cfg(feature = "zstd")]
@@ -250,7 +255,7 @@ impl<'a> Eu4File<'a> {
                     for file in eu4_files.files() {
                         inflated_size += file.size;
 
-                        if found_text.is_none() {
+                        if file.name == Eu4FileEntryName::Meta {
                             found_text = Some(file.is_text(data)?);
                         }
                     }
