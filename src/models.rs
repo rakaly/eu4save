@@ -543,6 +543,8 @@ pub struct Country {
     pub legitimacy: f32,
     #[jomini(default)]
     pub absolutism: f32,
+    #[jomini(default)]
+    pub horde_unity: f32,
 }
 
 #[derive(Debug, Clone, JominiDeserialize, Default)]
