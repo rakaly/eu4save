@@ -521,7 +521,7 @@ pub struct Country {
     #[jomini(default)]
     pub decision_seed: i32,
     #[jomini(duplicated, alias = "mercenary_company")]
-    pub mercenary_companries: Vec<MercenaryCompany>,
+    pub mercenary_companies: Vec<MercenaryCompany>,
     pub monarch: Option<ObjId>,
     pub heir: Option<ObjId>,
     #[jomini(duplicated, alias = "leader")]
