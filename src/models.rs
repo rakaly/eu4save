@@ -529,6 +529,20 @@ pub struct Country {
     #[jomini(duplicated, alias = "previous_monarch")]
     pub previous_monarchs: Vec<ObjId>,
     pub government: Option<CountryGovernment>,
+    #[jomini(default)]
+    pub powers: [i16; 3],
+    #[jomini(default)]
+    pub mercantilism: f32,
+    #[jomini(default)]
+    pub republican_tradition: f32,
+    #[jomini(default)]
+    pub devotion: f32,
+    #[jomini(default)]
+    pub meritocracy: f32,
+    #[jomini(default)]
+    pub legitimacy: f32,
+    #[jomini(default)]
+    pub absolutism: f32,
 }
 
 #[derive(Debug, Clone, JominiDeserialize, Default)]
