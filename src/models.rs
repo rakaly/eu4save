@@ -545,6 +545,16 @@ pub struct Country {
     pub absolutism: f32,
     #[jomini(default)]
     pub horde_unity: f32,
+    #[jomini(default)]
+    pub splendor: f32,
+    #[jomini(default)]
+    pub merchants: EnvoyGroup,
+    #[jomini(default)]
+    pub colonists: EnvoyGroup,
+    #[jomini(default)]
+    pub diplomats: EnvoyGroup,
+    #[jomini(default)]
+    pub missionaries: EnvoyGroup,
 }
 
 #[derive(Debug, Clone, JominiDeserialize, Default)]
@@ -561,6 +571,24 @@ pub struct CountryGovernmentReforms {
     pub reforms: Vec<String>,
     #[serde(default)]
     pub history: Vec<String>,
+}
+
+#[derive(Debug, Clone, JominiDeserialize, Default)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct EnvoyGroup {
+    #[jomini(duplicated, alias = "envoy")]
+    pub envoys: Vec<Envoy>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct Envoy {
+    #[serde(default)]
+    pub action: i32,
+    #[serde(default, alias = "type")]
+    pub kind: u32,
+    #[serde(default)]
+    pub id: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
