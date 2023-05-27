@@ -530,7 +530,7 @@ pub struct Country {
     pub previous_monarchs: Vec<ObjId>,
     pub government: Option<CountryGovernment>,
     #[jomini(default)]
-    pub powers: [i16; 3],
+    pub powers: [i32; 3],
     #[jomini(default)]
     pub mercantilism: f32,
     #[jomini(default)]
