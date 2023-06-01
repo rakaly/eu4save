@@ -27,7 +27,10 @@ impl<'de> Deserialize<'de> for TradeNode {
                 let mut country_section = false;
                 while let Some(key) = map.next_key::<&str>()? {
                     match key {
-                        "highest_power" => country_section = true,
+                        "highest_power" => {
+                            country_section = true;
+                            map.next_value::<de::IgnoredAny>()?;
+                        }
 
                         // We need to know once the fixed fields are done as
                         // there are fields like "max" which may be accidentally
@@ -39,9 +42,13 @@ impl<'de> Deserialize<'de> for TradeNode {
                                     tag,
                                     countries: &mut countries,
                                 })?;
+                            } else {
+                                map.next_value::<de::IgnoredAny>()?;
                             }
                         }
-                        _ => {}
+                        _ => {
+                            map.next_value::<de::IgnoredAny>()?;
+                        }
                     }
                 }
 
@@ -90,7 +97,10 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                     // an interesting field
                     match key {
                         "privateer_money" => privateer_money = map.next_value()?,
-                        _ => continue,
+                        _ => {
+                            map.next_value::<de::IgnoredAny>()?;
+                            continue;
+                        }
                     };
 
                     should_extend = true;

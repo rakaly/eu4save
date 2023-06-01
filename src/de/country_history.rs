@@ -47,10 +47,10 @@ impl<'de> Deserialize<'de> for CountryHistory {
 
                 while let Some(key) = map.next_key::<&str>()? {
                     match key {
-                        "government" => government = map.next_value()?,
-                        "technology_group" => technology_group = map.next_value()?,
-                        "primary_culture" => primary_culture = map.next_value()?,
-                        "religion" => religion = map.next_value()?,
+                        "government" => government = Some(map.next_value()?),
+                        "technology_group" => technology_group = Some(map.next_value()?),
+                        "primary_culture" => primary_culture = Some(map.next_value()?),
+                        "religion" => religion = Some(map.next_value()?),
                         "add_government_reform" => add_government_reform.push(map.next_value()?),
                         x => {
                             if let Ok(date) = Eu4Date::parse(x) {
@@ -60,11 +60,12 @@ impl<'de> Deserialize<'de> for CountryHistory {
                                     events: &mut events,
                                 };
                                 map.next_value_seed(seed)?;
+                            } else {
+                                map.next_value::<de::IgnoredAny>()?;
                             }
                         }
                     }
                 }
-
                 Ok(CountryHistory {
                     government,
                     technology_group,
@@ -148,7 +149,10 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                         }
                         "changed_tag_from" => CountryEvent::ChangedTagFrom(map.next_value()?),
                         "religion" => CountryEvent::Religion(map.next_value()?),
-                        _ => continue, /*panic!("unknown: {}", &key)*/
+                        _ => {
+                            map.next_value::<de::IgnoredAny>()?;
+                            continue;
+                        }
                     };
 
                     // Most countries tend to have 32 around events

@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use eu4save::{
-    file::{Eu4FileEntryName, Eu4ParsedFile, Eu4ParsedFileKind, Eu4Text},
+    file::{Eu4FileEntryName, Eu4ParsedFile, Eu4ParsedFileKind, Eu4ParsedText},
     models::SavegameVersion,
     EnvTokens, Eu4File,
 };
@@ -12,7 +12,7 @@ struct MyMeta {
     savegame_version: SavegameVersion,
 }
 
-fn json_to_stdout(file: &Eu4Text) {
+fn json_to_stdout(file: &Eu4ParsedText) {
     let _ = file.reader().json().to_writer(std::io::stdout());
 }
 
@@ -22,7 +22,7 @@ fn parsed_file_to_json(file: &Eu4ParsedFile) -> Result<(), Box<dyn std::error::E
         Eu4ParsedFileKind::Text(text) => json_to_stdout(text),
         Eu4ParsedFileKind::Binary(binary) => {
             let melted = binary.melter().verbatim(true).melt(&EnvTokens)?;
-            json_to_stdout(&Eu4Text::from_slice(melted.data())?);
+            json_to_stdout(&Eu4ParsedText::from_slice(melted.data())?);
         }
     };
 

@@ -1,7 +1,11 @@
 //! Parsing and deserializing EU4 save files
-use crate::{flavor::Eu4Flavor, models::Eu4Save, Encoding, Eu4Error, Eu4ErrorKind, Eu4Melter};
+use crate::{
+    flavor::Eu4Flavor,
+    models::{Eu4Save, GameState, Meta},
+    Encoding, Eu4Error, Eu4ErrorKind, Eu4Melter,
+};
 use jomini::{
-    binary::{FailedResolveStrategy, TokenResolver},
+    binary::{de::OndemandBinaryDeserializer, FailedResolveStrategy, TokenResolver},
     text::ObjectReader,
     BinaryDeserializer, BinaryTape, TextDeserializer, TextTape, Windows1252Encoding,
 };
@@ -56,20 +60,40 @@ impl Iterator for Eu4ZipFilesIter {
 }
 
 #[derive(Debug, Clone)]
-struct Eu4Zip<'a> {
+pub struct Eu4Zip<'a> {
     archive: Eu4ZipFiles<'a>,
     is_text: bool,
     inflated_size: usize,
 }
 
 impl<'a> Eu4Zip<'a> {
-    fn read_to_end(&self, zip_sink: &'a mut Vec<u8>) -> Result<(), Eu4Error> {
+    pub fn read_to_end(&self, zip_sink: &'a mut Vec<u8>) -> Result<(), Eu4Error> {
         for index in self.archive.files() {
             let file = self.archive.retrieve_file(index);
             file.read_to_end(zip_sink)?;
         }
 
         Ok(())
+    }
+
+    pub fn is_text(&self) -> bool {
+        self.is_text
+    }
+
+    pub fn meta_file(&self) -> Result<Eu4ZipFile, Eu4Error> {
+        let index = self.archive.meta_index.ok_or_else(|| {
+            Eu4Error::new(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Meta))
+        })?;
+
+        Ok(self.archive.retrieve_file(index))
+    }
+
+    pub fn gamestate_file(&self) -> Result<Eu4ZipFile, Eu4Error> {
+        let index = self.archive.gamestate_index.ok_or_else(|| {
+            Eu4Error::new(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Gamestate))
+        })?;
+
+        Ok(self.archive.retrieve_file(index))
     }
 }
 
@@ -188,18 +212,14 @@ impl<'a> Eu4ZipFiles<'a> {
     }
 }
 
-struct Eu4ZipFile<'a> {
+pub struct Eu4ZipFile<'a> {
     raw: &'a [u8],
     size: usize,
     compression: CompressionMethod,
 }
 
 impl<'a> Eu4ZipFile<'a> {
-    pub fn read_to_end(&self, buf: &mut Vec<u8>) -> Result<(), Eu4Error> {
-        let start_len = buf.len();
-        buf.resize(start_len + self.size(), 0);
-        let body = &mut buf[start_len..];
-
+    pub fn read_exact(&self, body: &mut [u8]) -> Result<(), Eu4Error> {
         let result = match self.compression {
             CompressionMethod::Deflate => crate::deflate::inflate_exact(self.raw, body),
             #[cfg(feature = "zstd")]
@@ -207,8 +227,20 @@ impl<'a> Eu4ZipFile<'a> {
         };
 
         result.map_err(Eu4ErrorKind::from)?;
-        body.copy_within(TXT_HEADER.len().., 0);
-        buf.truncate(start_len + self.size() - TXT_HEADER.len());
+        Ok(())
+    }
+
+    pub fn read_to_end(&self, buf: &mut Vec<u8>) -> Result<(), Eu4Error> {
+        let start_len = buf.len();
+        buf.resize(start_len + self.size(), 0);
+        let body = &mut buf[start_len..];
+        self.read_exact(body)?;
+
+        // If we are appending to an existing buffer, strip out the header
+        if start_len != 0 {
+            body.copy_within(TXT_HEADER.len().., 0);
+            buf.truncate(start_len + self.size() - TXT_HEADER.len());
+        }
         Ok(())
     }
 
@@ -217,9 +249,9 @@ impl<'a> Eu4ZipFile<'a> {
     }
 }
 
-enum FileKind<'a> {
-    Text(&'a [u8]),
-    Binary(&'a [u8]),
+pub enum Eu4FileKind<'a> {
+    Text(Eu4Text<'a>),
+    Binary(Eu4Binary<'a>),
     Zip(Eu4Zip<'a>),
 }
 
@@ -230,19 +262,19 @@ enum FileKind<'a> {
 ///
 /// Only consumes enough data to determine encoding of the file
 pub struct Eu4File<'a> {
-    kind: FileKind<'a>,
+    kind: Eu4FileKind<'a>,
 }
 
 impl<'a> Eu4File<'a> {
     /// Creates an EU4 file from a slice of data
     pub fn from_slice(data: &[u8]) -> Result<Eu4File, Eu4Error> {
-        if let Some(text_data) = is_text(data) {
+        if let Ok(text) = Eu4Text::from_slice(data) {
             Ok(Eu4File {
-                kind: FileKind::Text(text_data),
+                kind: Eu4FileKind::Text(text),
             })
-        } else if let Some(bin_data) = is_bin(data) {
+        } else if let Ok(bin) = Eu4Binary::from_slice(data) {
             Ok(Eu4File {
-                kind: FileKind::Binary(bin_data),
+                kind: Eu4FileKind::Binary(bin),
             })
         } else {
             let cursor = Cursor::new(data);
@@ -263,7 +295,7 @@ impl<'a> Eu4File<'a> {
                     match found_text {
                         None => Err(Eu4ErrorKind::ZipHeader.into()),
                         Some(is_text) => Ok(Eu4File {
-                            kind: FileKind::Zip(Eu4Zip {
+                            kind: Eu4FileKind::Zip(Eu4Zip {
                                 archive: eu4_files,
                                 is_text,
                                 inflated_size,
@@ -280,10 +312,10 @@ impl<'a> Eu4File<'a> {
     /// Returns the detected decoding of the file
     pub fn encoding(&self) -> Encoding {
         match &self.kind {
-            FileKind::Text(_) => Encoding::Text,
-            FileKind::Binary(_) => Encoding::Binary,
-            FileKind::Zip(zip) if zip.is_text => Encoding::TextZip,
-            FileKind::Zip(_) => Encoding::BinaryZip,
+            Eu4FileKind::Text(_) => Encoding::Text,
+            Eu4FileKind::Binary(_) => Encoding::Binary,
+            Eu4FileKind::Zip(zip) if zip.is_text => Encoding::TextZip,
+            Eu4FileKind::Zip(_) => Encoding::BinaryZip,
         }
     }
 
@@ -292,9 +324,14 @@ impl<'a> Eu4File<'a> {
     /// The size includes the inflated size of the zip
     pub fn size(&self) -> usize {
         match &self.kind {
-            FileKind::Text(x) | FileKind::Binary(x) => x.len(),
-            FileKind::Zip(x) => x.inflated_size,
+            Eu4FileKind::Text(x) => x.size(),
+            Eu4FileKind::Binary(x) => x.size(),
+            Eu4FileKind::Zip(x) => x.inflated_size,
         }
+    }
+
+    pub fn kind(&self) -> &Eu4FileKind {
+        &self.kind
     }
 
     /// A convenience method for creating [`Eu4Save`](crate::models::Eu4Save)
@@ -302,10 +339,40 @@ impl<'a> Eu4File<'a> {
     where
         R: TokenResolver,
     {
-        let mut zip_sink = Vec::new();
-        let parsed_file = self.parse(&mut zip_sink)?;
-        let des = parsed_file.deserializer(resolver);
-        Eu4Save::from_deserializer(&des)
+        match &self.kind {
+            Eu4FileKind::Text(x) => {
+                let text = x.parse()?;
+                Eu4Save::from_deserializer(&text.deserializer())
+            }
+            Eu4FileKind::Binary(x) => {
+                let binary = x.parse()?;
+                Eu4Save::from_deserializer(&binary.deserializer(resolver))
+            }
+            Eu4FileKind::Zip(zip) => {
+                if zip.is_text() {
+                    let mut zip_sink = Vec::new();
+                    zip.read_to_end(&mut zip_sink)?;
+                    let text = Eu4ParsedText::from_slice(&zip_sink)?;
+                    Eu4Save::from_deserializer(&text.deserializer())
+                } else {
+                    let meta_file = zip.meta_file()?;
+                    let gamestate_file = zip.gamestate_file()?;
+                    let mut zip_sink = vec![0; meta_file.size().max(gamestate_file.size())];
+
+                    let meta_data = &mut zip_sink[..meta_file.size()];
+                    meta_file.read_exact(meta_data)?;
+                    let file = Eu4Binary::from_slice(meta_data)?;
+                    let meta: Meta = file.ondemand_deserializer(resolver).deserialize()?;
+
+                    let gamestate_data = &mut zip_sink[..gamestate_file.size()];
+                    gamestate_file.read_exact(gamestate_data)?;
+                    let file = Eu4Binary::from_slice(gamestate_data)?;
+                    let game: GameState = file.ondemand_deserializer(resolver).deserialize()?;
+
+                    Ok(Eu4Save { meta, game })
+                }
+            }
+        }
     }
 
     /// Parses the entire file
@@ -314,22 +381,22 @@ impl<'a> Eu4File<'a> {
     /// sink before being parsed
     pub fn parse(&self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4ParsedFile<'a>, Eu4Error> {
         match &self.kind {
-            FileKind::Text(x) => {
-                let text = Eu4Text::from_raw(x)?;
+            Eu4FileKind::Text(x) => {
+                let text = x.parse()?;
                 Ok(Eu4ParsedFile::from(text))
             }
-            FileKind::Binary(x) => {
-                let binary = Eu4Binary::from_raw(x)?;
+            Eu4FileKind::Binary(x) => {
+                let binary = x.parse()?;
                 Ok(Eu4ParsedFile::from(binary))
             }
-            FileKind::Zip(zip) => {
+            Eu4FileKind::Zip(zip) => {
                 zip.read_to_end(zip_sink)?;
 
                 if zip.is_text {
-                    let text = Eu4Text::from_raw(zip_sink)?;
+                    let text = Eu4ParsedText::from_slice(zip_sink)?;
                     Ok(Eu4ParsedFile::from(text))
                 } else {
-                    let binary = Eu4Binary::from_raw(zip_sink)?;
+                    let binary = Eu4ParsedBinary::from_slice(zip_sink)?;
                     Ok(Eu4ParsedFile::from(binary))
                 }
             }
@@ -341,19 +408,19 @@ impl<'a> Eu4File<'a> {
     /// Non-zips will yield a single entry
     pub fn entries(&self) -> Eu4FileEntries {
         match &self.kind {
-            FileKind::Text(x) => Eu4FileEntries {
+            Eu4FileKind::Text(x) => Eu4FileEntries {
                 kind: Eu4FileEntriesKind::Text {
                     has_yielded: false,
-                    data: x,
+                    data: *x,
                 },
             },
-            FileKind::Binary(x) => Eu4FileEntries {
+            Eu4FileKind::Binary(x) => Eu4FileEntries {
                 kind: Eu4FileEntriesKind::Binary {
                     has_yielded: false,
-                    data: x,
+                    data: *x,
                 },
             },
-            FileKind::Zip(x) => Eu4FileEntries {
+            Eu4FileKind::Zip(x) => Eu4FileEntries {
                 kind: Eu4FileEntriesKind::Zip {
                     files: Box::new(x.clone()),
                     iter: x.archive.files(),
@@ -367,10 +434,10 @@ impl<'a> Eu4File<'a> {
 /// Contains the parsed EU4 file
 pub enum Eu4ParsedFileKind<'a> {
     /// The EU4 file as text
-    Text(Eu4Text<'a>),
+    Text(Eu4ParsedText<'a>),
 
     /// The EU4 file as binary
-    Binary(Eu4Binary<'a>),
+    Binary(Eu4ParsedBinary<'a>),
 }
 
 /// An EU4 file that has been parsed
@@ -380,7 +447,7 @@ pub struct Eu4ParsedFile<'data> {
 
 impl<'data> Eu4ParsedFile<'data> {
     /// Returns the file as text
-    pub fn as_text(&self) -> Option<&Eu4Text> {
+    pub fn as_text(&self) -> Option<&Eu4ParsedText> {
         match &self.kind {
             Eu4ParsedFileKind::Text(x) => Some(x),
             _ => None,
@@ -388,7 +455,7 @@ impl<'data> Eu4ParsedFile<'data> {
     }
 
     /// Returns the file as binary
-    pub fn as_binary(&self) -> Option<&Eu4Binary> {
+    pub fn as_binary(&self) -> Option<&Eu4ParsedBinary> {
         match &self.kind {
             Eu4ParsedFileKind::Binary(x) => Some(x),
             _ => None,
@@ -448,11 +515,11 @@ where
 enum Eu4FileEntriesKind<'a> {
     Text {
         has_yielded: bool,
-        data: &'a [u8],
+        data: Eu4Text<'a>,
     },
     Binary {
         has_yielded: bool,
-        data: &'a [u8],
+        data: Eu4Binary<'a>,
     },
     Zip {
         is_text: bool,
@@ -472,13 +539,13 @@ impl<'a> Eu4FileEntries<'a> {
             Eu4FileEntriesKind::Text { has_yielded, data } if !*has_yielded => {
                 *has_yielded = true;
                 Some(Eu4FileEntry {
-                    kind: Eu4FileEntryKind::Text(data),
+                    kind: Eu4FileEntryKind::Text(*data),
                 })
             }
             Eu4FileEntriesKind::Binary { has_yielded, data } if !*has_yielded => {
                 *has_yielded = true;
                 Some(Eu4FileEntry {
-                    kind: Eu4FileEntryKind::Binary(data),
+                    kind: Eu4FileEntryKind::Binary(*data),
                 })
             }
             Eu4FileEntriesKind::Zip {
@@ -499,16 +566,16 @@ impl<'a> Eu4FileEntries<'a> {
     }
 }
 
-impl<'data> From<Eu4Text<'data>> for Eu4ParsedFile<'data> {
-    fn from(value: Eu4Text<'data>) -> Self {
+impl<'data> From<Eu4ParsedText<'data>> for Eu4ParsedFile<'data> {
+    fn from(value: Eu4ParsedText<'data>) -> Self {
         Eu4ParsedFile {
             kind: Eu4ParsedFileKind::Text(value),
         }
     }
 }
 
-impl<'data> From<Eu4Binary<'data>> for Eu4ParsedFile<'data> {
-    fn from(value: Eu4Binary<'data>) -> Self {
+impl<'data> From<Eu4ParsedBinary<'data>> for Eu4ParsedFile<'data> {
+    fn from(value: Eu4ParsedBinary<'data>) -> Self {
         Eu4ParsedFile {
             kind: Eu4ParsedFileKind::Binary(value),
         }
@@ -516,8 +583,8 @@ impl<'data> From<Eu4Binary<'data>> for Eu4ParsedFile<'data> {
 }
 
 enum Eu4FileEntryKind<'a> {
-    Text(&'a [u8]),
-    Binary(&'a [u8]),
+    Text(Eu4Text<'a>),
+    Binary(Eu4Binary<'a>),
     Zip {
         files: Box<Eu4Zip<'a>>,
         index: VerifiedIndex,
@@ -565,7 +632,8 @@ impl<'a> Eu4FileEntry<'a> {
     /// Size of the entry (eg: inflated size)
     pub fn size(&self) -> usize {
         match &self.kind {
-            Eu4FileEntryKind::Text(x) | Eu4FileEntryKind::Binary(x) => x.len(),
+            Eu4FileEntryKind::Text(x) => x.size(),
+            Eu4FileEntryKind::Binary(x) => x.size(),
             Eu4FileEntryKind::Zip { index, .. } => index.size,
         }
     }
@@ -573,8 +641,8 @@ impl<'a> Eu4FileEntry<'a> {
     /// Parse the entry into a file, while inflating the contents into the zip sink
     pub fn parse(&self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4ParsedFile<'a>, Eu4Error> {
         match &self.kind {
-            Eu4FileEntryKind::Text(x) => Ok(Eu4ParsedFile::from(Eu4Text::from_raw(x)?)),
-            Eu4FileEntryKind::Binary(x) => Ok(Eu4ParsedFile::from(Eu4Binary::from_raw(x)?)),
+            Eu4FileEntryKind::Text(x) => Ok(Eu4ParsedFile::from(x.parse()?)),
+            Eu4FileEntryKind::Binary(x) => Ok(Eu4ParsedFile::from(x.parse()?)),
             Eu4FileEntryKind::Zip {
                 files,
                 is_text,
@@ -583,21 +651,50 @@ impl<'a> Eu4FileEntry<'a> {
                 let file = files.archive.retrieve_file(*index);
                 file.read_to_end(zip_sink)?;
                 if *is_text {
-                    Ok(Eu4ParsedFile::from(Eu4Text::from_raw(zip_sink)?))
+                    Ok(Eu4ParsedFile::from(Eu4ParsedText::from_slice(zip_sink)?))
                 } else {
-                    Ok(Eu4ParsedFile::from(Eu4Binary::from_raw(zip_sink)?))
+                    Ok(Eu4ParsedFile::from(Eu4ParsedBinary::from_slice(zip_sink)?))
                 }
             }
         }
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Eu4Text<'data> {
+    data: &'data [u8],
+}
+
+impl<'data> Eu4Text<'data> {
+    /// Accept EU4 text data that has the "Eu4txt" header
+    pub fn from_slice(data: &'data [u8]) -> Result<Self, Eu4Error> {
+        is_text(data)
+            .ok_or_else(|| Eu4ErrorKind::UnknownHeader.into())
+            .map(Self::from_raw)
+    }
+
+    /// Accept headerless EU4 binary data
+    pub fn from_raw(data: &'data [u8]) -> Self {
+        Eu4Text { data }
+    }
+
+    /// Parse binary data
+    pub fn parse(&self) -> Result<Eu4ParsedText<'data>, Eu4Error> {
+        Eu4ParsedText::from_raw(self.data)
+    }
+
+    /// Length of binary data
+    pub fn size(&self) -> usize {
+        self.data.len()
+    }
+}
+
 /// A parsed EU4 text document
-pub struct Eu4Text<'a> {
+pub struct Eu4ParsedText<'a> {
     tape: TextTape<'a>,
 }
 
-impl<'a> Eu4Text<'a> {
+impl<'a> Eu4ParsedText<'a> {
     /// Parse EU4 text data that has the "EU4txt" header
     pub fn from_slice(data: &'a [u8]) -> Result<Self, Eu4Error> {
         is_text(data)
@@ -608,7 +705,7 @@ impl<'a> Eu4Text<'a> {
     /// Parse headerless EU4 text data
     pub fn from_raw(data: &'a [u8]) -> Result<Self, Eu4Error> {
         let tape = TextTape::from_slice(data).map_err(Eu4ErrorKind::Parse)?;
-        Ok(Eu4Text { tape })
+        Ok(Eu4ParsedText { tape })
     }
 
     pub fn reader(&self) -> ObjectReader<Windows1252Encoding> {
@@ -636,12 +733,51 @@ impl<'de, 'tape> Eu4TextDeserializer<'de, 'tape> {
     }
 }
 
-/// A parsed EU4 binary document
+#[derive(Debug, Clone, Copy)]
 pub struct Eu4Binary<'data> {
-    tape: BinaryTape<'data>,
+    data: &'data [u8],
 }
 
 impl<'data> Eu4Binary<'data> {
+    /// Accept EU4 binary data that has the "EU4bin" header
+    pub fn from_slice(data: &'data [u8]) -> Result<Self, Eu4Error> {
+        is_bin(data)
+            .ok_or_else(|| Eu4ErrorKind::UnknownHeader.into())
+            .map(Self::from_raw)
+    }
+
+    /// Accept headerless EU4 binary data
+    pub fn from_raw(data: &'data [u8]) -> Self {
+        Eu4Binary { data }
+    }
+
+    /// Parse binary data
+    pub fn parse(&self) -> Result<Eu4ParsedBinary<'data>, Eu4Error> {
+        Eu4ParsedBinary::from_raw(self.data)
+    }
+
+    /// Length of binary data
+    pub fn size(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn ondemand_deserializer<'b, RES>(
+        &'b self,
+        resolver: &'b RES,
+    ) -> OndemandBinaryDeserializer<'data, 'b, RES, Eu4Flavor>
+    where
+        RES: TokenResolver,
+    {
+        OndemandBinaryDeserializer::builder_flavor(Eu4Flavor::new()).from_slice(self.data, resolver)
+    }
+}
+
+/// A parsed EU4 binary document
+pub struct Eu4ParsedBinary<'data> {
+    tape: BinaryTape<'data>,
+}
+
+impl<'data> Eu4ParsedBinary<'data> {
     /// Parse EU4 binary data that has the "EU4bin" header
     pub fn from_slice(data: &'data [u8]) -> Result<Self, Eu4Error> {
         is_bin(data)
@@ -652,7 +788,7 @@ impl<'data> Eu4Binary<'data> {
     /// Parse headerless EU4 binary data
     pub fn from_raw(data: &'data [u8]) -> Result<Self, Eu4Error> {
         let tape = BinaryTape::from_slice(data).map_err(Eu4ErrorKind::Parse)?;
-        Ok(Eu4Binary { tape })
+        Ok(Eu4ParsedBinary { tape })
     }
 
     pub(crate) fn tape(&self) -> &BinaryTape {
