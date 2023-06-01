@@ -56,6 +56,9 @@ impl<'de> Deserialize<'de> for GameplayOptions {
                     _ => return Err(de::Error::custom("unrecognized difficulty setting")),
                 };
 
+                while let Some(_) = seq.next_element::<de::IgnoredAny>()? {
+                }
+
                 Ok(GameplayOptions {
                     difficulty,
                     tax_manpower_modifier,

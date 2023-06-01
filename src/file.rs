@@ -1,7 +1,7 @@
 //! Parsing and deserializing EU4 save files
 use crate::{flavor::Eu4Flavor, models::Eu4Save, Encoding, Eu4Error, Eu4ErrorKind, Eu4Melter};
 use jomini::{
-    binary::{FailedResolveStrategy, TokenResolver},
+    binary::{FailedResolveStrategy, TokenResolver, de::{OndemandBinaryDeserializer, OndemandBinaryDeserializerBuilder}},
     text::ObjectReader,
     BinaryDeserializer, BinaryTape, TextDeserializer, TextTape, Windows1252Encoding,
 };
@@ -567,6 +567,30 @@ impl<'a> Eu4FileEntry<'a> {
         match &self.kind {
             Eu4FileEntryKind::Text(x) | Eu4FileEntryKind::Binary(x) => x.len(),
             Eu4FileEntryKind::Zip { index, .. } => index.size,
+        }
+    }
+
+    pub fn deserializer<'b: 'data, 'data, RES>(&'b self, zip_sink: &'data mut Vec<u8>, resolver: &'b RES) -> Result<OndemandBinaryDeserializer<'data, 'b, RES, Eu4Flavor>, Eu4Error>
+    where
+        RES: TokenResolver,
+    {
+        match &self.kind {
+            Eu4FileEntryKind::Text(x) => todo!(),
+            Eu4FileEntryKind::Binary(x) => todo!(),
+            Eu4FileEntryKind::Zip {
+                files,
+                is_text,
+                index,
+            } => {
+                let file = files.archive.retrieve_file(*index);
+                file.read_to_end(zip_sink)?;
+                if *is_text {
+                    todo!()
+                } else {
+                    let result = OndemandBinaryDeserializerBuilder::with_flavor(Eu4Flavor::new()).from_slice(zip_sink, resolver);
+                    Ok(result)
+                }
+            }
         }
     }
 

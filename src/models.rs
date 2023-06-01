@@ -529,8 +529,8 @@ pub struct Country {
     #[jomini(duplicated, alias = "previous_monarch")]
     pub previous_monarchs: Vec<ObjId>,
     pub government: Option<CountryGovernment>,
-    #[jomini(default)]
-    pub powers: [i32; 3],
+    // #[jomini(default)]
+    // pub powers: [i32; 3],
     #[jomini(default)]
     pub mercantilism: f32,
     #[jomini(default)]
