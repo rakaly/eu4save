@@ -144,9 +144,9 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                         "changed_country_adjective_from" => {
                             CountryEvent::ChangedCountryAdjectiveFrom(map.next_value()?)
                         }
-                        // "changed_country_mapcolor_from" => {
-                        //     CountryEvent::ChangedCountryMapColorFrom(map.next_value()?)
-                        // }
+                        "changed_country_mapcolor_from" => {
+                            CountryEvent::ChangedCountryMapColorFrom(map.next_value()?)
+                        }
                         "changed_tag_from" => CountryEvent::ChangedTagFrom(map.next_value()?),
                         "religion" => CountryEvent::Religion(map.next_value()?),
                         _ => {

@@ -30,7 +30,7 @@ impl<'de> Deserialize<'de> for TradeNode {
                         "highest_power" => {
                             country_section = true;
                             map.next_value::<de::IgnoredAny>()?;
-                        },
+                        }
 
                         // We need to know once the fixed fields are done as
                         // there are fields like "max" which may be accidentally
@@ -100,7 +100,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                         _ => {
                             map.next_value::<de::IgnoredAny>()?;
                             continue;
-                        },
+                        }
                     };
 
                     should_extend = true;

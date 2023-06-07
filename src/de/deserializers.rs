@@ -2,7 +2,7 @@ use crate::{
     file::{Eu4BinaryDeserializer, Eu4Deserializer, Eu4TextDeserializer},
     Eu4Error, Eu4ErrorKind,
 };
-use jomini::{binary::TokenResolver, DeserializeError};
+use jomini::binary::TokenResolver;
 use serde::Deserializer;
 
 impl<'de, 'tape, RES> Deserializer<'de> for &'_ Eu4Deserializer<'de, 'tape, RES>
@@ -341,12 +341,17 @@ where
     }
 }
 
-fn translate_deserialize_error(e: DeserializeError) -> Eu4Error {
-    let kind = match e.kind() {
-        &jomini::DeserializeErrorKind::UnknownToken { token_id } => {
-            Eu4ErrorKind::UnknownToken { token_id }
-        }
-        _ => Eu4ErrorKind::Deserialize(e),
+fn translate_deserialize_error(e: jomini::Error) -> Eu4Error {
+    let kind = match e.into_kind() {
+        jomini::ErrorKind::Deserialize(x) => match x.kind() {
+            &jomini::DeserializeErrorKind::UnknownToken { token_id } => {
+                Eu4ErrorKind::UnknownToken { token_id }
+            }
+            _ => Eu4ErrorKind::Deserialize(x),
+        },
+        _ => Eu4ErrorKind::DeserializeImpl {
+            msg: String::from("unexpected error"),
+        },
     };
 
     Eu4Error::new(kind)

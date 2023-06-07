@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::deflate::ZipInflationError;
+use crate::{deflate::ZipInflationError, file::Eu4FileEntryName};
 use zip::result::ZipError;
 
 /// An EU4 Error
@@ -69,6 +69,9 @@ pub enum Eu4ErrorKind {
 
     #[error("expected the binary integer: {0} to be parsed as a date")]
     InvalidDate(i32),
+
+    #[error("expected {0} file to exist within zip")]
+    MissingFile(Eu4FileEntryName),
 }
 
 impl From<ZipInflationError> for Eu4ErrorKind {
@@ -77,6 +80,24 @@ impl From<ZipInflationError> for Eu4ErrorKind {
             ZipInflationError::BadData { msg } => Eu4ErrorKind::ZipBadData { msg },
             ZipInflationError::EarlyEof { written } => Eu4ErrorKind::ZipEarlyEof { written },
         }
+    }
+}
+
+impl From<jomini::Error> for Eu4Error {
+    fn from(value: jomini::Error) -> Self {
+        let kind = match value.into_kind() {
+            jomini::ErrorKind::Deserialize(x) => match x.kind() {
+                &jomini::DeserializeErrorKind::UnknownToken { token_id } => {
+                    Eu4ErrorKind::UnknownToken { token_id }
+                }
+                _ => Eu4ErrorKind::Deserialize(x),
+            },
+            _ => Eu4ErrorKind::DeserializeImpl {
+                msg: String::from("unexpected error"),
+            },
+        };
+
+        Eu4Error::new(kind)
     }
 }
 

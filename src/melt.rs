@@ -1,4 +1,4 @@
-use crate::{file::Eu4Binary, flavor::Eu4Flavor, Eu4Date, Eu4Error, Eu4ErrorKind};
+use crate::{file::Eu4ParsedBinary, flavor::Eu4Flavor, Eu4Date, Eu4Error, Eu4ErrorKind};
 use jomini::{
     binary::{BinaryFlavor, FailedResolveStrategy, TokenResolver},
     common::PdsDate,
@@ -46,9 +46,9 @@ enum QuoteKind {
 enum Eu4MelterKind<'a, 'b> {
     Single(&'b BinaryTape<'a>),
     Multiple {
-        meta: &'b Eu4Binary<'a>,
-        gamestate: &'b Eu4Binary<'a>,
-        ai: &'b Eu4Binary<'a>,
+        meta: &'b Eu4ParsedBinary<'a>,
+        gamestate: &'b Eu4ParsedBinary<'a>,
+        ai: &'b Eu4ParsedBinary<'a>,
     },
 }
 
@@ -61,9 +61,9 @@ pub struct Eu4Melter<'a, 'b> {
 
 impl<'a, 'b> Eu4Melter<'a, 'b> {
     pub fn from_entries(
-        meta: &'b Eu4Binary<'a>,
-        gamestate: &'b Eu4Binary<'a>,
-        ai: &'b Eu4Binary<'a>,
+        meta: &'b Eu4ParsedBinary<'a>,
+        gamestate: &'b Eu4ParsedBinary<'a>,
+        ai: &'b Eu4ParsedBinary<'a>,
     ) -> Self {
         Eu4Melter {
             kind: Eu4MelterKind::Multiple {
@@ -624,18 +624,18 @@ mod tests {
             0x42, 0x48, 0x41,
         ];
 
-        let meta = Eu4Binary::from_slice(&data).unwrap();
+        let meta = Eu4ParsedBinary::from_slice(&data).unwrap();
 
         let mut gdata = data.to_vec();
         gdata[13] = 0x3a;
         gdata[14] = 0x29;
 
-        let gamestate = Eu4Binary::from_slice(&gdata).unwrap();
+        let gamestate = Eu4ParsedBinary::from_slice(&gdata).unwrap();
 
         let mut adata = data.to_vec();
         adata[13] = 0x76;
         adata[14] = 0x29;
-        let ai = Eu4Binary::from_slice(&adata).unwrap();
+        let ai = Eu4ParsedBinary::from_slice(&adata).unwrap();
 
         let out = Eu4Melter::from_entries(&meta, &gamestate, &ai)
             .melt(&EnvTokens)
