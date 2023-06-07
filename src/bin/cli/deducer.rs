@@ -60,13 +60,13 @@ pub fn run(data: &[u8]) -> Result<(), Box<dyn Error>> {
             .iter()
             .map(|(tag, c)| (*tag, c.ledger.expense.as_slice())),
     );
-    // deduce_vec(
-    //     save.game
-    //         .countries
-    //         .iter()
-    //         .filter(|(_tag, c)| c.num_of_cities > 0)
-    //         .map(|(tag, c)| (*tag, c.losses.members.as_slice())),
-    // );
+    deduce_vec(
+        save.game
+            .countries
+            .iter()
+            .filter(|(_tag, c)| c.num_of_cities > 0)
+            .map(|(tag, c)| (*tag, c.losses.members.as_slice())),
+    );
 
     Ok(())
 }
