@@ -409,6 +409,8 @@ pub struct Country {
     pub has_switched_nation: bool,
     #[jomini(default)]
     pub is_great_power: bool,
+    #[jomini(default, deserialize_with = "deserialize_token_bool")]
+    pub luck: bool,
     #[jomini(default)]
     pub history: CountryHistory,
     #[jomini(duplicated)]
