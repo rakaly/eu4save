@@ -81,17 +81,19 @@ impl<'a> Eu4Zip<'a> {
     }
 
     pub fn meta_file(&self) -> Result<Eu4ZipFile, Eu4Error> {
-        let index = self.archive.meta_index.ok_or_else(|| {
-            Eu4Error::new(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Meta))
-        })?;
+        let index = self
+            .archive
+            .meta_index
+            .ok_or_else(|| Eu4Error::new(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Meta)))?;
 
         Ok(self.archive.retrieve_file(index))
     }
 
     pub fn gamestate_file(&self) -> Result<Eu4ZipFile, Eu4Error> {
-        let index = self.archive.gamestate_index.ok_or_else(|| {
-            Eu4Error::new(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Gamestate))
-        })?;
+        let index = self
+            .archive
+            .gamestate_index
+            .ok_or_else(|| Eu4Error::new(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Gamestate)))?;
 
         Ok(self.archive.retrieve_file(index))
     }
@@ -789,10 +791,6 @@ impl<'data> Eu4ParsedBinary<'data> {
     pub fn from_raw(data: &'data [u8]) -> Result<Self, Eu4Error> {
         let tape = BinaryTape::from_slice(data).map_err(Eu4ErrorKind::Parse)?;
         Ok(Eu4ParsedBinary { tape })
-    }
-
-    pub(crate) fn tape(&self) -> &BinaryTape {
-        &self.tape
     }
 
     pub fn deserializer<'b, RES>(
