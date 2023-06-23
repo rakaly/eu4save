@@ -223,6 +223,7 @@ pub struct HRE {
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub enum TaxManpowerModifier {
     Historical,
     Random,
@@ -230,6 +231,7 @@ pub enum TaxManpowerModifier {
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub enum GameDifficulty {
     VeryEasy,
     Easy,
@@ -239,6 +241,7 @@ pub enum GameDifficulty {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct GameplayOptions {
     pub difficulty: GameDifficulty,
     pub tax_manpower_modifier: TaxManpowerModifier,
