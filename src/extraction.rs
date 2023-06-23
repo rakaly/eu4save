@@ -2,7 +2,6 @@ use std::fmt;
 
 /// Describes the format of the save before decoding
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "tsify", derive(tsify::Tsify), tsify(into_wasm_abi))]
 pub enum Encoding {
     /// Plaintext
     Text,
