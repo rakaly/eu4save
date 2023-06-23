@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, JominiDeserialize, Serialize)]
-#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify), tsify(into_wasm_abi))]
 pub struct Meta {
     pub campaign_id: String,
     pub save_game: String,
@@ -241,7 +241,7 @@ pub enum GameDifficulty {
 }
 
 #[derive(Debug, Clone, Serialize)]
-#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify), tsify(into_wasm_abi))]
 pub struct GameplayOptions {
     pub difficulty: GameDifficulty,
     pub tax_manpower_modifier: TaxManpowerModifier,
