@@ -22,6 +22,7 @@ pub struct AnnualLedgers {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct CountryIncomeLedger {
     pub taxation: f32,
     pub production: f32,
@@ -46,6 +47,7 @@ pub struct CountryIncomeLedger {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct CountryExpenseLedger {
     pub advisor_maintenance: f32,
     pub interest: f32,
@@ -83,6 +85,7 @@ pub struct CountryExpenseLedger {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct CountryManaUsage {
     pub adm: CountryManaSpend,
     pub dip: CountryManaSpend,
@@ -90,6 +93,7 @@ pub struct CountryManaUsage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct CountryManaSpend {
     pub buy_idea: i32,
     pub advance_tech: i32,
@@ -287,6 +291,7 @@ struct TagId {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct Inheritance {
     pub start_t0_year: i16,
     pub end_t0_year: i16,
@@ -308,12 +313,14 @@ pub enum TagDependency {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct HeirInheritanceCalculation {
     enabled: bool,
     heir_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct CuriaInheritanceCalculation {
     enabled: bool,
     controller_tag: CountryTag,
@@ -321,12 +328,14 @@ pub struct CuriaInheritanceCalculation {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct HreInheritanceCalculation {
     emperor_tag: Option<CountryTag>,
     ruler_id: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct InheritanceCalculations {
     pub hre: HreInheritanceCalculation,
     pub curia: CuriaInheritanceCalculation,

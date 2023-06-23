@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, JominiDeserialize, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify), tsify(into_wasm_abi))]
 pub struct Meta {
     pub campaign_id: String,
     pub save_game: String,
@@ -32,6 +33,7 @@ pub struct Meta {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct ModName {
     pub filename: String,
     pub name: String,
@@ -121,6 +123,7 @@ pub struct CountryTrade {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct SavegameVersion {
     pub first: u16,
     pub second: u16,
@@ -220,6 +223,7 @@ pub struct HRE {
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub enum TaxManpowerModifier {
     Historical,
     Random,
@@ -227,6 +231,7 @@ pub enum TaxManpowerModifier {
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub enum GameDifficulty {
     VeryEasy,
     Easy,
@@ -236,6 +241,7 @@ pub enum GameDifficulty {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify), tsify(into_wasm_abi))]
 pub struct GameplayOptions {
     pub difficulty: GameDifficulty,
     pub tax_manpower_modifier: TaxManpowerModifier,
@@ -693,6 +699,7 @@ pub struct Monarch {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub enum LeaderKind {
     Admiral,
     General,
@@ -701,6 +708,7 @@ pub enum LeaderKind {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct Leader {
     pub name: String,
     #[serde(alias = "type")]
@@ -858,6 +866,7 @@ pub struct Ship {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct ObjId {
     pub id: u32,
     #[serde(alias = "type")]
