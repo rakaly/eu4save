@@ -22,6 +22,7 @@ pub struct AnnualLedgers {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct CountryIncomeLedger {
     pub taxation: f32,
     pub production: f32,
