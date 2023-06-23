@@ -6,7 +6,6 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, JominiDeserialize, Serialize)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
-#[cfg_attr(feature = "tsify", tsify(into_wasm_abi))]
 pub struct Meta {
     pub campaign_id: String,
     pub save_game: String,
