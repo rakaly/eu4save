@@ -85,6 +85,7 @@ pub struct CountryExpenseLedger {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct CountryManaUsage {
     pub adm: CountryManaSpend,
     pub dip: CountryManaSpend,
@@ -92,6 +93,7 @@ pub struct CountryManaUsage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct CountryManaSpend {
     pub buy_idea: i32,
     pub advance_tech: i32,
