@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, JominiDeserialize, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct Meta {
     pub campaign_id: String,
     pub save_game: String,
@@ -32,6 +33,7 @@ pub struct Meta {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct ModName {
     pub filename: String,
     pub name: String,
@@ -121,6 +123,7 @@ pub struct CountryTrade {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct SavegameVersion {
     pub first: u16,
     pub second: u16,
