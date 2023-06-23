@@ -47,6 +47,7 @@ pub struct CountryIncomeLedger {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct CountryExpenseLedger {
     pub advisor_maintenance: f32,
     pub interest: f32,
