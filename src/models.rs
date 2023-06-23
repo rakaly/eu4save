@@ -693,6 +693,7 @@ pub struct Monarch {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub enum LeaderKind {
     Admiral,
     General,
@@ -701,6 +702,7 @@ pub enum LeaderKind {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct Leader {
     pub name: String,
     #[serde(alias = "type")]
@@ -858,6 +860,7 @@ pub struct Ship {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct ObjId {
     pub id: u32,
     #[serde(alias = "type")]
