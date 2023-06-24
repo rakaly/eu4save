@@ -808,6 +808,7 @@ pub struct InfluenceModifier {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct CountryTechnology {
     pub adm_tech: u8,
     pub dip_tech: u8,
