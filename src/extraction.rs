@@ -2,17 +2,23 @@ use std::fmt;
 
 /// Describes the format of the save before decoding
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify), tsify(into_wasm_abi))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum Encoding {
     /// Plaintext
+    #[serde(rename = "text")]
     Text,
 
     /// Plaintext documents within a zip file
+    #[serde(rename = "textzip")]
     TextZip,
 
     /// Binary documents within a zip file
+    #[serde(rename = "binzip")]
     BinaryZip,
 
     /// Binary
+    #[serde(rename = "binary")]
     Binary,
 }
 

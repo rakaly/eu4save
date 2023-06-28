@@ -232,6 +232,7 @@ pub enum TaxManpowerModifier {
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub enum GameDifficulty {
     VeryEasy,
     Easy,
