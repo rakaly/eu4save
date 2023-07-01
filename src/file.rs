@@ -97,6 +97,15 @@ impl<'a> Eu4Zip<'a> {
 
         Ok(self.archive.retrieve_file(index))
     }
+
+    pub fn ai_file(&self) -> Result<Eu4ZipFile, Eu4Error> {
+        let index = self
+            .archive
+            .ai_index
+            .ok_or_else(|| Eu4Error::new(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Ai)))?;
+
+        Ok(self.archive.retrieve_file(index))
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
