@@ -280,6 +280,7 @@ pub struct Province {
     #[jomini(default)]
     pub claims: Vec<CountryTag>,
     pub institutions: Vec<f32>,
+    pub exploit_date: Option<Eu4Date>,
     pub trade: Option<String>,
     pub original_culture: Option<String>,
     pub culture: Option<String>,
