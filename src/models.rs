@@ -716,7 +716,7 @@ pub struct Leader {
     #[serde(alias = "type")]
     pub kind: LeaderKind,
     #[serde(default)]
-    pub manuever: u16,
+    pub maneuver: u16,
     #[serde(default)]
     pub shock: u16,
     #[serde(default)]
