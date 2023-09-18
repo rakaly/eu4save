@@ -1032,3 +1032,71 @@ ironman_test!(
         assertions(m)
     }
 );
+
+
+ironman_test!(
+    bottom_achievy,
+    "BottomAchievy.eu4",
+    IronmanQuery {
+        starting: "NOV",
+        player: "RUS",
+        patch: "1.35.6.0",
+        date: Eu4Date::parse("1603.9.30").unwrap()
+    },
+    |query: Query, _melted_data: &[u8]| {
+        let player = query.country(&"RUS".parse().unwrap()).unwrap();
+        let m = query.country_mana_breakdown(&player);
+
+        #[rustfmt::skip]
+        fn assertions(m: CountryManaUsage) {
+            assert_eq!((m.adm.buy_idea, m.dip.buy_idea, m.mil.buy_idea), (2572, 4808, 2445));
+            assert_eq!((m.adm.advance_tech, m.dip.advance_tech, m.mil.advance_tech), (5306, 4681, 7296));
+            assert_eq!((m.adm.boost_stab, m.dip.boost_stab, m.mil.boost_stab), (933, 0, 0));
+            assert_eq!((m.adm.buy_general, m.dip.buy_general, m.mil.buy_general), (0, 0, 0));
+            assert_eq!((m.adm.buy_admiral, m.dip.buy_admiral, m.mil.buy_admiral), (0, 0, 0));
+            assert_eq!((m.adm.buy_conq, m.dip.buy_conq, m.mil.buy_conq), (0, 0, 0));
+            assert_eq!((m.adm.buy_explorer, m.dip.buy_explorer, m.mil.buy_explorer), (0, 0, 0));
+            assert_eq!((m.adm.develop_prov, m.dip.develop_prov, m.mil.develop_prov), (8065, 10804, 8645));
+            assert_eq!((m.adm.force_march, m.dip.force_march, m.mil.force_march), (0, 0, 0));
+            assert_eq!((m.adm.assault, m.dip.assault, m.mil.assault), (0, 0, 16));
+            assert_eq!((m.adm.seize_colony, m.dip.seize_colony, m.mil.seize_colony), (0, 0, 0));
+            assert_eq!((m.adm.burn_colony, m.dip.burn_colony, m.mil.burn_colony), (0, 0, 0));
+            assert_eq!((m.adm.attack_natives, m.dip.attack_natives, m.mil.attack_natives), (0, 0, 0));
+            assert_eq!((m.adm.scorch_earth, m.dip.scorch_earth, m.mil.scorch_earth), (0, 0, 32));
+            assert_eq!((m.adm.demand_non_wargoal_prov, m.dip.demand_non_wargoal_prov, m.mil.demand_non_wargoal_prov), (0, 219, 0));
+            assert_eq!((m.adm.reduce_inflation, m.dip.reduce_inflation, m.mil.reduce_inflation), (347, 0, 0));
+            assert_eq!((m.adm.move_capital, m.dip.move_capital, m.mil.move_capital), (0, 0, 0));
+            assert_eq!((m.adm.make_province_core, m.dip.make_province_core, m.mil.make_province_core), (3845, 0, 0));
+            assert_eq!((m.adm.replace_rival, m.dip.replace_rival, m.mil.replace_rival), (0, 94, 0));
+            assert_eq!((m.adm.change_gov, m.dip.change_gov, m.mil.change_gov), (0, 0, 0));
+            assert_eq!((m.adm.change_culture, m.dip.change_culture, m.mil.change_culture), (0, 98, 0));
+            assert_eq!((m.adm.harsh_treatment, m.dip.harsh_treatment, m.mil.harsh_treatment), (0, 0, 285));
+            assert_eq!((m.adm.reduce_we, m.dip.reduce_we, m.mil.reduce_we), (0, 0, 0));
+            assert_eq!((m.adm.boost_faction, m.dip.boost_faction, m.mil.boost_faction), (123, 117, 132));
+            assert_eq!((m.adm.raise_war_taxes, m.dip.raise_war_taxes, m.mil.raise_war_taxes), (0, 0, 0));
+            assert_eq!((m.adm.increse_tariffs, m.dip.increse_tariffs, m.mil.increse_tariffs), (0, 0, 0));
+            assert_eq!((m.adm.promote_merc, m.dip.promote_merc, m.mil.promote_merc), (0, 0, 0));
+            assert_eq!((m.adm.decrease_tariffs, m.dip.decrease_tariffs, m.mil.decrease_tariffs), (0, 0, 0));
+            assert_eq!((m.adm.move_trade_port, m.dip.move_trade_port, m.mil.move_trade_port), (0, 0, 0));
+            assert_eq!((m.adm.create_trade_post, m.dip.create_trade_post, m.mil.create_trade_post), (0, 0, 0));
+            assert_eq!((m.adm.siege_sorties, m.dip.siege_sorties, m.mil.siege_sorties), (0, 0, 36));
+            assert_eq!((m.adm.buy_religious_reform, m.dip.buy_religious_reform, m.mil.buy_religious_reform), (0, 0, 0));
+            assert_eq!((m.adm.set_primary_culture, m.dip.set_primary_culture, m.mil.set_primary_culture), (0, 0, 0));
+            assert_eq!((m.adm.add_accepted_culture, m.dip.add_accepted_culture, m.mil.add_accepted_culture), (0, 182, 0));
+            assert_eq!((m.adm.remove_accepted_culture, m.dip.remove_accepted_culture, m.mil.remove_accepted_culture), (0, 0, 0));
+            assert_eq!((m.adm.strengthen_government, m.dip.strengthen_government, m.mil.strengthen_government), (0, 0, 902));
+            assert_eq!((m.adm.artillery_barrage, m.dip.artillery_barrage, m.mil.artillery_barrage), (0, 0, 45));
+            assert_eq!((m.adm.establish_siberian_frontier, m.dip.establish_siberian_frontier, m.mil.establish_siberian_frontier), (0, 803, 0));
+            assert_eq!((m.adm.naval_barrage, m.dip.naval_barrage, m.mil.naval_barrage), (0, 0, 0));
+            assert_eq!((m.adm.add_tribal_land, m.dip.add_tribal_land, m.mil.add_tribal_land), (0, 0, 0));
+            assert_eq!((m.adm.force_march, m.dip.force_march, m.mil.force_march), (0, 0, 0));
+            assert_eq!((m.adm.create_leader, m.dip.create_leader, m.mil.create_leader), (0, 45, 1343));
+            assert_eq!((m.adm.enforce_culture, m.dip.enforce_culture, m.mil.enforce_culture), (0, 0, 0));
+            assert_eq!((m.adm.effect, m.dip.effect, m.mil.effect), (0, 0, 0));
+            assert_eq!((m.adm.minority_expulsion, m.dip.minority_expulsion, m.mil.minority_expulsion), (0, 0, 0));
+            assert_eq!((m.adm.other, m.dip.other, m.mil.other), (0, -329, 0));
+        }
+
+        assertions(m)
+    }
+);

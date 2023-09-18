@@ -946,68 +946,126 @@ impl Query {
     }
 
     fn mana_spent_indexed(&self, data: &[(i32, i32)]) -> CountryManaSpend {
-        let offset = i32::from(self.save().meta.savegame_version.second >= 31);
-        let force_march = find_index(8, data) + find_index(45, data);
-        CountryManaSpend {
-            buy_idea: find_index(0, data),
-            advance_tech: find_index(1, data),
-            boost_stab: find_index(2, data),
-            buy_general: find_index(3, data),
-            buy_admiral: find_index(4, data),
-            buy_conq: find_index(5, data),
-            buy_explorer: find_index(6, data),
-            develop_prov: find_index(7, data),
-            force_march,
-            assault: find_index(9, data),
-            seize_colony: find_index(10, data),
-            burn_colony: find_index(11, data),
-            attack_natives: find_index(12, data),
-            scorch_earth: find_index(13, data),
-            demand_non_wargoal_prov: find_index(14, data),
-            reduce_inflation: find_index(15, data),
-            move_capital: find_index(16, data),
-            make_province_core: find_index(17, data),
-            replace_rival: find_index(18, data),
-            change_gov: find_index(19, data),
-            change_culture: find_index(20, data),
-            harsh_treatment: find_index(21, data),
-            reduce_we: find_index(22, data),
-            boost_faction: find_index(23, data),
-            raise_war_taxes: find_index(24, data),
-            buy_native_advancement: if offset != 0 { 0 } else { find_index(25, data) },
-            increse_tariffs: find_index(26 - offset, data),
-            promote_merc: find_index(27 - offset, data),
-            decrease_tariffs: find_index(28 - offset, data),
-            move_trade_port: find_index(29 - offset, data),
-            create_trade_post: find_index(30 - offset, data),
-            siege_sorties: find_index(31 - offset, data),
-            buy_religious_reform: find_index(32 - offset, data),
-            set_primary_culture: find_index(33 - offset, data),
-            add_accepted_culture: find_index(34 - offset, data),
-            remove_accepted_culture: find_index(35 - offset, data),
-            strengthen_government: find_index(36 - offset, data),
-            boost_militarization: find_index(37 - offset, data),
-            artillery_barrage: find_index(39 - offset, data),
-            establish_siberian_frontier: find_index(40 - offset, data),
-            government_interaction: find_index(41 - offset, data),
-            naval_barrage: find_index(43 - offset, data),
-            add_tribal_land: if offset != 1 {
-                0
-            } else {
-                find_index(44 - offset, data)
+        const ARR: usize = 51;
+        let mut powers = [0i32; ARR];
+        for &(index, power) in data {
+            powers[(index as usize).min(ARR - 1)] += power;
+        }
+
+        let offset = usize::from(self.save().meta.savegame_version.second >= 31);
+        match self.save().meta.savegame_version.second {
+            ..=34 => {
+                CountryManaSpend {
+                    buy_idea: powers[0],
+                    advance_tech: powers[1],
+                    boost_stab: powers[2],
+                    buy_general: powers[3],
+                    buy_admiral: powers[4],
+                    buy_conq: powers[5],
+                    buy_explorer: powers[6],
+                    develop_prov: powers[7],
+                    force_march: powers[8] + powers[45],
+                    assault: powers[9],
+                    seize_colony: powers[10],
+                    burn_colony: powers[11],
+                    attack_natives: powers[12],
+                    scorch_earth: powers[13],
+                    demand_non_wargoal_prov: powers[14],
+                    reduce_inflation: powers[15],
+                    move_capital: powers[16],
+                    make_province_core: powers[17],
+                    replace_rival: powers[18],
+                    change_gov: powers[19],
+                    change_culture: powers[20],
+                    harsh_treatment: powers[21],
+                    reduce_we: powers[22],
+                    boost_faction: powers[23],
+                    raise_war_taxes: powers[24],
+                    buy_native_advancement: if offset != 0 { 0 } else { powers[25] },
+                    increse_tariffs: powers[26 - offset],
+                    promote_merc: powers[27 - offset],
+                    decrease_tariffs: powers[28 - offset],
+                    move_trade_port: powers[29 - offset],
+                    create_trade_post: powers[30 - offset],
+                    siege_sorties: powers[31 - offset],
+                    buy_religious_reform: powers[32 - offset],
+                    set_primary_culture: powers[33 - offset],
+                    add_accepted_culture: powers[34 - offset],
+                    remove_accepted_culture: powers[35 - offset],
+                    strengthen_government: powers[36 - offset],
+                    boost_militarization: powers[37 - offset],
+                    artillery_barrage: powers[39 - offset],
+                    establish_siberian_frontier: powers[40 - offset],
+                    government_interaction: powers[41 - offset],
+                    naval_barrage: powers[43 - offset],
+                    add_tribal_land: if offset != 1 {
+                        0
+                    } else {
+                        powers[44 - offset]
+                    },
+                    create_leader: powers[46],
+                    enforce_culture: powers[47],
+                    effect: powers[48],
+                    minority_expulsion: powers[49],
+                    other: powers[38 - offset]
+                        + powers[42 - offset]
+                        + powers[44] + powers[50]
+                }
+            }
+            35.. => CountryManaSpend {
+                buy_native_advancement: 0,
+                boost_militarization: 0,
+                government_interaction: 0,
+                buy_idea: powers[0],
+                advance_tech: powers[1],
+                boost_stab: powers[2],
+                buy_general: powers[3],
+                buy_admiral: powers[4],
+                buy_conq: powers[5],
+                buy_explorer: powers[6],
+                develop_prov: powers[7],
+                force_march: powers[8] + powers[43],
+                assault: powers[9],
+                seize_colony: powers[10],
+                burn_colony: powers[11],
+                attack_natives: powers[12],
+                scorch_earth: powers[13],
+                demand_non_wargoal_prov: powers[14],
+                reduce_inflation: powers[15],
+                move_capital: powers[16],
+                make_province_core: powers[17],
+                replace_rival: powers[18],
+                change_gov: powers[19],
+                change_culture: powers[20],
+                harsh_treatment: powers[21],
+                reduce_we: powers[22],
+                boost_faction: powers[23],
+                raise_war_taxes: powers[24],
+                increse_tariffs: powers[25],
+                promote_merc: powers[26],
+                decrease_tariffs: powers[27],
+                move_trade_port: powers[28],
+                create_trade_post: powers[29],
+                siege_sorties: powers[30],
+                buy_religious_reform: powers[31],
+                set_primary_culture: powers[32],
+                add_accepted_culture: powers[33],
+                remove_accepted_culture: powers[34],
+                strengthen_government: powers[35],
+                // unknown: powers[36],
+                artillery_barrage: powers[37],
+                establish_siberian_frontier: powers[38],
+                // unknown: powers[39],
+                naval_barrage: powers[40],
+                add_tribal_land: powers[41],
+                // unknown: powers[42],
+                // force_march: powers[43],
+                create_leader: powers[44],
+                enforce_culture: powers[45],
+                effect: powers[46],
+                minority_expulsion: powers[47],
+                other: powers[36] + powers[39] + powers[42] + powers[48] + powers[49] + powers[50],
             },
-            create_leader: find_index(46, data),
-            enforce_culture: find_index(47, data),
-            effect: find_index(48, data),
-            minority_expulsion: find_index(49, data),
-            other: find_index(38 - offset, data)
-                + find_index(42 - offset, data)
-                + find_index(44, data)
-                + data
-                    .iter()
-                    .filter(|(ind, _)| *ind > 49)
-                    .map(|(_, val)| val)
-                    .sum::<i32>(),
         }
     }
 
@@ -1077,13 +1135,6 @@ impl Query {
 
         initial_buildings.chain(over_time).collect()
     }
-}
-
-fn find_index(index: i32, data: &[(i32, i32)]) -> i32 {
-    data.iter()
-        .find(|&(ind, _)| *ind == index)
-        .map(|(_, val)| *val)
-        .unwrap_or(0)
 }
 
 fn nation_events(save: &Eu4Save, province_owners: &ProvinceOwners) -> Vec<NationEvents> {
