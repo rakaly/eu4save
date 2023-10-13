@@ -1033,7 +1033,6 @@ ironman_test!(
     }
 );
 
-
 ironman_test!(
     bottom_achievy,
     "BottomAchievy.eu4",
