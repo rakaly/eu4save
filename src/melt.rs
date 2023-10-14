@@ -138,7 +138,6 @@ pub(crate) fn melt<R>(melter: &Eu4Melter, resolver: &R) -> Result<MeltedDocument
 where
     R: TokenResolver,
 {
-    // let tokens = melter.tape.tokens();
     let mut out = Vec::with_capacity(melter.tokens_len() * 10);
     out.extend_from_slice(b"EU4txt\n");
     let mut unknown_tokens = HashSet::new();
@@ -155,32 +154,18 @@ where
     let mut known_date = false;
     let mut quote_mode = QuoteMode::new();
     let mut long_format = false;
-    let mut depth = 0;
     let mut queued_checksum: Option<Scalar> = None;
     let flavor = Eu4Flavor::new();
 
     while let Some(token) = melter.get_token(token_idx) {
         match token {
-            BinaryToken::Object(_) => {
-                depth += 1;
-                wtr.write_object_start()?;
-            }
-            BinaryToken::Array(_) => {
-                depth += 1;
-                wtr.write_array_start()?;
-            }
             BinaryToken::End(x) => {
-                depth -= 1;
-
                 if *x == quote_mode.idx {
                     quote_mode.clear();
                 }
 
                 wtr.write_end()?;
             }
-            BinaryToken::Bool(x) => wtr.write_bool(*x)?,
-            BinaryToken::U32(x) => wtr.write_u32(*x)?,
-            BinaryToken::U64(x) => wtr.write_u64(*x)?,
             BinaryToken::I32(x) => {
                 if known_number {
                     wtr.write_i32(*x)?;
@@ -222,9 +207,6 @@ where
                 if token_idx == quote_mode.idx {
                     quote_mode.clear();
                 }
-            }
-            BinaryToken::Unquoted(x) => {
-                wtr.write_unquoted(x.as_bytes())?;
             }
             BinaryToken::F32(x) => {
                 let val = flavor.visit_f32(*x);
@@ -303,7 +285,7 @@ where
                         _ => {}
                     }
 
-                    if depth == 2
+                    if wtr.depth() == 2
                         && matches!(id, "discovered_by" | "tribal_owner" | "active_disaster")
                     {
                         quote_mode = QuoteMode {
@@ -329,14 +311,14 @@ where
                         _ => {}
                     }
 
-                    if depth == 4 && id == "leader" {
+                    if wtr.depth() == 4 && id == "leader" {
                         quote_mode = QuoteMode {
                             kind: QuoteKind::UnquoteScalar,
                             idx: token_idx + 1,
                         }
                     }
 
-                    if depth == 0 && id == "ai" {
+                    if wtr.depth() == 0 && id == "ai" {
                         long_format = true;
                     }
 
@@ -357,21 +339,7 @@ where
                 },
             },
 
-            // Tokens below are not found in EU4 saves, but we handle them anyways.
-            BinaryToken::MixedContainer => {
-                wtr.start_mixed_mode();
-            }
-            BinaryToken::Equal => {
-                wtr.write_operator(jomini::text::Operator::Equal)?;
-            }
-            BinaryToken::Rgb(color) => {
-                wtr.write_header(b"rgb")?;
-                wtr.write_array_start()?;
-                wtr.write_u32(color.r)?;
-                wtr.write_u32(color.g)?;
-                wtr.write_u32(color.b)?;
-                wtr.write_end()?;
-            }
+            x => wtr.write_binary(x)?,
         }
 
         token_idx += 1;
