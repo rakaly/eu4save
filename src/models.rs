@@ -465,7 +465,6 @@ pub struct Country {
     pub religious_unity: f32,
     #[jomini(default)]
     pub church: Option<CountryChurch>,
-    pub initialized_rivals: bool,
     pub national_focus: Option<String>,
     pub recalculate_strategy: bool,
     pub colors: CountryColors,
