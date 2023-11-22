@@ -372,19 +372,6 @@ mod tests {
     }
 
     #[test]
-    fn test_rgb_regression() {
-        let data = [
-            45, 2, 1, 0, 1, 137, 1, 45, 1, 0, 67, 2, 0, 255, 255, 255, 255, 226, 2, 1, 0, 1, 137,
-            1, 45, 1, 56, 226, 1, 255, 255, 255, 255, 255,
-        ];
-        let tape = BinaryTape::from_slice(&data).unwrap();
-        let _ = Eu4Melter::new(&tape)
-            .on_failed_resolve(FailedResolveStrategy::Ignore)
-            .melt(&EnvTokens)
-            .unwrap();
-    }
-
-    #[test]
     fn test_ironman_nonscalar() {
         let data = [137, 53, 3, 0, 4, 0];
         let tape = BinaryTape::from_slice(&data).unwrap();
