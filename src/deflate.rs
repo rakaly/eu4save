@@ -41,10 +41,11 @@ pub(crate) fn inflate_exact(raw: &[u8], out: &mut [u8]) -> Result<(), ZipInflati
 #[cfg(feature = "zstd")]
 pub(crate) fn zstd_inflate(raw: &[u8], out: &mut [u8]) -> Result<(), ZipInflationError> {
     let mut ctx = zstd_safe::DCtx::create();
-    ctx.decompress(out, raw)
-        .map_err(|e| ZipInflationError::BadData {
+    match ctx.decompress(out, raw) {
+        Ok(written) if written == out.len() => Ok(()),
+        Ok(written) => Err(ZipInflationError::EarlyEof { written }),
+        Err(e) => Err(ZipInflationError::BadData {
             msg: zstd_safe::get_error_name(e).to_string(),
-        })?;
-
-    Ok(())
+        })
+    }
 }
