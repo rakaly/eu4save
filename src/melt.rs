@@ -1,29 +1,17 @@
-use crate::{flavor::Eu4Flavor, Eu4Date, Eu4Error, Eu4ErrorKind};
-use jomini::{
-    binary::{BinaryFlavor, FailedResolveStrategy, TokenResolver},
-    common::PdsDate,
-    BinaryTape, BinaryToken, Scalar, TextWriterBuilder,
+use crate::{
+    file::{Eu4Binary, Eu4Text, Eu4Zip},
+    flavor::Eu4Flavor,
+    Eu4Date, Eu4Error, Eu4ErrorKind,
 };
-use std::{collections::HashSet, io::Cursor};
-
-#[derive(Debug)]
-struct QuoteMode {
-    kind: QuoteKind,
-    idx: usize,
-}
-
-impl QuoteMode {
-    fn new() -> Self {
-        QuoteMode {
-            kind: QuoteKind::Inactive,
-            idx: 0,
-        }
-    }
-
-    fn clear(&mut self) {
-        self.kind = QuoteKind::Inactive;
-    }
-}
+use jomini::{
+    binary::{self, BinaryFlavor, FailedResolveStrategy, TokenReader, TokenResolver},
+    common::PdsDate,
+    TextWriterBuilder,
+};
+use std::{
+    collections::HashSet,
+    io::{Read, Write},
+};
 
 #[derive(Debug, Clone, Copy)]
 enum QuoteKind {
@@ -43,89 +31,260 @@ enum QuoteKind {
     ForceQuote,
 }
 
-/// Convert a binary save to plaintext
-pub struct Eu4Melter<'a, 'b> {
-    tape: &'b BinaryTape<'a>,
-    verbatim: bool,
-    on_failed_resolve: FailedResolveStrategy,
+#[derive(Debug, Default)]
+struct Quoter {
+    queued: Option<QuoteKind>,
+    depth: Vec<QuoteKind>,
 }
 
-impl<'a, 'b> Eu4Melter<'a, 'b> {
-    pub(crate) fn new(tape: &'b BinaryTape<'a>) -> Self {
-        Eu4Melter {
-            tape,
+impl Quoter {
+    #[inline]
+    pub fn push(&mut self) {
+        let next = match self.queued.take() {
+            Some(x @ QuoteKind::ForceQuote | x @ QuoteKind::UnquoteAll) => x,
+            _ => QuoteKind::Inactive,
+        };
+
+        self.depth.push(next);
+    }
+
+    #[inline]
+    pub fn pop(&mut self) {
+        let _ = self.depth.pop();
+    }
+
+    #[inline]
+    pub fn take_scalar(&mut self) -> QuoteKind {
+        match self.queued.take() {
+            Some(x) => x,
+            None => self.depth.last().copied().unwrap_or(QuoteKind::Inactive),
+        }
+    }
+
+    #[inline]
+    fn queue(&mut self, mode: QuoteKind) {
+        self.queued = Some(mode);
+    }
+
+    #[inline]
+    fn clear_queued(&mut self) {
+        self.queued = None;
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MeltOptions {
+    skip_checksum: bool,
+    verbatim: bool,
+    on_failed_resolve: FailedResolveStrategy,
+    check_header: bool,
+}
+
+impl Default for MeltOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MeltOptions {
+    pub fn new() -> Self {
+        Self {
+            skip_checksum: false,
             verbatim: false,
             on_failed_resolve: FailedResolveStrategy::Ignore,
+            check_header: true,
+        }
+    }
+
+    pub fn skip_checksum(self, skip_checksum: bool) -> Self {
+        MeltOptions {
+            skip_checksum,
+            ..self
+        }
+    }
+
+    pub fn verbatim(self, verbatim: bool) -> Self {
+        MeltOptions { verbatim, ..self }
+    }
+
+    pub fn check_header(self, check_header: bool) -> Self {
+        MeltOptions {
+            check_header,
+            ..self
+        }
+    }
+
+    pub fn on_failed_resolve(self, on_failed_resolve: FailedResolveStrategy) -> Self {
+        MeltOptions {
+            on_failed_resolve,
+            ..self
+        }
+    }
+}
+
+#[derive(Debug)]
+enum MeltInput<'data> {
+    Text(Eu4Text<'data>),
+    Binary(Eu4Binary<'data>),
+    TextStream(crate::DeflateReader<'data>),
+    BinaryStream(crate::DeflateReader<'data>),
+    Zip(Eu4Zip<'data>),
+}
+
+pub struct Eu4Melter<'data> {
+    input: MeltInput<'data>,
+    options: MeltOptions,
+}
+
+impl<'data> From<Eu4Zip<'data>> for Eu4Melter<'data> {
+    fn from(value: Eu4Zip<'data>) -> Self {
+        Eu4Melter {
+            input: MeltInput::Zip(value),
+            options: MeltOptions::new(),
+        }
+    }
+}
+
+impl<'data> From<Eu4Text<'data>> for Eu4Melter<'data> {
+    fn from(value: Eu4Text<'data>) -> Self {
+        Eu4Melter {
+            input: MeltInput::Text(value),
+            options: MeltOptions::new(),
+        }
+    }
+}
+
+impl<'data> From<Eu4Binary<'data>> for Eu4Melter<'data> {
+    fn from(value: Eu4Binary<'data>) -> Self {
+        Eu4Melter {
+            input: MeltInput::Binary(value),
+            options: MeltOptions::new(),
+        }
+    }
+}
+
+impl<'data> Eu4Melter<'data> {
+    pub fn from_reader(stream: crate::DeflateReader<'data>, is_text: bool) -> Self {
+        if is_text {
+            Eu4Melter {
+                input: MeltInput::TextStream(stream),
+                options: MeltOptions::new(),
+            }
+        } else {
+            Eu4Melter {
+                input: MeltInput::BinaryStream(stream),
+                options: MeltOptions::new(),
+            }
         }
     }
 
     pub fn verbatim(&mut self, verbatim: bool) -> &mut Self {
-        self.verbatim = verbatim;
+        self.options = self.options.verbatim(verbatim);
         self
     }
 
-    pub fn on_failed_resolve(&mut self, strategy: FailedResolveStrategy) -> &mut Self {
-        self.on_failed_resolve = strategy;
+    pub fn on_failed_resolve(&mut self, on_failed_resolve: FailedResolveStrategy) -> &mut Self {
+        self.options = self.options.on_failed_resolve(on_failed_resolve);
         self
     }
 
-    pub(crate) fn tokens_len(&self) -> usize {
-        self.tape.tokens().len()
-    }
-
-    pub(crate) fn get_token(&self, idx: usize) -> Option<&BinaryToken> {
-        self.tape.tokens().get(idx)
-    }
-
-    pub(crate) fn skip_value_idx(&self, token_idx: usize) -> usize {
-        self.get_token(token_idx + 1)
-            .map(|next_token| match next_token {
-                BinaryToken::Object(end) | BinaryToken::Array(end) => end + 1,
-                _ => token_idx + 2,
-            })
-            .unwrap_or(token_idx + 1)
-    }
-
-    pub fn melt<R>(&self, resolver: &R) -> Result<MeltedDocument, Eu4Error>
+    pub fn melt<Writer, Resolver>(
+        &mut self,
+        mut output: Writer,
+        resolver: Resolver,
+    ) -> Result<MeltedDocument, Eu4Error>
     where
-        R: TokenResolver,
+        Writer: Write,
+        Resolver: TokenResolver,
     {
-        let out = melt(self, resolver).map_err(|e| match e {
-            MelterError::Write(x) => Eu4ErrorKind::Writer(x),
-            MelterError::UnknownToken { token_id } => Eu4ErrorKind::UnknownToken { token_id },
-            MelterError::InvalidDate(x) => Eu4ErrorKind::InvalidDate(x),
-        })?;
-        Ok(out)
+        match &mut self.input {
+            MeltInput::Text(x) => {
+                output.write_all(b"EU4txt\n")?;
+                output.write_all(x.data())?;
+                Ok(MeltedDocument::new())
+            }
+            MeltInput::TextStream(ref mut x) => {
+                std::io::copy(x, &mut output)?;
+                Ok(MeltedDocument::new())
+            }
+            MeltInput::Binary(x) => {
+                output.write_all(b"EU4txt\n")?;
+                let result = melt(x.data(), output, resolver, self.options.check_header(false))?;
+                Ok(result)
+            }
+            MeltInput::BinaryStream(x) => {
+                output.write_all(b"EU4txt\n")?;
+                let result = melt(x, output, resolver, self.options)?;
+                Ok(result)
+            }
+            MeltInput::Zip(zip) => {
+                if zip.is_text() {
+                    let meta = zip.meta_file()?;
+                    std::io::copy(&mut meta.reader(), &mut output)?;
+
+                    let mut header = [0u8; 7];
+                    let gamestate = zip.gamestate_file()?;
+                    let mut reader = gamestate.reader();
+                    reader.read_exact(&mut header[..])?;
+                    std::io::copy(&mut reader, &mut output)?;
+
+                    let ai = zip.ai_file()?;
+                    let mut reader = ai.reader();
+                    reader.read_exact(&mut header[..])?;
+                    std::io::copy(&mut reader, &mut output)?;
+
+                    Ok(MeltedDocument::new())
+                } else {
+                    output.write_all(b"EU4txt\n")?;
+                    let meta = zip.meta_file()?;
+                    let meta_result = melt(
+                        meta.reader(),
+                        &mut output,
+                        &resolver,
+                        self.options.skip_checksum(true),
+                    )?;
+
+                    let gamestate = zip.gamestate_file()?;
+                    let gamestate_result = melt(
+                        gamestate.reader(),
+                        &mut output,
+                        &resolver,
+                        self.options.skip_checksum(true),
+                    )?;
+
+                    let ai = zip.ai_file()?;
+                    let ai_result = melt(
+                        ai.reader(),
+                        &mut output,
+                        &resolver,
+                        self.options.skip_checksum(false),
+                    )?;
+
+                    let union = meta_result
+                        .unknown_tokens
+                        .iter()
+                        .chain(gamestate_result.unknown_tokens.iter())
+                        .chain(ai_result.unknown_tokens.iter())
+                        .copied()
+                        .collect::<HashSet<u16>>();
+
+                    Ok(MeltedDocument {
+                        unknown_tokens: union,
+                    })
+                }
+            }
+        }
     }
 }
 
-#[derive(thiserror::Error, Debug)]
-pub(crate) enum MelterError {
-    #[error("{0}")]
-    Write(#[from] jomini::Error),
-
-    #[error("")]
-    UnknownToken { token_id: u16 },
-
-    #[error("")]
-    InvalidDate(i32),
-}
-
-/// Output from melting a binary save to plaintext
+#[derive(Debug, Default)]
 pub struct MeltedDocument {
-    data: Vec<u8>,
     unknown_tokens: HashSet<u16>,
 }
 
 impl MeltedDocument {
-    /// The converted plaintext data
-    pub fn into_data(self) -> Vec<u8> {
-        self.data
-    }
-
-    /// The converted plaintext data
-    pub fn data(&self) -> &[u8] {
-        self.data.as_slice()
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// The list of unknown tokens that the provided resolver accumulated
@@ -134,103 +293,100 @@ impl MeltedDocument {
     }
 }
 
-pub(crate) fn melt<R>(melter: &Eu4Melter, resolver: &R) -> Result<MeltedDocument, MelterError>
+fn melt<Reader, Writer, Resolver>(
+    input: Reader,
+    output: Writer,
+    resolver: Resolver,
+    options: MeltOptions,
+) -> Result<MeltedDocument, Eu4Error>
 where
-    R: TokenResolver,
+    Reader: Read,
+    Writer: Write,
+    Resolver: TokenResolver,
 {
-    let mut out = Vec::with_capacity(melter.tokens_len() * 10);
-    out.extend_from_slice(b"EU4txt\n");
-    let mut unknown_tokens = HashSet::new();
-    let pos = out.len() as u64;
-    let mut writer = Cursor::new(out);
-    writer.set_position(pos);
+    let mut reader = TokenReader::new(input);
+    if options.check_header && reader.read_bytes(6)? != b"EU4bin" {
+        return Err(Eu4Error::new(Eu4ErrorKind::UnknownHeader));
+    }
 
     let mut wtr = TextWriterBuilder::new()
         .indent_char(b'\t')
         .indent_factor(1)
-        .from_writer(writer);
-    let mut token_idx = 0;
+        .from_writer(output);
+    let flavor = Eu4Flavor::new();
+    let mut unknown_tokens: HashSet<u16> = HashSet::new();
+    let skip_checksum = options.skip_checksum;
+    let verbatim = options.verbatim;
+    let on_failed_resolve = options.on_failed_resolve;
+
+    let mut quoter = Quoter::default();
     let mut known_number = false;
     let mut known_date = false;
-    let mut quote_mode = QuoteMode::new();
     let mut long_format = false;
-    let mut queued_checksum: Option<Scalar> = None;
-    let flavor = Eu4Flavor::new();
-
-    while let Some(token) = melter.get_token(token_idx) {
+    while let Some(token) = reader.next()? {
         match token {
-            BinaryToken::End(x) => {
-                if *x == quote_mode.idx {
-                    quote_mode.clear();
-                }
-
-                wtr.write_end()?;
+            jomini::binary::Token::Open => {
+                quoter.push();
+                wtr.write_array_start()?
             }
-            BinaryToken::I32(x) => {
+            jomini::binary::Token::Close => {
+                quoter.pop();
+                wtr.write_end()?
+            }
+            jomini::binary::Token::Equal => wtr.write_operator(jomini::text::Operator::Equal)?,
+            jomini::binary::Token::U32(x) => wtr.write_u32(x)?,
+            jomini::binary::Token::U64(x) => wtr.write_u64(x)?,
+            jomini::binary::Token::I32(x) => {
                 if known_number {
-                    wtr.write_i32(*x)?;
+                    wtr.write_i32(x)?;
                     known_number = false;
                 } else if known_date {
-                    if let Some(date) = Eu4Date::from_binary(*x) {
+                    if let Some(date) = Eu4Date::from_binary(x) {
                         wtr.write_date(date.game_fmt())?;
-                    } else if melter.on_failed_resolve != FailedResolveStrategy::Error {
-                        wtr.write_i32(*x)?;
+                    } else if on_failed_resolve != FailedResolveStrategy::Error {
+                        wtr.write_i32(x)?;
                     } else {
-                        return Err(MelterError::InvalidDate(*x));
+                        return Err(Eu4Error::new(Eu4ErrorKind::InvalidDate(x)));
                     }
                     known_date = false;
-                } else if let Some(date) = Eu4Date::from_binary_heuristic(*x) {
+                } else if let Some(date) = Eu4Date::from_binary_heuristic(x) {
                     wtr.write_date(date.game_fmt())?;
                 } else {
-                    wtr.write_i32(*x)?;
+                    wtr.write_i32(x)?;
                 }
             }
-            BinaryToken::Quoted(x) => {
-                match quote_mode.kind {
-                    QuoteKind::Inactive if wtr.expecting_key() => {
-                        wtr.write_unquoted(x.as_bytes())?
-                    }
-                    QuoteKind::Inactive => wtr.write_quoted(x.as_bytes())?,
-                    QuoteKind::ForceQuote => wtr.write_quoted(x.as_bytes())?,
-                    QuoteKind::UnquoteAll => wtr.write_unquoted(x.as_bytes())?,
-                    QuoteKind::UnquoteScalar if token_idx == quote_mode.idx => {
-                        wtr.write_unquoted(x.as_bytes())?
-                    }
-                    QuoteKind::UnquoteScalar => wtr.write_quoted(x.as_bytes())?,
-                    QuoteKind::QuoteScalar if token_idx == quote_mode.idx => {
-                        wtr.write_quoted(x.as_bytes())?
-                    }
-                    QuoteKind::QuoteScalar => wtr.write_unquoted(x.as_bytes())?,
-                };
-
-                // Clear quote mode after encountering a scalar value
-                if token_idx == quote_mode.idx {
-                    quote_mode.clear();
-                }
+            jomini::binary::Token::Bool(x) => wtr.write_bool(x)?,
+            jomini::binary::Token::Unquoted(x) => wtr.write_unquoted(x.as_bytes())?,
+            jomini::binary::Token::Quoted(x) => match quoter.take_scalar() {
+                QuoteKind::Inactive if wtr.expecting_key() => wtr.write_unquoted(x.as_bytes())?,
+                QuoteKind::Inactive => wtr.write_quoted(x.as_bytes())?,
+                QuoteKind::ForceQuote => wtr.write_quoted(x.as_bytes())?,
+                QuoteKind::UnquoteAll => wtr.write_unquoted(x.as_bytes())?,
+                QuoteKind::UnquoteScalar => wtr.write_unquoted(x.as_bytes())?,
+                QuoteKind::QuoteScalar => wtr.write_quoted(x.as_bytes())?,
+            },
+            jomini::binary::Token::F32(x) if long_format => {
+                write!(&mut wtr, "{:.6}", flavor.visit_f32(x))?
             }
-            BinaryToken::F32(x) => {
-                let val = flavor.visit_f32(*x);
-                if long_format {
-                    write!(&mut wtr, "{:.6}", val)?;
-                } else {
-                    write!(&mut wtr, "{:.3}", val)?;
-                }
-            }
-            BinaryToken::F64(x) => write!(&mut wtr, "{:.5}", flavor.visit_f64(*x))?,
-            BinaryToken::Token(x) => match resolver.resolve(*x) {
+            jomini::binary::Token::F32(x) => write!(&mut wtr, "{:.3}", flavor.visit_f32(x))?,
+            jomini::binary::Token::F64(x) => write!(&mut wtr, "{:.5}", flavor.visit_f64(x))?,
+            jomini::binary::Token::Rgb(x) => wtr.write_rgb(&x)?,
+            jomini::binary::Token::I64(x) => wtr.write_i64(x)?,
+            jomini::binary::Token::Id(x) => match resolver.resolve(x) {
                 Some(id) => {
-                    let skip = (id == "is_ironman" && !melter.verbatim) || id == "checksum";
-                    if skip && wtr.expecting_key() {
-                        let next = melter.get_token(token_idx + 1);
-                        if id == "checksum" {
-                            if let Some(BinaryToken::Quoted(s)) = next {
-                                queued_checksum = Some(*s);
-                            }
-                        };
+                    if (id == "checksum" && skip_checksum) || (id == "is_ironman" && !verbatim) {
+                        let mut next = reader.read()?;
+                        if matches!(next, binary::Token::Equal) {
+                            next = reader.read()?;
+                        }
 
-                        token_idx = melter.skip_value_idx(token_idx);
+                        if matches!(next, binary::Token::Open) {
+                            reader.skip_container()?;
+                        }
                         continue;
                     }
+
+                    quoter.clear_queued();
 
                     // There are certain tokens that we know are integers and will dupe the date heuristic
                     known_number = id == "random" || id.ends_with("seed") || id == "id";
@@ -276,46 +432,29 @@ where
                         | "transfer_trade_power_to"
                         | "guarantees"
                         | "warnings"
-                        | "flags" => {
-                            quote_mode = QuoteMode {
-                                kind: QuoteKind::UnquoteAll,
-                                idx: token_idx + 1,
-                            };
-                        }
+                        | "flags" => quoter.queue(QuoteKind::UnquoteAll),
                         _ => {}
                     }
 
                     if wtr.depth() == 2
                         && matches!(id, "discovered_by" | "tribal_owner" | "active_disaster")
                     {
-                        quote_mode = QuoteMode {
-                            kind: QuoteKind::UnquoteAll,
-                            idx: token_idx + 1,
-                        };
+                        quoter.queue(QuoteKind::UnquoteAll);
                     }
 
                     match id {
                         "culture_group" | "saved_names" | "tech_level_dates"
                         | "incident_variables" => {
-                            quote_mode = QuoteMode {
-                                kind: QuoteKind::ForceQuote,
-                                idx: token_idx + 1,
-                            };
+                            quoter.queue(QuoteKind::ForceQuote);
                         }
                         "subjects" => {
-                            quote_mode = QuoteMode {
-                                kind: QuoteKind::QuoteScalar,
-                                idx: token_idx + 1,
-                            };
+                            quoter.queue(QuoteKind::QuoteScalar);
                         }
                         _ => {}
                     }
 
                     if wtr.depth() == 4 && id == "leader" {
-                        quote_mode = QuoteMode {
-                            kind: QuoteKind::UnquoteScalar,
-                            idx: token_idx + 1,
-                        }
+                        quoter.queue(QuoteKind::UnquoteScalar);
                     }
 
                     if wtr.depth() == 0 && id == "ai" {
@@ -324,79 +463,50 @@ where
 
                     wtr.write_unquoted(id.as_bytes())?;
                 }
-                None => match melter.on_failed_resolve {
+                None => match on_failed_resolve {
                     FailedResolveStrategy::Error => {
-                        return Err(MelterError::UnknownToken { token_id: *x });
+                        return Err(Eu4Error::new(Eu4ErrorKind::UnknownToken { token_id: x }))
                     }
                     FailedResolveStrategy::Ignore if wtr.expecting_key() => {
-                        token_idx = melter.skip_value_idx(token_idx);
-                        continue;
+                        let mut next = reader.read()?;
+                        if matches!(next, binary::Token::Equal) {
+                            next = reader.read()?;
+                        }
+
+                        if matches!(next, binary::Token::Open) {
+                            reader.skip_container()?;
+                        }
                     }
                     _ => {
-                        unknown_tokens.insert(*x);
+                        unknown_tokens.insert(x);
                         write!(wtr, "__unknown_0x{:x}", x)?;
                     }
                 },
             },
-
-            x => wtr.write_binary(x)?,
         }
-
-        token_idx += 1;
     }
 
-    if let Some(checksum) = queued_checksum.take() {
-        wtr.write_unquoted(b"checksum")?;
-        wtr.write_quoted(checksum.as_bytes())?;
-    }
-
-    Ok(MeltedDocument {
-        data: wtr.into_inner().into_inner(),
-        unknown_tokens,
-    })
+    Ok(MeltedDocument { unknown_tokens })
 }
 
 #[cfg(all(test, ironman))]
 mod tests {
+    use std::io::Cursor;
+
     use super::*;
     use crate::{EnvTokens, Eu4File};
-
-    #[test]
-    fn test_short_input_regression() {
-        // Make sure it doesn't crash
-        let tape = BinaryTape::from_slice(&[]).unwrap();
-        let _ = Eu4Melter::new(&tape)
-            .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&EnvTokens)
-            .unwrap();
-    }
-
-    #[test]
-    fn test_ironman_nonscalar() {
-        let data = [137, 53, 3, 0, 4, 0];
-        let tape = BinaryTape::from_slice(&data).unwrap();
-        let expected = b"EU4txt\n";
-        let out = Eu4Melter::new(&tape)
-            .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&EnvTokens)
-            .unwrap();
-        assert_eq!(out.data(), &expected[..]);
-    }
 
     #[test]
     fn test_melt_meta() {
         let meta = include_bytes!("../tests/it/fixtures/meta.bin");
         let expected = include_bytes!("../tests/it/fixtures/meta.bin.melted");
         let file = Eu4File::from_slice(&meta[..]).unwrap();
-        let mut zip_sink = Vec::new();
-        let parsed_file = file.parse(&mut zip_sink).unwrap();
-        let binary = parsed_file.as_binary().unwrap();
-        let out = binary
-            .melter()
+        let mut out = Cursor::new(Vec::new());
+        file.melter()
             .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&EnvTokens)
+            .melt(&mut out, &EnvTokens)
             .unwrap();
-        assert_eq!(out.data(), &expected[..]);
+        assert_eq!(out.into_inner().as_slice(), &expected[..]);
     }
 
     #[test]
@@ -409,16 +519,12 @@ mod tests {
 
         let expected = b"EU4txt\ndate=1804.12.9\nplayer=\"BHA\"";
         let file = Eu4File::from_slice(&data).unwrap();
-        let mut zip_sink = Vec::new();
-        let parsed_file = file.parse(&mut zip_sink).unwrap();
-        let binary = parsed_file.as_binary().unwrap();
-        let out = binary
-            .melter()
+        let mut out = Cursor::new(Vec::new());
+        file.melter()
             .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&EnvTokens)
+            .melt(&mut out, &EnvTokens)
             .unwrap();
-
-        assert_eq!(out.data(), &expected[..]);
+        assert_eq!(out.into_inner().as_slice(), &expected[..]);
     }
 
     #[test]
@@ -431,16 +537,15 @@ mod tests {
 
         let expected = "EU4txt\ndate=1804.12.9\nimpassable={ }\nplayer=\"BHA\"";
         let file = Eu4File::from_slice(&data).unwrap();
-        let mut zip_sink = Vec::new();
-        let parsed_file = file.parse(&mut zip_sink).unwrap();
-        let binary = parsed_file.as_binary().unwrap();
-        let out = binary
-            .melter()
+        let mut out = Cursor::new(Vec::new());
+        file.melter()
             .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&EnvTokens)
+            .melt(&mut out, &EnvTokens)
             .unwrap();
-
-        assert_eq!(std::str::from_utf8(&out.data()).unwrap(), &expected[..]);
+        assert_eq!(
+            std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
+            &expected[..]
+        );
     }
 
     #[test]
@@ -456,16 +561,15 @@ mod tests {
         let expected = "EU4txt\nflags={\n\tschools_initiated=1444.11.11\n\n}";
 
         let file = Eu4File::from_slice(&data).unwrap();
-        let mut zip_sink = Vec::new();
-        let parsed_file = file.parse(&mut zip_sink).unwrap();
-        let binary = parsed_file.as_binary().unwrap();
-        let out = binary
-            .melter()
+        let mut out = Cursor::new(Vec::new());
+        file.melter()
             .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&EnvTokens)
+            .melt(&mut out, &EnvTokens)
             .unwrap();
-
-        assert_eq!(std::str::from_utf8(out.data()).unwrap(), &expected[..]);
+        assert_eq!(
+            std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
+            &expected[..]
+        );
     }
 
     #[test]
@@ -478,15 +582,15 @@ mod tests {
 
         let expected = "EU4txt\nplayer=\"BHA\"";
         let file = Eu4File::from_slice(&data).unwrap();
-        let mut zip_sink = Vec::new();
-        let parsed_file = file.parse(&mut zip_sink).unwrap();
-        let binary = parsed_file.as_binary().unwrap();
-        let out = binary
-            .melter()
+        let mut out = Cursor::new(Vec::new());
+        file.melter()
             .on_failed_resolve(FailedResolveStrategy::Ignore)
-            .melt(&EnvTokens)
+            .melt(&mut out, &EnvTokens)
             .unwrap();
-        assert_eq!(std::str::from_utf8(out.data()).unwrap(), &expected[..]);
+        assert_eq!(
+            std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
+            &expected[..]
+        );
     }
 
     #[test]
@@ -499,14 +603,14 @@ mod tests {
 
         let expected = "EU4txt\ndate=__unknown_0xffff\nplayer=\"BHA\"";
         let file = Eu4File::from_slice(&data).unwrap();
-        let mut zip_sink = Vec::new();
-        let parsed_file = file.parse(&mut zip_sink).unwrap();
-        let binary = parsed_file.as_binary().unwrap();
-        let out = binary
-            .melter()
+        let mut out = Cursor::new(Vec::new());
+        file.melter()
             .on_failed_resolve(FailedResolveStrategy::Ignore)
-            .melt(&EnvTokens)
+            .melt(&mut out, &EnvTokens)
             .unwrap();
-        assert_eq!(std::str::from_utf8(out.data()).unwrap(), &expected[..]);
+        assert_eq!(
+            std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
+            &expected[..]
+        );
     }
 }

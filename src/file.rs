@@ -2,15 +2,18 @@
 use crate::{
     flavor::Eu4Flavor,
     models::{Eu4Save, GameState, Meta},
-    Encoding, Eu4Error, Eu4ErrorKind, Eu4Melter,
+    CompressionMethod, Encoding, Eu4Error, Eu4ErrorKind, Eu4Melter,
 };
 use jomini::{
     binary::{de::OndemandBinaryDeserializer, FailedResolveStrategy, TokenResolver},
-    text::ObjectReader,
-    BinaryDeserializer, BinaryTape, TextDeserializer, TextTape, Windows1252Encoding,
+    text::{de::TextReaderDeserializer, ObjectReader},
+    BinaryDeserializer, BinaryTape, SliceReader, TextDeserializer, TextTape, Windows1252Encoding,
 };
-use serde::Deserialize;
-use std::{fmt::Display, io::Cursor};
+use serde::{de::DeserializeOwned, Deserialize};
+use std::{
+    fmt::Display,
+    io::{Cursor, Read},
+};
 use zip::{result::ZipError, CompressionMethod as ZipCompressionMethod};
 
 const TXT_HEADER: &[u8] = b"EU4txt";
@@ -32,13 +35,6 @@ fn is_bin(data: &[u8]) -> Option<&[u8]> {
     } else {
         None
     }
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-enum CompressionMethod {
-    Deflate,
-    #[cfg(feature = "zstd")]
-    Zstd,
 }
 
 #[derive(Debug)]
@@ -69,7 +65,7 @@ pub struct Eu4Zip<'a> {
 impl<'a> Eu4Zip<'a> {
     pub fn read_to_end(&self, zip_sink: &'a mut Vec<u8>) -> Result<(), Eu4Error> {
         for index in self.archive.files() {
-            let file = self.archive.retrieve_file(index);
+            let file = self.archive.retrieve_file(index, self.is_text);
             file.read_to_end(zip_sink)?;
         }
 
@@ -86,7 +82,7 @@ impl<'a> Eu4Zip<'a> {
             .meta_index
             .ok_or_else(|| Eu4Error::new(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Meta)))?;
 
-        Ok(self.archive.retrieve_file(index))
+        Ok(self.archive.retrieve_file(index, self.is_text))
     }
 
     pub fn gamestate_file(&self) -> Result<Eu4ZipFile, Eu4Error> {
@@ -95,7 +91,7 @@ impl<'a> Eu4Zip<'a> {
             .gamestate_index
             .ok_or_else(|| Eu4Error::new(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Gamestate)))?;
 
-        Ok(self.archive.retrieve_file(index))
+        Ok(self.archive.retrieve_file(index, self.is_text))
     }
 
     pub fn ai_file(&self) -> Result<Eu4ZipFile, Eu4Error> {
@@ -104,7 +100,7 @@ impl<'a> Eu4Zip<'a> {
             .ai_index
             .ok_or_else(|| Eu4Error::new(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Ai)))?;
 
-        Ok(self.archive.retrieve_file(index))
+        Ok(self.archive.retrieve_file(index, self.is_text))
     }
 }
 
@@ -120,19 +116,21 @@ struct VerifiedIndex {
 impl VerifiedIndex {
     fn is_text(&self, data: &[u8]) -> Result<bool, Eu4Error> {
         let raw = &data[self.data_start..self.data_end];
+        let mut header = [0; TXT_HEADER.len()];
         match self.compression {
             CompressionMethod::Deflate => {
-                let mut header = [0; TXT_HEADER.len()];
                 crate::deflate::inflate_exact(raw, &mut header).map_err(Eu4ErrorKind::from)?;
-                Ok(is_text(&header).is_some())
             }
             #[cfg(feature = "zstd")]
             CompressionMethod::Zstd => {
-                let mut header = vec![0; self.size];
-                crate::deflate::zstd_inflate(raw, &mut header).map_err(Eu4ErrorKind::from)?;
-                Ok(is_text(&header).is_some())
+                zstd::stream::read::Decoder::with_buffer(raw)
+                    .expect("zstd to initialize")
+                    .read_exact(&mut header)
+                    .map_err(Eu4ErrorKind::from)?;
             }
         }
+
+        Ok(is_text(&header).is_some())
     }
 }
 
@@ -205,12 +203,13 @@ impl<'a> Eu4ZipFiles<'a> {
         }
     }
 
-    pub fn retrieve_file(&self, index: VerifiedIndex) -> Eu4ZipFile {
+    pub fn retrieve_file(&self, index: VerifiedIndex, is_text: bool) -> Eu4ZipFile<'a> {
         let raw = &self.archive[index.data_start..index.data_end];
         Eu4ZipFile {
             raw,
             compression: index.compression,
             size: index.size,
+            is_text,
         }
     }
 
@@ -227,6 +226,7 @@ pub struct Eu4ZipFile<'a> {
     raw: &'a [u8],
     size: usize,
     compression: CompressionMethod,
+    is_text: bool,
 }
 
 impl<'a> Eu4ZipFile<'a> {
@@ -258,8 +258,17 @@ impl<'a> Eu4ZipFile<'a> {
     pub fn size(&self) -> usize {
         self.size
     }
+
+    pub fn reader(&self) -> crate::DeflateReader<'a> {
+        crate::DeflateReader::new(self.raw, self.compression)
+    }
+
+    pub fn melter(&self) -> Eu4Melter {
+        Eu4Melter::from_reader(self.reader(), self.is_text)
+    }
 }
 
+#[derive(Debug, Clone)]
 pub enum Eu4FileKind<'a> {
     Text(Eu4Text<'a>),
     Binary(Eu4Binary<'a>),
@@ -272,6 +281,7 @@ pub enum Eu4FileKind<'a> {
 /// files within a zip.
 ///
 /// Only consumes enough data to determine encoding of the file
+#[derive(Debug, Clone)]
 pub struct Eu4File<'a> {
     kind: Eu4FileKind<'a>,
 }
@@ -351,37 +361,31 @@ impl<'a> Eu4File<'a> {
         R: TokenResolver,
     {
         match &self.kind {
-            Eu4FileKind::Text(x) => {
-                let text = x.parse()?;
-                Eu4Save::from_deserializer(&text.deserializer())
-            }
-            Eu4FileKind::Binary(x) => {
-                let binary = x.parse()?;
-                Eu4Save::from_deserializer(&binary.deserializer(resolver))
-            }
+            Eu4FileKind::Text(x) => Ok(x.deserializer().deserialize()?),
+            Eu4FileKind::Binary(x) => Ok(x.deserializer(resolver).deserialize()?),
             Eu4FileKind::Zip(zip) => {
-                if zip.is_text() {
-                    let mut zip_sink = Vec::new();
-                    zip.read_to_end(&mut zip_sink)?;
-                    let text = Eu4ParsedText::from_slice(&zip_sink)?;
-                    Eu4Save::from_deserializer(&text.deserializer())
-                } else {
-                    let meta_file = zip.meta_file()?;
-                    let gamestate_file = zip.gamestate_file()?;
-                    let mut zip_sink = vec![0; meta_file.size().max(gamestate_file.size())];
+                let meta_file = zip.meta_file()?;
+                let gamestate_file = zip.gamestate_file()?;
+                let max_size = meta_file.size().max(gamestate_file.size());
+                let mut zip_sink = Vec::with_capacity(max_size);
 
-                    let meta_data = &mut zip_sink[..meta_file.size()];
-                    meta_file.read_exact(meta_data)?;
-                    let file = Eu4Binary::from_slice(meta_data)?;
-                    let meta: Meta = file.ondemand_deserializer(resolver).deserialize()?;
-
-                    let gamestate_data = &mut zip_sink[..gamestate_file.size()];
-                    gamestate_file.read_exact(gamestate_data)?;
-                    let file = Eu4Binary::from_slice(gamestate_data)?;
-                    let game: GameState = file.ondemand_deserializer(resolver).deserialize()?;
-
-                    Ok(Eu4Save { meta, game })
+                // This is safe as the "read_exact" method guarantee to
+                // initialize the entire passed in buffer.
+                #[allow(clippy::uninit_vec)]
+                unsafe {
+                    zip_sink.set_len(max_size)
                 }
+
+                let meta_data = &mut zip_sink[..meta_file.size()];
+                meta_file.read_exact(meta_data)?;
+                let meta: Meta = Eu4Modeller::from_slice(&*meta_data, resolver).deserialize()?;
+
+                let gamestate_data = &mut zip_sink[..gamestate_file.size()];
+                gamestate_file.read_exact(gamestate_data)?;
+                let game: GameState =
+                    Eu4Modeller::from_slice(&*gamestate_data, resolver).deserialize()?;
+
+                Ok(Eu4Save { meta, game })
             }
         }
     }
@@ -414,6 +418,14 @@ impl<'a> Eu4File<'a> {
         }
     }
 
+    pub fn melter(&self) -> Eu4Melter<'a> {
+        match &self.kind {
+            Eu4FileKind::Text(x) => Eu4Melter::from(*x),
+            Eu4FileKind::Binary(x) => Eu4Melter::from(*x),
+            Eu4FileKind::Zip(zip) => Eu4Melter::from((*zip).clone()),
+        }
+    }
+
     /// Iterates through the individual entries of the Eu4 file
     ///
     /// Non-zips will yield a single entry
@@ -439,6 +451,163 @@ impl<'a> Eu4File<'a> {
                 },
             },
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct Eu4Modeller<'res, Reader, Resolver> {
+    reader: Reader,
+    encoding: Encoding,
+    resolver: &'res Resolver,
+}
+
+impl<'res, Resolver> Eu4Modeller<'res, (), Resolver> {
+    pub fn from_slice<'data>(
+        data: &'data [u8],
+        resolver: &'res Resolver,
+    ) -> Eu4ModellerSlice<'res, 'data, Resolver> {
+        Eu4ModellerSlice {
+            data,
+            resolver,
+            encoding: Encoding::Text,
+        }
+    }
+}
+
+impl<'res, Reader: Read, Resolver: TokenResolver> Eu4Modeller<'res, Reader, Resolver> {
+    pub fn from_reader(reader: Reader, resolver: &'res Resolver) -> Self {
+        Eu4Modeller {
+            reader,
+            resolver,
+            encoding: Encoding::Text,
+        }
+    }
+
+    pub fn deserialize<T>(&mut self) -> Result<T, Eu4Error>
+    where
+        T: DeserializeOwned,
+    {
+        T::deserialize(self)
+    }
+
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
+    }
+}
+
+impl<'de, 'res: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deserializer<'de>
+    for &'_ mut Eu4Modeller<'res, Reader, Resolver>
+{
+    type Error = Eu4Error;
+
+    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::Visitor<'de>,
+    {
+        Err(Eu4Error::new(Eu4ErrorKind::DeserializeImpl {
+            msg: String::from("only struct supported"),
+        }))
+    }
+
+    fn deserialize_struct<V>(
+        self,
+        name: &'static str,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::Visitor<'de>,
+    {
+        let mut header = [0u8; BIN_HEADER.len()];
+        self.reader.read_exact(&mut header)?;
+        if header == BIN_HEADER {
+            use jomini::binary::BinaryFlavor;
+            self.encoding = Encoding::Binary;
+            let flavor = Eu4Flavor::new();
+            let mut deser = flavor
+                .deserializer()
+                .from_reader(&mut self.reader, self.resolver);
+            Ok(deser.deserialize_struct(name, fields, visitor)?)
+        } else if header == TXT_HEADER {
+            self.encoding = Encoding::Text;
+            let reader = jomini::text::TokenReader::new(&mut self.reader);
+            let mut deser = TextDeserializer::from_windows1252_reader(reader);
+            Ok(deser.deserialize_struct(name, fields, visitor)?)
+        } else {
+            Err(Eu4ErrorKind::UnknownHeader.into())
+        }
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map enum identifier ignored_any
+    }
+}
+
+#[derive(Debug)]
+pub struct Eu4ModellerSlice<'res, 'data, Resolver> {
+    data: &'data [u8],
+    encoding: Encoding,
+    resolver: &'res Resolver,
+}
+
+impl<'res, 'data, Resolver: TokenResolver> Eu4ModellerSlice<'res, 'data, Resolver> {
+    pub fn deserialize<T>(&mut self) -> Result<T, Eu4Error>
+    where
+        T: DeserializeOwned,
+    {
+        T::deserialize(self)
+    }
+
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
+    }
+}
+
+impl<'de, 'data: 'de, 'res: 'de, Resolver: TokenResolver> serde::de::Deserializer<'de>
+    for &'_ mut Eu4ModellerSlice<'res, 'data, Resolver>
+{
+    type Error = Eu4Error;
+
+    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::Visitor<'de>,
+    {
+        Err(Eu4Error::new(Eu4ErrorKind::DeserializeImpl {
+            msg: String::from("only struct supported"),
+        }))
+    }
+
+    fn deserialize_struct<V>(
+        self,
+        name: &'static str,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::Visitor<'de>,
+    {
+        if let Some(data) = is_bin(self.data) {
+            use jomini::binary::BinaryFlavor;
+            self.encoding = Encoding::Binary;
+            let flavor = Eu4Flavor::new();
+            let mut deser = flavor.deserializer().from_slice(data, self.resolver);
+            Ok(deser.deserialize_struct(name, fields, visitor)?)
+        } else if let Some(data) = is_text(self.data) {
+            self.encoding = Encoding::Text;
+            let reader = jomini::text::TokenReader::from_slice(data);
+            let mut deser = TextDeserializer::from_windows1252_reader(reader);
+            Ok(deser.deserialize_struct(name, fields, visitor)?)
+        } else {
+            Err(Eu4ErrorKind::UnknownHeader.into())
+        }
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map enum identifier ignored_any
     }
 }
 
@@ -476,50 +645,6 @@ impl<'data> Eu4ParsedFile<'data> {
     /// Returns the kind of file (binary or text)
     pub fn kind(&self) -> &Eu4ParsedFileKind {
         &self.kind
-    }
-
-    /// Prepares the file for deserialization into a custom structure
-    pub fn deserializer<'b, RES>(&'b self, resolver: &'b RES) -> Eu4Deserializer<'data, 'b, RES>
-    where
-        RES: TokenResolver,
-    {
-        match &self.kind {
-            Eu4ParsedFileKind::Text(x) => Eu4Deserializer {
-                kind: Eu4DeserializerKind::Text(x.deserializer()),
-            },
-            Eu4ParsedFileKind::Binary(x) => Eu4Deserializer {
-                kind: Eu4DeserializerKind::Binary(x.deserializer(resolver)),
-            },
-        }
-    }
-}
-
-pub(crate) enum Eu4DeserializerKind<'data, 'tape, RES> {
-    Text(Eu4TextDeserializer<'data, 'tape>),
-    Binary(Eu4BinaryDeserializer<'data, 'tape, RES>),
-}
-
-/// A deserializer for custom structures
-pub struct Eu4Deserializer<'data, 'tape, RES> {
-    pub(crate) kind: Eu4DeserializerKind<'data, 'tape, RES>,
-}
-
-impl<'data, 'tape, RES> Eu4Deserializer<'data, 'tape, RES>
-where
-    RES: TokenResolver,
-{
-    pub fn on_failed_resolve(&mut self, strategy: FailedResolveStrategy) -> &mut Self {
-        if let Eu4DeserializerKind::Binary(x) = &mut self.kind {
-            x.on_failed_resolve(strategy);
-        }
-        self
-    }
-
-    pub fn deserialize<T>(&self) -> Result<T, Eu4Error>
-    where
-        T: Deserialize<'data>,
-    {
-        T::deserialize(self)
     }
 }
 
@@ -649,6 +774,41 @@ impl<'a> Eu4FileEntry<'a> {
         }
     }
 
+    pub fn deserialize<RES, T>(&self, resolver: &RES) -> Result<T, Eu4Error>
+    where
+        T: DeserializeOwned,
+        RES: TokenResolver,
+    {
+        match &self.kind {
+            Eu4FileEntryKind::Text(x) => Ok(x.deserializer().deserialize()?),
+            Eu4FileEntryKind::Binary(x) => Ok(x.deserializer(resolver).deserialize()?),
+            Eu4FileEntryKind::Zip {
+                files,
+                index,
+                is_text,
+            } => {
+                let file = files.archive.retrieve_file(*index, *is_text);
+                let mut reader = file.reader();
+                Ok(Eu4Modeller::from_reader(&mut reader, resolver).deserialize()?)
+            }
+        }
+    }
+
+    pub fn melter(&self) -> Eu4Melter<'a> {
+        match &self.kind {
+            Eu4FileEntryKind::Text(x) => Eu4Melter::from(*x),
+            Eu4FileEntryKind::Binary(x) => Eu4Melter::from(*x),
+            Eu4FileEntryKind::Zip {
+                files,
+                index,
+                is_text,
+            } => {
+                let file = files.archive.retrieve_file(*index, *is_text);
+                Eu4Melter::from_reader(file.reader(), *is_text)
+            }
+        }
+    }
+
     /// Parse the entry into a file, while inflating the contents into the zip sink
     pub fn parse(&self, zip_sink: &'a mut Vec<u8>) -> Result<Eu4ParsedFile<'a>, Eu4Error> {
         match &self.kind {
@@ -659,7 +819,7 @@ impl<'a> Eu4FileEntry<'a> {
                 is_text,
                 index,
             } => {
-                let file = files.archive.retrieve_file(*index);
+                let file = files.archive.retrieve_file(*index, *is_text);
                 file.read_to_end(zip_sink)?;
                 if *is_text {
                     Ok(Eu4ParsedFile::from(Eu4ParsedText::from_slice(zip_sink)?))
@@ -698,6 +858,17 @@ impl<'data> Eu4Text<'data> {
     pub fn size(&self) -> usize {
         self.data.len()
     }
+
+    pub(crate) fn data(&self) -> &[u8] {
+        self.data
+    }
+
+    pub fn deserializer(&self) -> Eu4TextDeserializer<SliceReader<'_>> {
+        let reader = jomini::text::TokenReader::from_slice(self.data);
+        Eu4TextDeserializer {
+            deser: TextDeserializer::from_windows1252_reader(reader),
+        }
+    }
 }
 
 /// A parsed EU4 text document
@@ -722,21 +893,15 @@ impl<'a> Eu4ParsedText<'a> {
     pub fn reader(&self) -> ObjectReader<Windows1252Encoding> {
         self.tape.windows1252_reader()
     }
-
-    pub fn deserializer(&self) -> Eu4TextDeserializer {
-        Eu4TextDeserializer {
-            deser: TextDeserializer::from_windows1252_tape(&self.tape),
-        }
-    }
 }
 
 /// Deserializes binary data into custom structures
-pub struct Eu4TextDeserializer<'data, 'tape> {
-    pub(crate) deser: TextDeserializer<'tape, 'data, Windows1252Encoding>,
+pub struct Eu4TextDeserializer<R> {
+    pub(crate) deser: TextReaderDeserializer<R, Windows1252Encoding>,
 }
 
-impl<'de, 'tape> Eu4TextDeserializer<'de, 'tape> {
-    pub fn deserialize<T>(&self) -> Result<T, Eu4Error>
+impl<'de, R: Read> Eu4TextDeserializer<R> {
+    pub fn deserialize<T>(&mut self) -> Result<T, Eu4Error>
     where
         T: Deserialize<'de>,
     {
@@ -772,14 +937,18 @@ impl<'data> Eu4Binary<'data> {
         self.data.len()
     }
 
-    pub fn ondemand_deserializer<'b, RES>(
+    pub(crate) fn data(&self) -> &[u8] {
+        self.data
+    }
+
+    pub fn deserializer<'b, RES>(
         &'b self,
         resolver: &'b RES,
     ) -> OndemandBinaryDeserializer<'data, 'b, RES, Eu4Flavor>
     where
         RES: TokenResolver,
     {
-        OndemandBinaryDeserializer::builder_flavor(Eu4Flavor::new()).from_slice(self.data, resolver)
+        BinaryDeserializer::builder_flavor(Eu4Flavor::new()).from_slice(self.data, resolver)
     }
 }
 
@@ -813,10 +982,6 @@ impl<'data> Eu4ParsedBinary<'data> {
             BinaryDeserializer::builder_flavor(Eu4Flavor::new()).from_tape(&self.tape, resolver);
         Eu4BinaryDeserializer { deser }
     }
-
-    pub fn melter<'b>(&'b self) -> Eu4Melter<'data, 'b> {
-        Eu4Melter::new(&self.tape)
-    }
 }
 
 /// Deserializes binary data into custom structures
@@ -841,7 +1006,8 @@ impl<'de, 'tape, RES: TokenResolver> Eu4BinaryDeserializer<'de, 'tape, RES> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{collections::HashMap, io::Write};
+    use crate::EnvTokens;
+    use std::io::Write;
     use zip::{write::FileOptions, ZipWriter};
 
     fn create_zip(meta: &[u8], gamestate: &[u8], ai: &[u8]) -> Vec<u8> {
@@ -886,8 +1052,8 @@ mod tests {
     #[test]
     fn test_zip_meta_text_file() {
         #[derive(Deserialize)]
-        struct MyMeta<'a> {
-            date: &'a str,
+        struct MyMeta {
+            date: String,
         }
 
         let zip_data = create_zip(b"date=1463.5.28\n", b"speed=2", b"base=4636");
@@ -902,11 +1068,13 @@ mod tests {
             if let Some(Eu4FileEntryName::Meta) = entry.name() {
                 let data = entry.parse(&mut sink).unwrap();
                 let text = data.as_text().unwrap();
-                let actual: MyMeta = text.deserializer().deserialize().unwrap();
-                assert_eq!(actual.date, "1463.5.28");
-
                 let out = text.reader().json().to_string();
                 assert_eq!(&out, r#"{"date":"1463.5.28"}"#);
+
+                let actual: MyMeta = Eu4Modeller::from_reader(sink.as_slice(), &EnvTokens)
+                    .deserialize()
+                    .unwrap();
+                assert_eq!(actual.date, "1463.5.28");
                 found = true;
             }
         }
@@ -917,8 +1085,8 @@ mod tests {
     #[test]
     fn test_zip_meta_text_files() {
         #[derive(Deserialize)]
-        struct MySave<'a> {
-            date: &'a str,
+        struct MySave {
+            date: String,
             speed: u16,
             base: u16,
         }
@@ -927,30 +1095,10 @@ mod tests {
 
         let file = Eu4File::from_slice(&zip_data).unwrap();
         let mut sink = Vec::new();
-        let eu4 = file.parse(&mut sink).unwrap();
-        let text = eu4.as_text().unwrap();
-        let actual: MySave = text.deserializer().deserialize().unwrap();
-        assert_eq!(actual.date, "1463.5.28");
-        assert_eq!(actual.speed, 2);
-        assert_eq!(actual.base, 4636);
-    }
-
-    #[test]
-    fn test_zip_text_file() {
-        #[derive(Deserialize)]
-        struct MySave<'a> {
-            date: &'a str,
-            speed: u16,
-            base: u16,
-        }
-
-        let zip_data = create_zip(b"date=1463.5.28\n", b"speed=2", b"base=4636");
-
-        let file = Eu4File::from_slice(&zip_data).unwrap();
-        let mut sink = Vec::new();
-        let eu4 = file.parse(&mut sink).unwrap();
-        let resolver: HashMap<u16, &str> = HashMap::new();
-        let actual: MySave = eu4.deserializer(&resolver).deserialize().unwrap();
+        let _eu4 = file.parse(&mut sink).unwrap();
+        let actual: MySave = Eu4Modeller::from_reader(sink.as_slice(), &EnvTokens)
+            .deserialize()
+            .unwrap();
         assert_eq!(actual.date, "1463.5.28");
         assert_eq!(actual.speed, 2);
         assert_eq!(actual.base, 4636);

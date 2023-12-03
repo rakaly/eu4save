@@ -43,6 +43,13 @@ impl Encoding {
     pub fn is_zip(&self) -> bool {
         matches!(self, Encoding::BinaryZip | Encoding::TextZip)
     }
+
+    pub fn zipify(&self) -> Encoding {
+        match self {
+            Encoding::Text | Encoding::TextZip => Encoding::TextZip,
+            Encoding::BinaryZip | Encoding::Binary => Encoding::BinaryZip,
+        }
+    }
 }
 
 impl fmt::Display for Encoding {
