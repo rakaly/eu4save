@@ -100,9 +100,7 @@ fn test_eu4_compressed_text_raw() -> Result<(), Box<dyn Error>> {
     let mut entries = file.entries();
     let meta_entry = entries.next_entry().unwrap();
     assert_eq!(meta_entry.name(), Some(Eu4FileEntryName::Meta));
-    let mut zip_sink = Vec::new();
-    let meta_parsed = meta_entry.parse(&mut zip_sink)?;
-    let meta: Meta = meta_parsed.deserializer(&EnvTokens).deserialize()?;
+    let meta: Meta = meta_entry.deserialize(&EnvTokens)?;
     assert_eq!(file.encoding(), Encoding::TextZip);
     assert_eq!(meta.player, "ENG".parse()?);
     Ok(())

@@ -1,11 +1,10 @@
 #![cfg(ironman)]
 
+use std::io::Cursor;
+
 use crate::utils;
 use eu4save::{
-    models::{
-        Eu4Save, GameDifficulty, GameState, Meta, ProvinceEvent, ProvinceEventValue,
-        TaxManpowerModifier,
-    },
+    models::{GameDifficulty, ProvinceEvent, ProvinceEventValue, TaxManpowerModifier},
     query::{
         CountryManaUsage, LedgerPoint, NationEvent, NationEventKind, NationEvents, PlayerHistory,
         Query,
@@ -231,17 +230,13 @@ fn test_inheritance_values() {
 fn test_roundtrip_melt() {
     let data = utils::request("kandy2.bin.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let mut zip_sink = Vec::new();
-    let parsed_file = file.parse(&mut zip_sink).unwrap();
-    let out = parsed_file
-        .as_binary()
-        .unwrap()
-        .melter()
+    let mut out = Cursor::new(Vec::new());
+    file.melter()
         .on_failed_resolve(FailedResolveStrategy::Error)
-        .melt(&EnvTokens)
+        .melt(&mut out, &EnvTokens)
         .unwrap();
 
-    let file = Eu4File::from_slice(out.data()).unwrap();
+    let file = Eu4File::from_slice(out.get_ref().as_slice()).unwrap();
     let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "BHA".parse().unwrap());
@@ -253,34 +248,18 @@ macro_rules! ironman_test {
             #[test]
             fn [<test_ $name>]() {
                 let data = utils::request($fp);
-
-                let mut zip_sink = Vec::new();
                 let file = Eu4File::from_slice(&data).unwrap();
-                let parsed_file = file.parse(&mut zip_sink).unwrap();
 
                 // Ensure that every ironman can be melted with all tokens resolvable.
                 // Deserialization will not try and resolve tokens that aren't used. Melting
                 // ensures that every token is seen
-                let melted = parsed_file
-                    .as_binary()
-                    .unwrap()
-                    .melter()
+                let mut out = Cursor::new(Vec::new());
+                file.melter()
                     .on_failed_resolve(FailedResolveStrategy::Error)
-                    .melt(&EnvTokens)
+                    .melt(&mut out, &EnvTokens)
                     .unwrap();
-                assert!(!melted.data().is_empty());
 
-                let meta: Meta = parsed_file
-                    .deserializer(&EnvTokens)
-                    .on_failed_resolve(FailedResolveStrategy::Error)
-                    .deserialize()
-                    .unwrap();
-                let game: GameState = parsed_file
-                    .deserializer(&EnvTokens)
-                    .on_failed_resolve(FailedResolveStrategy::Error)
-                    .deserialize()
-                    .unwrap();
-                let save = Eu4Save { meta, game };
+                let save = file.parse_save(&EnvTokens).unwrap();
 
                 assert_eq!(file.encoding(), Encoding::BinaryZip);
                 let expected = $query;
@@ -307,7 +286,7 @@ macro_rules! ironman_test {
                     expected.starting.parse::<CountryTag>().unwrap(),
                 );
 
-                ($further)(query, melted.data());
+                ($further)(query, out.into_inner().as_slice());
             }
         }
     };

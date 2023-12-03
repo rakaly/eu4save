@@ -70,7 +70,7 @@ mod errors;
 mod eu4date;
 mod extraction;
 pub mod file;
-pub(crate) mod flavor;
+pub mod flavor;
 mod melt;
 /// Repository of raw structs extracted from a save file
 pub mod models;
@@ -81,6 +81,7 @@ mod tag_resolver;
 mod tokens;
 
 pub use country_tag::*;
+pub use deflate::*;
 pub use dlc::*;
 pub use errors::*;
 pub use eu4date::*;

@@ -1,6 +1,6 @@
-use std::fmt;
-
-use crate::{deflate::ZipInflationError, file::Eu4FileEntryName};
+use crate::file::Eu4FileEntryName;
+use jomini::binary;
+use std::{fmt, io};
 use zip::result::ZipError;
 
 /// An EU4 Error
@@ -31,12 +31,6 @@ pub enum Eu4ErrorKind {
     #[error("unable to parse as zip: {0}")]
     ZipArchive(#[from] ZipError),
 
-    #[error("unable to inflate zip entry: {msg}")]
-    ZipBadData { msg: String },
-
-    #[error("early eof, only able to write {written} bytes")]
-    ZipEarlyEof { written: usize },
-
     #[error("unknown header found in zip entry. Must be EU4txt or EU4bin")]
     ZipHeader,
 
@@ -55,9 +49,6 @@ pub enum Eu4ErrorKind {
     #[error("unable to deserialize due to: {0}")]
     Deserialize(#[from] jomini::DeserializeError),
 
-    #[error("error while writing output: {0}")]
-    Writer(#[source] jomini::Error),
-
     #[error("unknown binary token encountered: {token_id:#x}")]
     UnknownToken { token_id: u16 },
 
@@ -72,32 +63,44 @@ pub enum Eu4ErrorKind {
 
     #[error("expected {0} file to exist within zip")]
     MissingFile(Eu4FileEntryName),
-}
 
-impl From<ZipInflationError> for Eu4ErrorKind {
-    fn from(x: ZipInflationError) -> Self {
-        match x {
-            ZipInflationError::BadData { msg } => Eu4ErrorKind::ZipBadData { msg },
-            ZipInflationError::EarlyEof { written } => Eu4ErrorKind::ZipEarlyEof { written },
-        }
-    }
+    #[error("io error: {0}")]
+    Io(#[from] io::Error),
 }
 
 impl From<jomini::Error> for Eu4Error {
     fn from(value: jomini::Error) -> Self {
-        let kind = match value.into_kind() {
-            jomini::ErrorKind::Deserialize(x) => match x.kind() {
-                &jomini::DeserializeErrorKind::UnknownToken { token_id } => {
-                    Eu4ErrorKind::UnknownToken { token_id }
-                }
-                _ => Eu4ErrorKind::Deserialize(x),
-            },
-            _ => Eu4ErrorKind::DeserializeImpl {
-                msg: String::from("unexpected error"),
-            },
+        let kind = if matches!(value.kind(), jomini::ErrorKind::Deserialize(_)) {
+            match value.into_kind() {
+                jomini::ErrorKind::Deserialize(x) => match x.kind() {
+                    &jomini::DeserializeErrorKind::UnknownToken { token_id } => {
+                        Eu4ErrorKind::UnknownToken { token_id }
+                    }
+                    _ => Eu4ErrorKind::Deserialize(x),
+                },
+                _ => unreachable!(),
+            }
+        } else {
+            Eu4ErrorKind::Parse(value)
         };
 
         Eu4Error::new(kind)
+    }
+}
+
+impl From<io::Error> for Eu4Error {
+    fn from(value: io::Error) -> Self {
+        Eu4Error::from(Eu4ErrorKind::from(value))
+    }
+}
+
+impl From<binary::ReaderError> for Eu4Error {
+    fn from(value: binary::ReaderError) -> Self {
+        match value.kind() {
+            binary::ReaderErrorKind::Read(_) => todo!(),
+            binary::ReaderErrorKind::BufferFull => todo!(),
+            binary::ReaderErrorKind::Lexer(_) => todo!(),
+        }
     }
 }
 
