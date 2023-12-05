@@ -24,7 +24,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                 A: de::SeqAccess<'de>,
             {
                 // Hmm empty object
-                let abc = seq.next_element::<&str>()?;
+                let abc = seq.next_element::<de::IgnoredAny>()?;
                 if abc.is_some() {
                     return Err(de::Error::custom("unexpected sequence!"));
                 }
@@ -45,24 +45,20 @@ impl<'de> Deserialize<'de> for CountryHistory {
                 let hint = map.size_hint().unwrap_or_default();
                 let estimate = hint.max(8);
 
-                while let Some(key) = map.next_key::<&str>()? {
+                while let Some(key) = map.next_key::<Chf>()? {
                     match key {
-                        "government" => government = Some(map.next_value()?),
-                        "technology_group" => technology_group = Some(map.next_value()?),
-                        "primary_culture" => primary_culture = Some(map.next_value()?),
-                        "religion" => religion = Some(map.next_value()?),
-                        "add_government_reform" => add_government_reform.push(map.next_value()?),
-                        x => {
-                            if let Ok(date) = Eu4Date::parse(x) {
-                                let seed = ExtendVec {
-                                    date,
-                                    estimate,
-                                    events: &mut events,
-                                };
-                                map.next_value_seed(seed)?;
-                            } else {
-                                map.next_value::<de::IgnoredAny>()?;
-                            }
+                        Chf::Government => government = Some(map.next_value()?),
+                        Chf::TechnologyGroup => technology_group = Some(map.next_value()?),
+                        Chf::PrimaryCulture => primary_culture = Some(map.next_value()?),
+                        Chf::Religion => religion = Some(map.next_value()?),
+                        Chf::AddGovernmentReform => add_government_reform.push(map.next_value()?),
+                        Chf::Date(date) => map.next_value_seed(ExtendVec {
+                            date,
+                            estimate,
+                            events: &mut events,
+                        })?,
+                        Chf::Other => {
+                            map.next_value::<de::IgnoredAny>()?;
                         }
                     }
                 }
@@ -78,6 +74,107 @@ impl<'de> Deserialize<'de> for CountryHistory {
         }
 
         deserializer.deserialize_map(CountryHistoryVisitor)
+    }
+}
+
+enum Chf {
+    AddGovernmentReform,
+    Date(Eu4Date),
+    Government,
+    Other,
+    PrimaryCulture,
+    Religion,
+    TechnologyGroup,
+}
+
+impl<'de> de::Deserialize<'de> for Chf {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Visitor;
+        impl de::Visitor<'_> for Visitor {
+            type Value = Chf;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct CountryHistoryField")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                match v {
+                    "government" => Ok(Chf::Government),
+                    "technology_group" => Ok(Chf::TechnologyGroup),
+                    "primary_culture" => Ok(Chf::PrimaryCulture),
+                    "religion" => Ok(Chf::Religion),
+                    "add_government_reform" => Ok(Chf::AddGovernmentReform),
+                    x => Eu4Date::parse(x).map(Chf::Date).or(Ok(Chf::Other)),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
+    }
+}
+
+enum Chdf {
+    Capital,
+    ChangedCountryAdjectiveFrom,
+    ChangedCountryMapColorFrom,
+    ChangedCountryNameFrom,
+    ChangedTagFrom,
+    Heir,
+    Leader,
+    Monarch,
+    MonarchConsort,
+    MonarchHeir,
+    Other,
+    Queen,
+    Religion,
+    RemoveAcceptedCulture,
+    Union,
+}
+
+impl<'de> de::Deserialize<'de> for Chdf {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Visitor;
+        impl de::Visitor<'_> for Visitor {
+            type Value = Chdf;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct CountryHistoryField")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                match v {
+                    "monarch" => Ok(Chdf::Monarch),
+                    "monarch_heir" => Ok(Chdf::MonarchHeir),
+                    "monarch_consort" => Ok(Chdf::MonarchConsort),
+                    "heir" => Ok(Chdf::Heir),
+                    "queen" => Ok(Chdf::Queen),
+                    "union" => Ok(Chdf::Union),
+                    "capital" => Ok(Chdf::Capital),
+                    "leader" => Ok(Chdf::Leader),
+                    "remove_accepted_culture" => Ok(Chdf::RemoveAcceptedCulture),
+                    "changed_country_name_from" => Ok(Chdf::ChangedCountryNameFrom),
+                    "changed_country_adjective_from" => Ok(Chdf::ChangedCountryAdjectiveFrom),
+                    "changed_country_mapcolor_from" => Ok(Chdf::ChangedCountryMapColorFrom),
+                    "changed_tag_from" => Ok(Chdf::ChangedTagFrom),
+                    "religion" => Ok(Chdf::Religion),
+                    _ => Ok(Chdf::Other),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
     }
 }
 
@@ -113,7 +210,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                 A: de::SeqAccess<'de>,
             {
                 // Hmm empty object
-                let abc = seq.next_element::<&str>()?;
+                let abc = seq.next_element::<de::IgnoredAny>()?;
                 if abc.is_some() {
                     return Err(de::Error::custom("unexpected sequence!"));
                 }
@@ -125,30 +222,30 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
             where
                 A: de::MapAccess<'de>,
             {
-                while let Some(key) = map.next_key::<&str>()? {
+                while let Some(key) = map.next_key::<Chdf>()? {
                     let val = match key {
-                        "monarch" => CountryEvent::Monarch(map.next_value()?),
-                        "monarch_heir" => CountryEvent::MonarchHeir(map.next_value()?),
-                        "monarch_consort" => CountryEvent::MonarchConsort(map.next_value()?),
-                        "heir" => CountryEvent::Heir(map.next_value()?),
-                        "queen" => CountryEvent::Queen(map.next_value()?),
-                        "union" => CountryEvent::Union(map.next_value()?),
-                        "capital" => CountryEvent::Capital(map.next_value()?),
-                        "leader" => CountryEvent::Leader(map.next_value()?),
-                        "remove_accepted_culture" => {
+                        Chdf::Monarch => CountryEvent::Monarch(map.next_value()?),
+                        Chdf::MonarchHeir => CountryEvent::MonarchHeir(map.next_value()?),
+                        Chdf::MonarchConsort => CountryEvent::MonarchConsort(map.next_value()?),
+                        Chdf::Heir => CountryEvent::Heir(map.next_value()?),
+                        Chdf::Queen => CountryEvent::Queen(map.next_value()?),
+                        Chdf::Union => CountryEvent::Union(map.next_value()?),
+                        Chdf::Capital => CountryEvent::Capital(map.next_value()?),
+                        Chdf::Leader => CountryEvent::Leader(map.next_value()?),
+                        Chdf::RemoveAcceptedCulture => {
                             CountryEvent::RemoveAcceptedCulture(map.next_value()?)
                         }
-                        "changed_country_name_from" => {
+                        Chdf::ChangedCountryNameFrom => {
                             CountryEvent::ChangedCountryNameFrom(map.next_value()?)
                         }
-                        "changed_country_adjective_from" => {
+                        Chdf::ChangedCountryAdjectiveFrom => {
                             CountryEvent::ChangedCountryAdjectiveFrom(map.next_value()?)
                         }
-                        "changed_country_mapcolor_from" => {
+                        Chdf::ChangedCountryMapColorFrom => {
                             CountryEvent::ChangedCountryMapColorFrom(map.next_value()?)
                         }
-                        "changed_tag_from" => CountryEvent::ChangedTagFrom(map.next_value()?),
-                        "religion" => CountryEvent::Religion(map.next_value()?),
+                        Chdf::ChangedTagFrom => CountryEvent::ChangedTagFrom(map.next_value()?),
+                        Chdf::Religion => CountryEvent::Religion(map.next_value()?),
                         _ => {
                             map.next_value::<de::IgnoredAny>()?;
                             continue;

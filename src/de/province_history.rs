@@ -23,7 +23,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                 A: de::SeqAccess<'de>,
             {
                 // Hmm empty object
-                let abc = seq.next_element::<&str>()?;
+                let abc = seq.next_element::<de::IgnoredAny>()?;
                 if abc.is_some() {
                     return Err(de::Error::custom("unexpected sequence!"));
                 }
@@ -45,24 +45,25 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                 let hint = map.size_hint().unwrap_or_default();
                 let estimate = (hint * 3 / 4) + 8;
 
-                while let Some(key) = map.next_key::<&str>()? {
+                while let Some(key) = map.next_key::<Phf>()? {
                     match key {
-                        "owner" => owner = map.next_value()?,
-                        "base_tax" => base_tax = map.next_value()?,
-                        "base_production" => base_production = map.next_value()?,
-                        "base_manpower" => base_manpower = map.next_value()?,
-                        "religion" => religion = map.next_value()?,
-                        x => {
-                            if let Ok(date) = Eu4Date::parse(x) {
-                                let seed = ExtendVec {
-                                    date,
-                                    estimate,
-                                    events: &mut events,
-                                };
-                                map.next_value_seed(seed)?;
-                            } else if let x @ ProvinceEventValue::Bool(_) = map.next_value()? {
+                        Phf::Owner => owner = map.next_value()?,
+                        Phf::BaseTax => base_tax = map.next_value()?,
+                        Phf::BaseProduction => base_production = map.next_value()?,
+                        Phf::BaseManpower => base_manpower = map.next_value()?,
+                        Phf::Religion => religion = map.next_value()?,
+                        Phf::Date(date) => map.next_value_seed(ExtendVec {
+                            date,
+                            estimate,
+                            events: &mut events,
+                        })?,
+                        Phf::Other(key) => {
+                            if let x @ ProvinceEventValue::Bool(_) = map.next_value()? {
                                 other.insert(key.to_string(), x);
                             }
+                        }
+                        _ => {
+                            map.next_value::<de::IgnoredAny>()?;
                         }
                     }
                 }
@@ -81,6 +82,127 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
         }
 
         deserializer.deserialize_map(ProvinceHistoryVisitor)
+    }
+}
+
+enum Phf {
+    AddCore,
+    BaseManpower,
+    BaseProduction,
+    BaseTax,
+    Capital,
+    Culture,
+    Date(Eu4Date),
+    DiscoveredBy,
+    Hre,
+    Other(String),
+    Owner,
+    Religion,
+    TradeGoods,
+}
+
+impl<'de> de::Deserialize<'de> for Phf {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Visitor;
+        impl de::Visitor<'_> for Visitor {
+            type Value = Phf;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("enum province history field")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                match v {
+                    "owner" => Ok(Phf::Owner),
+                    "base_tax" => Ok(Phf::BaseTax),
+                    "base_manpower" => Ok(Phf::BaseManpower),
+                    "base_production" => Ok(Phf::BaseProduction),
+                    "religion" => Ok(Phf::Religion),
+                    "trade_goods" => Ok(Phf::TradeGoods),
+                    "discovered_by" => Ok(Phf::DiscoveredBy),
+                    "culture" => Ok(Phf::Culture),
+                    "capital" => Ok(Phf::Capital),
+                    "add_core" => Ok(Phf::AddCore),
+                    "hre" => Ok(Phf::Hre),
+                    x => {
+                        if let Ok(date) = Eu4Date::parse(x) {
+                            Ok(Phf::Date(date))
+                        } else {
+                            Ok(Phf::Other(String::from(x)))
+                        }
+                    }
+                }
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
+    }
+}
+
+enum Pef {
+    AddClaim,
+    AddCore,
+    Advisor,
+    BaseManpower,
+    BaseProduction,
+    BaseTax,
+    Controller,
+    Culture,
+    DiscoveredBy,
+    IsCity,
+    Other(String),
+    Owner,
+    Religion,
+    RemoveClaim,
+    RemoveCore,
+    TradeGoods,
+}
+
+impl<'de> de::Deserialize<'de> for Pef {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Visitor;
+        impl de::Visitor<'_> for Visitor {
+            type Value = Pef;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("enum province event field")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                match v {
+                    "owner" => Ok(Pef::Owner),
+                    "controller" => Ok(Pef::Controller),
+                    "base_tax" => Ok(Pef::BaseTax),
+                    "base_manpower" => Ok(Pef::BaseManpower),
+                    "base_production" => Ok(Pef::BaseProduction),
+                    "religion" => Ok(Pef::Religion),
+                    "add_claim" => Ok(Pef::AddClaim),
+                    "remove_claim" => Ok(Pef::RemoveClaim),
+                    "add_core" => Ok(Pef::AddCore),
+                    "remove_core" => Ok(Pef::RemoveCore),
+                    "advisor" => Ok(Pef::Advisor),
+                    "trade_goods" => Ok(Pef::TradeGoods),
+                    "discovered_by" => Ok(Pef::DiscoveredBy),
+                    "culture" => Ok(Pef::Culture),
+                    "is_city" => Ok(Pef::IsCity),
+                    x => Ok(Pef::Other(String::from(x))),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
     }
 }
 
@@ -116,7 +238,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                 A: de::SeqAccess<'de>,
             {
                 // Hmm empty object
-                let abc = seq.next_element::<&str>()?;
+                let abc = seq.next_element::<de::IgnoredAny>()?;
                 if abc.is_some() {
                     return Err(de::Error::custom("unexpected sequence!"));
                 }
@@ -128,20 +250,24 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
             where
                 A: de::MapAccess<'de>,
             {
-                while let Some(key) = map.next_key::<&str>()? {
+                while let Some(key) = map.next_key::<Pef>()? {
                     let val = match key {
-                        "owner" => ProvinceEvent::Owner(map.next_value()?),
-                        "controller" => ProvinceEvent::Controller(map.next_value()?),
-                        "base_tax" => ProvinceEvent::BaseTax(map.next_value()?),
-                        "base_manpower" => ProvinceEvent::BaseManpower(map.next_value()?),
-                        "base_production" => ProvinceEvent::BaseProduction(map.next_value()?),
-                        "religion" => ProvinceEvent::Religion(map.next_value()?),
-                        _ => {
+                        Pef::Owner => ProvinceEvent::Owner(map.next_value()?),
+                        Pef::Controller => ProvinceEvent::Controller(map.next_value()?),
+                        Pef::BaseTax => ProvinceEvent::BaseTax(map.next_value()?),
+                        Pef::BaseManpower => ProvinceEvent::BaseManpower(map.next_value()?),
+                        Pef::BaseProduction => ProvinceEvent::BaseProduction(map.next_value()?),
+                        Pef::Religion => ProvinceEvent::Religion(map.next_value()?),
+                        Pef::Other(key) => {
                             if let x @ ProvinceEventValue::Bool(_) = map.next_value()? {
-                                ProvinceEvent::KV((key.to_string(), x))
+                                ProvinceEvent::KV((key, x))
                             } else {
                                 continue;
                             }
+                        }
+                        _ => {
+                            map.next_value::<de::IgnoredAny>()?;
+                            continue;
                         }
                     };
 

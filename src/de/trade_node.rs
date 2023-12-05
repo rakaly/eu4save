@@ -25,9 +25,9 @@ impl<'de> Deserialize<'de> for TradeNode {
             {
                 let mut countries: Vec<_> = Vec::new();
                 let mut country_section = false;
-                while let Some(key) = map.next_key::<&str>()? {
+                while let Some(key) = map.next_key_seed(TnfSeed { country_section })? {
                     match key {
-                        "highest_power" => {
+                        Tnf::HighestPower => {
                             country_section = true;
                             map.next_value::<de::IgnoredAny>()?;
                         }
@@ -36,17 +36,11 @@ impl<'de> Deserialize<'de> for TradeNode {
                         // there are fields like "max" which may be accidentally
                         // interpretted as a country tag (country tag's can be
                         // lowercase).
-                        x if country_section => {
-                            if let Ok(tag) = CountryTag::create(x.as_bytes()) {
-                                map.next_value_seed(ExtendVec {
-                                    tag,
-                                    countries: &mut countries,
-                                })?;
-                            } else {
-                                map.next_value::<de::IgnoredAny>()?;
-                            }
-                        }
-                        _ => {
+                        Tnf::Tag(tag) => map.next_value_seed(ExtendVec {
+                            tag,
+                            countries: &mut countries,
+                        })?,
+                        Tnf::Other => {
                             map.next_value::<de::IgnoredAny>()?;
                         }
                     }
@@ -57,6 +51,88 @@ impl<'de> Deserialize<'de> for TradeNode {
         }
 
         deserializer.deserialize_map(TradeNodeVisitor)
+    }
+}
+
+#[derive(Debug)]
+struct TnfSeed {
+    country_section: bool,
+}
+
+enum Tnf {
+    HighestPower,
+    Other,
+    Tag(CountryTag),
+}
+
+impl<'de> de::DeserializeSeed<'de> for TnfSeed {
+    type Value = Tnf;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Visitor(bool);
+        impl de::Visitor<'_> for Visitor {
+            type Value = Tnf;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("enum trade node field")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                match v {
+                    "highest_power" => Ok(Tnf::HighestPower),
+                    _ => {
+                        if self.0 {
+                            if let Ok(tag) = CountryTag::create(v.as_bytes()) {
+                                return Ok(Tnf::Tag(tag));
+                            }
+                        }
+
+                        Ok(Tnf::Other)
+                    }
+                }
+            }
+        }
+
+        deserializer.deserialize_str(Visitor(self.country_section))
+    }
+}
+
+enum Tntf {
+    PrivateerMoney,
+    Other,
+}
+
+impl<'de> de::Deserialize<'de> for Tntf {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Visitor;
+        impl de::Visitor<'_> for Visitor {
+            type Value = Tntf;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("enum trade node tag field")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                match v {
+                    "privateer_money" => Ok(Tntf::PrivateerMoney),
+                    _ => Ok(Tntf::Other),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
     }
 }
 
@@ -91,13 +167,13 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
             {
                 let mut privateer_money = 0.0;
                 let mut should_extend = false;
-                while let Some(key) = map.next_key::<&str>()? {
+                while let Some(key) = map.next_key::<Tntf>()? {
                     // Every country seems to have a max_demand field that seems
                     // useless so we only add a country to the array when it has
                     // an interesting field
                     match key {
-                        "privateer_money" => privateer_money = map.next_value()?,
-                        _ => {
+                        Tntf::PrivateerMoney => privateer_money = map.next_value()?,
+                        Tntf::Other => {
                             map.next_value::<de::IgnoredAny>()?;
                             continue;
                         }

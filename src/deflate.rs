@@ -46,6 +46,6 @@ pub(crate) fn zstd_inflate(raw: &[u8], out: &mut [u8]) -> Result<(), ZipInflatio
         Ok(written) => Err(ZipInflationError::EarlyEof { written }),
         Err(e) => Err(ZipInflationError::BadData {
             msg: zstd_safe::get_error_name(e).to_string(),
-        })
+        }),
     }
 }
