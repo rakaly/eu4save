@@ -37,14 +37,14 @@ where
 
             loop {
                 let key = if let Some((_key, key_value)) = map.next_entry()? {
-                    let _ignore_value: &str = _key;
+                    let _ignore_value: serde::de::IgnoredAny = _key;
                     key_value
                 } else {
                     return Ok(result);
                 };
 
                 let value = if let Some((_value, value_value)) = map.next_entry()? {
-                    let _ignore_value: &str = _value;
+                    let _ignore_value: serde::de::IgnoredAny = _value;
                     value_value
                 } else {
                     return Ok(result);
