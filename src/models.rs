@@ -49,6 +49,124 @@ pub struct Eu4Save {
     pub game: GameState,
 }
 
+impl<'de> Deserialize<'de> for Eu4Save {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Debug, JominiDeserialize)]
+        struct Eu4SaveFlatten {
+            pub campaign_id: String,
+            pub save_game: String,
+            pub player: CountryTag,
+            pub displayed_country_name: String,
+            pub campaign_length: i32,
+            pub date: Eu4Date,
+            #[jomini(default)]
+            pub is_ironman: bool,
+            #[jomini(default, alias = "multi_player")]
+            #[jomini(alias = "multi_player")]
+            pub multiplayer: bool,
+            pub not_observer: bool,
+            #[jomini(default)]
+            pub dlc_enabled: Vec<String>,
+            #[jomini(default)]
+            pub mod_enabled: Vec<String>,
+            #[jomini(default)]
+            pub mods_enabled_names: Vec<ModName>,
+            #[jomini(take_last)]
+            pub checksum: String,
+            pub savegame_version: SavegameVersion,
+            #[jomini(default)]
+            pub is_random_new_world: bool,
+
+            #[jomini(default)]
+            pub players_countries: Vec<String>,
+            pub current_age: String,
+            pub start_date: Eu4Date,
+            pub map_area_data: HashMap<String, MapAreaDatum>,
+            pub military_hegemon: Option<Hegemon>,
+            pub naval_hegemon: Option<Hegemon>,
+            pub economic_hegemon: Option<Hegemon>,
+            pub trade: TradeNodes,
+            #[jomini(duplicated, alias = "rebel_faction")]
+            pub rebel_factions: Vec<RebelFaction>,
+            #[jomini(default, deserialize_with = "deserialize_vec_pair")]
+            pub religions: Vec<(String, ReligionGameState)>,
+            pub religion_instance_data: HashMap<String, ReligionInstanceDatum>,
+            pub empire: Option<HRE>,
+            #[jomini(default, deserialize_with = "deserialize_vec_pair")]
+            pub countries: Vec<(CountryTag, Country)>,
+            pub provinces: HashMap<ProvinceId, Province>,
+            pub income_statistics: LedgerData,
+            pub nation_size_statistics: LedgerData,
+            pub score_statistics: LedgerData,
+            pub inflation_statistics: LedgerData,
+            #[jomini(duplicated, alias = "active_war")]
+            pub active_wars: Vec<ActiveWar>,
+            #[jomini(duplicated, alias = "previous_war")]
+            pub previous_wars: Vec<PreviousWar>,
+            #[jomini(default)]
+            pub achievement_ok: bool,
+            #[jomini(default)]
+            pub achievement: Vec<i32>,
+            #[jomini(default)]
+            pub completed_achievements: Vec<i32>,
+            #[jomini(alias = "gameplaysettings")]
+            pub gameplay_settings: GameplaySettings,
+            pub diplomacy: Diplomacy,
+        }
+
+        let result = Eu4SaveFlatten::deserialize(deserializer)?;
+        Ok(Eu4Save {
+            meta: Meta {
+                campaign_id: result.campaign_id,
+                save_game: result.save_game,
+                player: result.player,
+                displayed_country_name: result.displayed_country_name,
+                campaign_length: result.campaign_length,
+                date: result.date,
+                is_ironman: result.is_ironman,
+                multiplayer: result.multiplayer,
+                not_observer: result.not_observer,
+                dlc_enabled: result.dlc_enabled,
+                mod_enabled: result.mod_enabled,
+                mods_enabled_names: result.mods_enabled_names,
+                checksum: result.checksum,
+                savegame_version: result.savegame_version,
+                is_random_new_world: result.is_random_new_world,
+            },
+            game: GameState {
+                players_countries: result.players_countries,
+                current_age: result.current_age,
+                start_date: result.start_date,
+                map_area_data: result.map_area_data,
+                military_hegemon: result.military_hegemon,
+                naval_hegemon: result.naval_hegemon,
+                economic_hegemon: result.economic_hegemon,
+                trade: result.trade,
+                rebel_factions: result.rebel_factions,
+                religions: result.religions,
+                religion_instance_data: result.religion_instance_data,
+                empire: result.empire,
+                countries: result.countries,
+                provinces: result.provinces,
+                income_statistics: result.income_statistics,
+                nation_size_statistics: result.nation_size_statistics,
+                score_statistics: result.score_statistics,
+                inflation_statistics: result.inflation_statistics,
+                active_wars: result.active_wars,
+                previous_wars: result.previous_wars,
+                achievement_ok: result.achievement_ok,
+                achievement: result.achievement,
+                completed_achievements: result.completed_achievements,
+                gameplay_settings: result.gameplay_settings,
+                diplomacy: result.diplomacy,
+            },
+        })
+    }
+}
+
 impl Eu4Save {
     pub fn from_deserializer<'a, 'de, D>(
         deser: &'a D,
@@ -56,9 +174,7 @@ impl Eu4Save {
     where
         &'a D: serde::de::Deserializer<'de>,
     {
-        let meta = Meta::deserialize(deser)?;
-        let game = GameState::deserialize(deser)?;
-        Ok(Eu4Save { meta, game })
+        Eu4Save::deserialize(deser)
     }
 }
 
