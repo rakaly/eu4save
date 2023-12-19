@@ -1,7 +1,7 @@
 use crate::{
     file::{Eu4Binary, Eu4Text, Eu4Zip},
     flavor::Eu4Flavor,
-    DeflateReader, Eu4Date, Eu4Error, Eu4ErrorKind,
+    Eu4Date, Eu4Error, Eu4ErrorKind,
 };
 use jomini::{
     binary::{self, BinaryFlavor, FailedResolveStrategy, TokenReader, TokenResolver},
@@ -126,8 +126,8 @@ impl MeltOptions {
 enum MeltInput<'data> {
     Text(Eu4Text<'data>),
     Binary(Eu4Binary<'data>),
-    TextStream(DeflateReader<'data>),
-    BinaryStream(DeflateReader<'data>),
+    TextStream(crate::DeflateReader<'data>),
+    BinaryStream(crate::DeflateReader<'data>),
     Zip(Eu4Zip<'data>),
 }
 
@@ -164,7 +164,7 @@ impl<'data> From<Eu4Binary<'data>> for Eu4Melter<'data> {
 }
 
 impl<'data> Eu4Melter<'data> {
-    pub fn from_reader(stream: DeflateReader<'data>, is_text: bool) -> Self {
+    pub fn from_reader(stream: crate::DeflateReader<'data>, is_text: bool) -> Self {
         if is_text {
             Eu4Melter {
                 input: MeltInput::TextStream(stream),

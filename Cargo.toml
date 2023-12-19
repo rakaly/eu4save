@@ -13,8 +13,8 @@ categories = ["parsing"]
 
 [features]
 default = ["miniz"]
-miniz = ["flate2/rust_backend"]
-zlib-ng = ["flate2/zlib-ng"]
+miniz = ["miniz_oxide", "flate2/rust_backend"]
+libdeflate = ["libdeflater/freestanding"]
 zstd = ["dep:zstd"]
 serialize = []
 tsify = ["dep:tsify", "dep:wasm-bindgen"]
@@ -26,6 +26,8 @@ once_cell = "1"
 zip = { version =  "0.6", default-features = false }
 serde = { version = "1", features = ["derive"] }
 thiserror = "1"
+libdeflater = { version = "1.19", optional = true }
+miniz_oxide = { version = "0.7", optional = true }
 zstd = { version = "0.13", default-features = false, optional = true }
 tsify = { version = "0.4.5", default-features = false, optional = true }
 wasm-bindgen = { version = "0.2", default-features = false, optional = true }

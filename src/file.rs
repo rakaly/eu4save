@@ -2,12 +2,12 @@
 use crate::{
     flavor::Eu4Flavor,
     models::{Eu4Save, GameState, Meta},
-    CompressionMethod, DeflateReader, Encoding, Eu4Error, Eu4ErrorKind, Eu4Melter,
+    CompressionMethod, Encoding, Eu4Error, Eu4ErrorKind, Eu4Melter,
 };
 use jomini::{
     binary::{de::OndemandBinaryDeserializer, FailedResolveStrategy, TokenResolver},
     text::{de::TextReaderDeserializer, ObjectReader},
-    BinaryDeserializer, BinaryTape, TextDeserializer, TextTape, Windows1252Encoding,
+    BinaryDeserializer, BinaryTape, SliceReader, TextDeserializer, TextTape, Windows1252Encoding,
 };
 use serde::{de::DeserializeOwned, Deserialize};
 use std::{
@@ -116,9 +116,20 @@ struct VerifiedIndex {
 impl VerifiedIndex {
     fn is_text(&self, data: &[u8]) -> Result<bool, Eu4Error> {
         let raw = &data[self.data_start..self.data_end];
-        let mut reader = DeflateReader::new(raw, self.compression);
         let mut header = [0; TXT_HEADER.len()];
-        reader.read_exact(&mut header)?;
+        match self.compression {
+            CompressionMethod::Deflate => {
+                crate::deflate::inflate_exact(raw, &mut header).map_err(Eu4ErrorKind::from)?;
+            }
+            #[cfg(feature = "zstd")]
+            CompressionMethod::Zstd => {
+                zstd::stream::read::Decoder::with_buffer(raw)
+                    .expect("zstd to initialize")
+                    .read_exact(&mut header)
+                    .map_err(Eu4ErrorKind::from)?;
+            }
+        }
+
         Ok(is_text(&header).is_some())
     }
 }
@@ -220,8 +231,14 @@ pub struct Eu4ZipFile<'a> {
 
 impl<'a> Eu4ZipFile<'a> {
     pub fn read_exact(&self, body: &mut [u8]) -> Result<(), Eu4Error> {
-        let mut reader = DeflateReader::new(self.raw, self.compression);
-        Ok(reader.read_exact(body)?)
+        let result = match self.compression {
+            CompressionMethod::Deflate => crate::deflate::inflate_exact(self.raw, body),
+            #[cfg(feature = "zstd")]
+            CompressionMethod::Zstd => crate::deflate::zstd_inflate(self.raw, body),
+        };
+
+        result.map_err(Eu4ErrorKind::from)?;
+        Ok(())
     }
 
     pub fn read_to_end(&self, buf: &mut Vec<u8>) -> Result<(), Eu4Error> {
@@ -242,8 +259,8 @@ impl<'a> Eu4ZipFile<'a> {
         self.size
     }
 
-    pub fn reader(&self) -> DeflateReader<'a> {
-        DeflateReader::new(self.raw, self.compression)
+    pub fn reader(&self) -> crate::DeflateReader<'a> {
+        crate::DeflateReader::new(self.raw, self.compression)
     }
 
     pub fn melter(&self) -> Eu4Melter {
@@ -348,14 +365,25 @@ impl<'a> Eu4File<'a> {
             Eu4FileKind::Binary(x) => Ok(x.deserializer(resolver).deserialize()?),
             Eu4FileKind::Zip(zip) => {
                 let meta_file = zip.meta_file()?;
-                let mut reader = meta_file.reader();
-                let mut modeller = Eu4Modeller::from_reader(&mut reader, resolver);
-                let meta: Meta = modeller.deserialize()?;
-
                 let gamestate_file = zip.gamestate_file()?;
-                let mut reader = gamestate_file.reader();
-                let mut modeller = Eu4Modeller::from_reader(&mut reader, resolver);
-                let game: GameState = modeller.deserialize()?;
+                let max_size = meta_file.size().max(gamestate_file.size());
+                let mut zip_sink = Vec::with_capacity(max_size);
+
+                // This is safe as the "read_exact" method guarantee to
+                // initialize the entire passed in buffer.
+                #[allow(clippy::uninit_vec)]
+                unsafe {
+                    zip_sink.set_len(max_size)
+                }
+
+                let meta_data = &mut zip_sink[..meta_file.size()];
+                meta_file.read_exact(meta_data)?;
+                let meta: Meta = Eu4Modeller::from_slice(&*meta_data, resolver).deserialize()?;
+
+                let gamestate_data = &mut zip_sink[..gamestate_file.size()];
+                gamestate_file.read_exact(gamestate_data)?;
+                let game: GameState =
+                    Eu4Modeller::from_slice(&*gamestate_data, resolver).deserialize()?;
 
                 Ok(Eu4Save { meta, game })
             }
@@ -433,6 +461,19 @@ pub struct Eu4Modeller<'res, Reader, Resolver> {
     resolver: &'res Resolver,
 }
 
+impl<'res, Resolver> Eu4Modeller<'res, (), Resolver> {
+    pub fn from_slice<'data>(
+        data: &'data [u8],
+        resolver: &'res Resolver,
+    ) -> Eu4ModellerSlice<'res, 'data, Resolver> {
+        Eu4ModellerSlice {
+            data,
+            resolver,
+            encoding: Encoding::Text,
+        }
+    }
+}
+
 impl<'res, Reader: Read, Resolver: TokenResolver> Eu4Modeller<'res, Reader, Resolver> {
     pub fn from_reader(reader: Reader, resolver: &'res Resolver) -> Self {
         Eu4Modeller {
@@ -489,7 +530,76 @@ impl<'de, 'res: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deseriali
             Ok(deser.deserialize_struct(name, fields, visitor)?)
         } else {
             self.encoding = Encoding::Text;
-            let mut deser = TextDeserializer::from_windows1252_reader(&mut self.reader);
+            let reader = jomini::text::TokenReader::new(&mut self.reader);
+            let mut deser = TextDeserializer::from_windows1252_reader(reader);
+            Ok(deser.deserialize_struct(name, fields, visitor)?)
+        }
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map enum identifier ignored_any
+    }
+}
+
+#[derive(Debug)]
+pub struct Eu4ModellerSlice<'res, 'data, Resolver> {
+    data: &'data [u8],
+    encoding: Encoding,
+    resolver: &'res Resolver,
+}
+
+impl<'res, 'data, Resolver: TokenResolver> Eu4ModellerSlice<'res, 'data, Resolver> {
+    pub fn deserialize<T>(&mut self) -> Result<T, Eu4Error>
+    where
+        T: DeserializeOwned,
+    {
+        T::deserialize(self)
+    }
+
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
+    }
+}
+
+impl<'de, 'data: 'de, 'res: 'de, Resolver: TokenResolver> serde::de::Deserializer<'de>
+    for &'_ mut Eu4ModellerSlice<'res, 'data, Resolver>
+{
+    type Error = Eu4Error;
+
+    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::Visitor<'de>,
+    {
+        Err(Eu4Error::new(Eu4ErrorKind::DeserializeImpl {
+            msg: String::from("only struct supported"),
+        }))
+    }
+
+    fn deserialize_struct<V>(
+        self,
+        name: &'static str,
+        fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::Visitor<'de>,
+    {
+        if self.data.starts_with(BIN_HEADER) {
+            use jomini::binary::BinaryFlavor;
+            self.encoding = Encoding::Binary;
+            let flavor = Eu4Flavor::new();
+            let mut deser = flavor
+                .deserializer()
+                .from_slice(&self.data[BIN_HEADER.len()..], self.resolver);
+            Ok(deser.deserialize_struct(name, fields, visitor)?)
+        } else {
+            self.encoding = Encoding::Text;
+            let reader = jomini::text::TokenReader::<SliceReader>::from_slice(
+                &self.data[BIN_HEADER.len()..],
+            );
+            let mut deser = TextDeserializer::from_windows1252_reader(reader);
             Ok(deser.deserialize_struct(name, fields, visitor)?)
         }
     }
@@ -753,9 +863,10 @@ impl<'data> Eu4Text<'data> {
         self.data
     }
 
-    pub fn deserializer(&self) -> Eu4TextDeserializer<&'data [u8]> {
+    pub fn deserializer(&self) -> Eu4TextDeserializer<SliceReader<'_>> {
+        let reader = jomini::text::TokenReader::<SliceReader>::from_slice(self.data);
         Eu4TextDeserializer {
-            deser: TextDeserializer::from_windows1252_reader(self.data),
+            deser: TextDeserializer::from_windows1252_reader(reader),
         }
     }
 }
