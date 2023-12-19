@@ -489,7 +489,8 @@ impl<'de, 'res: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deseriali
             Ok(deser.deserialize_struct(name, fields, visitor)?)
         } else {
             self.encoding = Encoding::Text;
-            let mut deser = TextDeserializer::from_windows1252_reader(&mut self.reader);
+            let reader = jomini::text::TokenReader::new(&mut self.reader);
+            let mut deser = TextDeserializer::from_windows1252_reader(reader);
             Ok(deser.deserialize_struct(name, fields, visitor)?)
         }
     }
@@ -754,8 +755,9 @@ impl<'data> Eu4Text<'data> {
     }
 
     pub fn deserializer(&self) -> Eu4TextDeserializer<&'data [u8]> {
+        let reader = jomini::text::TokenReader::new(self.data);
         Eu4TextDeserializer {
-            deser: TextDeserializer::from_windows1252_reader(self.data),
+            deser: TextDeserializer::from_windows1252_reader(reader),
         }
     }
 }
