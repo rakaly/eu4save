@@ -519,7 +519,7 @@ impl<'de, 'res: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deseriali
         V: serde::de::Visitor<'de>,
     {
         let mut header = [0u8; BIN_HEADER.len()];
-        self.reader.read_exact(&mut header).unwrap();
+        self.reader.read_exact(&mut header)?;
         if header == BIN_HEADER {
             use jomini::binary::BinaryFlavor;
             self.encoding = Encoding::Binary;
@@ -528,11 +528,13 @@ impl<'de, 'res: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deseriali
                 .deserializer()
                 .from_reader(&mut self.reader, self.resolver);
             Ok(deser.deserialize_struct(name, fields, visitor)?)
-        } else {
+        } else if header == TXT_HEADER {
             self.encoding = Encoding::Text;
             let reader = jomini::text::TokenReader::new(&mut self.reader);
             let mut deser = TextDeserializer::from_windows1252_reader(reader);
             Ok(deser.deserialize_struct(name, fields, visitor)?)
+        } else {
+            Err(Eu4ErrorKind::UnknownHeader.into())
         }
     }
 
@@ -586,19 +588,19 @@ impl<'de, 'data: 'de, 'res: 'de, Resolver: TokenResolver> serde::de::Deserialize
     where
         V: serde::de::Visitor<'de>,
     {
-        if self.data.starts_with(BIN_HEADER) {
+        if let Some(data) = is_bin(self.data) {
             use jomini::binary::BinaryFlavor;
             self.encoding = Encoding::Binary;
             let flavor = Eu4Flavor::new();
-            let mut deser = flavor
-                .deserializer()
-                .from_slice(&self.data[BIN_HEADER.len()..], self.resolver);
+            let mut deser = flavor.deserializer().from_slice(data, self.resolver);
             Ok(deser.deserialize_struct(name, fields, visitor)?)
-        } else {
+        } else if let Some(data) = is_text(self.data) {
             self.encoding = Encoding::Text;
-            let reader = jomini::text::TokenReader::from_slice(&self.data[BIN_HEADER.len()..]);
+            let reader = jomini::text::TokenReader::from_slice(data);
             let mut deser = TextDeserializer::from_windows1252_reader(reader);
             Ok(deser.deserialize_struct(name, fields, visitor)?)
+        } else {
+            Err(Eu4ErrorKind::UnknownHeader.into())
         }
     }
 
