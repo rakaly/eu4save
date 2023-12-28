@@ -7,7 +7,7 @@ use crate::{
 use jomini::{
     binary::{de::OndemandBinaryDeserializer, FailedResolveStrategy, TokenResolver},
     text::{de::TextReaderDeserializer, ObjectReader},
-    BinaryDeserializer, BinaryTape, SliceReader, TextDeserializer, TextTape, Windows1252Encoding,
+    BinaryDeserializer, BinaryTape, TextDeserializer, TextTape, Windows1252Encoding,
 };
 use serde::{de::DeserializeOwned, Deserialize};
 use std::{
@@ -863,7 +863,7 @@ impl<'data> Eu4Text<'data> {
         self.data
     }
 
-    pub fn deserializer(&self) -> Eu4TextDeserializer<SliceReader<'_>> {
+    pub fn deserializer(&self) -> Eu4TextDeserializer<&'_ [u8]> {
         let reader = jomini::text::TokenReader::from_slice(self.data);
         Eu4TextDeserializer {
             deser: TextDeserializer::from_windows1252_reader(reader),
