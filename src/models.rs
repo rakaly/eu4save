@@ -581,7 +581,8 @@ pub struct Country {
     pub religious_unity: f32,
     #[jomini(default)]
     pub church: Option<CountryChurch>,
-    pub national_focus: Option<String>,
+    #[jomini(default)]
+    pub national_focus: NationalFocus,
     pub recalculate_strategy: bool,
     pub colors: CountryColors,
     pub dirty_colony: bool,
@@ -764,6 +765,9 @@ pub enum CountryEvent {
     ),
     ChangedTagFrom(CountryTag),
     Leader(Leader),
+    NationalFocus(NationalFocus),
+    PrimaryCulture(String),
+    AddAcceptedCulture(String),
     RemoveAcceptedCulture(String),
     Religion(String),
 }
@@ -845,6 +849,58 @@ pub struct Leader {
     // is a test case for it to prevent regression.
     pub activation: Option<Eu4Date>,
     pub id: Option<ObjId>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum NationalFocus {
+    #[serde(rename = "ADM")]
+    Adm,
+    #[serde(rename = "DIP")]
+    Dip,
+    #[serde(rename = "MIL")]
+    Mil,
+    #[serde(rename = "none")]
+    None,
+}
+
+impl Default for NationalFocus {
+    fn default() -> Self {
+        NationalFocus::None
+    }
+}
+
+impl<'de> Deserialize<'de> for NationalFocus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct NationalFocusVisitor;
+        impl<'de> serde::de::Visitor<'de> for NationalFocusVisitor {
+            type Value = NationalFocus;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("national focus")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match v {
+                    "ADM" => Ok(NationalFocus::Adm),
+                    "DIP" => Ok(NationalFocus::Dip),
+                    "MIL" => Ok(NationalFocus::Mil),
+                    "none" => Ok(NationalFocus::None),
+                    _ => Err(E::invalid_value(
+                        serde::de::Unexpected::Str(v),
+                        &"national focus",
+                    )),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(NationalFocusVisitor)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -133,6 +133,9 @@ enum Chdf {
     Other,
     Queen,
     Religion,
+    NationalFocus,
+    PrimaryCulture,
+    AddAcceptedCulture,
     RemoveAcceptedCulture,
     Union,
 }
@@ -163,12 +166,15 @@ impl<'de> de::Deserialize<'de> for Chdf {
                     "union" => Ok(Chdf::Union),
                     "capital" => Ok(Chdf::Capital),
                     "leader" => Ok(Chdf::Leader),
-                    "remove_accepted_culture" => Ok(Chdf::RemoveAcceptedCulture),
                     "changed_country_name_from" => Ok(Chdf::ChangedCountryNameFrom),
                     "changed_country_adjective_from" => Ok(Chdf::ChangedCountryAdjectiveFrom),
                     "changed_country_mapcolor_from" => Ok(Chdf::ChangedCountryMapColorFrom),
                     "changed_tag_from" => Ok(Chdf::ChangedTagFrom),
                     "religion" => Ok(Chdf::Religion),
+                    "national_focus" => Ok(Chdf::NationalFocus),
+                    "primary_culture" => Ok(Chdf::PrimaryCulture),
+                    "remove_accepted_culture" => Ok(Chdf::RemoveAcceptedCulture),
+                    "add_accepted_culture" => Ok(Chdf::AddAcceptedCulture),
                     _ => Ok(Chdf::Other),
                 }
             }
@@ -246,7 +252,12 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                         }
                         Chdf::ChangedTagFrom => CountryEvent::ChangedTagFrom(map.next_value()?),
                         Chdf::Religion => CountryEvent::Religion(map.next_value()?),
-                        _ => {
+                        Chdf::NationalFocus => CountryEvent::NationalFocus(map.next_value()?),
+                        Chdf::PrimaryCulture => CountryEvent::PrimaryCulture(map.next_value()?),
+                        Chdf::AddAcceptedCulture => {
+                            CountryEvent::AddAcceptedCulture(map.next_value()?)
+                        }
+                        Chdf::Other => {
                             map.next_value::<de::IgnoredAny>()?;
                             continue;
                         }
