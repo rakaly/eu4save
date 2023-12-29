@@ -770,6 +770,7 @@ pub enum CountryEvent {
     AddAcceptedCulture(String),
     RemoveAcceptedCulture(String),
     Religion(String),
+    Decision(String),
 }
 
 impl CountryEvent {

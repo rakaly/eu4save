@@ -138,6 +138,7 @@ enum Chdf {
     AddAcceptedCulture,
     RemoveAcceptedCulture,
     Union,
+    Decision,
 }
 
 impl<'de> de::Deserialize<'de> for Chdf {
@@ -175,6 +176,7 @@ impl<'de> de::Deserialize<'de> for Chdf {
                     "primary_culture" => Ok(Chdf::PrimaryCulture),
                     "remove_accepted_culture" => Ok(Chdf::RemoveAcceptedCulture),
                     "add_accepted_culture" => Ok(Chdf::AddAcceptedCulture),
+                    "decision" => Ok(Chdf::Decision),
                     _ => Ok(Chdf::Other),
                 }
             }
@@ -257,6 +259,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
                         Chdf::AddAcceptedCulture => {
                             CountryEvent::AddAcceptedCulture(map.next_value()?)
                         }
+                        Chdf::Decision => CountryEvent::Decision(map.next_value()?),
                         Chdf::Other => {
                             map.next_value::<de::IgnoredAny>()?;
                             continue;
