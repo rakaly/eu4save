@@ -546,6 +546,7 @@ pub struct Country {
     pub capital: ProvinceId,
     pub original_capital: Option<ProvinceId>,
     pub trade_port: ProvinceId,
+    pub golden_era_date: Option<Eu4Date>,
     #[jomini(default)]
     pub base_tax: f32,
     #[jomini(default)]
