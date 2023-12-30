@@ -819,6 +819,7 @@ pub struct Monarch {
     pub personalities: Vec<(String, String)>,
     pub leader_id: Option<ObjId>,
     pub leader: Option<Leader>,
+    pub dynasty: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
