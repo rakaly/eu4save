@@ -822,7 +822,7 @@ pub struct Monarch {
     pub dynasty: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub enum LeaderKind {
     Admiral,
