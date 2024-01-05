@@ -649,6 +649,8 @@ pub struct Country {
     pub decision_seed: i32,
     #[jomini(duplicated, alias = "mercenary_company")]
     pub mercenary_companies: Vec<MercenaryCompany>,
+    #[jomini(duplicated, alias = "active_policy")]
+    pub active_policies: Vec<CountryPolicy>,
     pub monarch: Option<ObjId>,
     pub heir: Option<ObjId>,
     #[jomini(duplicated, alias = "leader")]
@@ -682,6 +684,12 @@ pub struct Country {
     pub diplomats: EnvoyGroup,
     #[jomini(default)]
     pub missionaries: EnvoyGroup,
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+pub struct CountryPolicy {
+    pub policy: String,
+    pub date: Eu4Date,
 }
 
 #[derive(Debug, Clone, JominiDeserialize, Default)]
