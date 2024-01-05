@@ -687,6 +687,7 @@ pub struct Country {
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct CountryPolicy {
     pub policy: String,
     pub date: Eu4Date,
