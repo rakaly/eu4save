@@ -774,6 +774,15 @@ impl<'a> Eu4FileEntry<'a> {
         }
     }
 
+    pub fn encoding(&self) -> Encoding {
+        match &self.kind {
+            Eu4FileEntryKind::Text(_) => Encoding::Text,
+            Eu4FileEntryKind::Binary(_) => Encoding::Binary,
+            Eu4FileEntryKind::Zip { is_text: true, .. } => Encoding::TextZip,
+            Eu4FileEntryKind::Zip { is_text: false, .. } => Encoding::BinaryZip,
+        }
+    }
+
     pub fn deserialize<RES, T>(&self, resolver: &RES) -> Result<T, Eu4Error>
     where
         T: DeserializeOwned,

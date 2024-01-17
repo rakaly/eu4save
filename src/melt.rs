@@ -1,7 +1,7 @@
 use crate::{
     file::{Eu4Binary, Eu4Text, Eu4Zip},
     flavor::Eu4Flavor,
-    Eu4Date, Eu4Error, Eu4ErrorKind,
+    Encoding, Eu4Date, Eu4Error, Eu4ErrorKind,
 };
 use jomini::{
     binary::{self, BinaryFlavor, FailedResolveStrategy, TokenReader, TokenResolver},
@@ -175,6 +175,15 @@ impl<'data> Eu4Melter<'data> {
                 input: MeltInput::BinaryStream(stream),
                 options: MeltOptions::new(),
             }
+        }
+    }
+
+    pub fn input_encoding(&self) -> Encoding {
+        match &self.input {
+            MeltInput::Text(_) | MeltInput::TextStream(_) => Encoding::Text,
+            MeltInput::Binary(_) | MeltInput::BinaryStream(_) => Encoding::Binary,
+            MeltInput::Zip(x) if x.is_text() => Encoding::TextZip,
+            MeltInput::Zip(_) => Encoding::BinaryZip,
         }
     }
 
