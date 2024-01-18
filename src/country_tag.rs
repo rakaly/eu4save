@@ -50,6 +50,7 @@ impl CountryTag {
         CountryTag(s)
     }
 
+    /// The "---" tag, no one.
     pub const NONE: CountryTag = CountryTag::new(*b"---");
 
     /// Returns if a country tag is the "none" tag

@@ -171,7 +171,7 @@ pub struct PlayerHistory {
 
 pub struct ProvinceOwners {
     /// Initial owners of provinces, index using province id
-    pub initial: Vec<Option<CountryTag>>,
+    pub initial: Vec<CountryTag>,
 
     /// Sorted by date and then province id    
     pub changes: Vec<ProvinceOwnerChange>,
@@ -180,7 +180,8 @@ pub struct ProvinceOwners {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct ProvinceOwnerChange {
     pub province: ProvinceId,
-    pub tag: CountryTag,
+    pub from: CountryTag,
+    pub to: CountryTag,
     pub date: Eu4Date,
 }
 
@@ -1201,11 +1202,7 @@ fn nation_events(save: &Eu4Save, province_owners: &ProvinceOwners) -> Vec<Nation
 
     let mut counts: HashMap<CountryTag, i32> = HashMap::with_capacity(save.game.countries.len());
     let mut owners: Vec<Option<CountryTag>> = vec![None; save.game.provinces.len() + 1];
-    let initial_owners = province_owners
-        .initial
-        .iter()
-        .enumerate()
-        .filter_map(|(i, x)| x.map(|y| (i, y)));
+    let initial_owners = province_owners.initial.iter().enumerate();
 
     for (id, tag) in initial_owners {
         if let Some(&stored) = initial_to_stored.get(&tag) {
@@ -1226,10 +1223,10 @@ fn nation_events(save: &Eu4Save, province_owners: &ProvinceOwners) -> Vec<Nation
 
     for change in &province_owners.changes {
         let store = tag_dater
-            .get(&change.tag)
+            .get(&change.to)
             .and_then(|x| x.iter().find(|x| x.date >= change.date))
             .map(|x| x.stored)
-            .unwrap_or(change.tag);
+            .unwrap_or(change.to);
 
         let prov_id = usize::from(change.province.as_u16());
         if let Some(old) = owners[prov_id].replace(store) {
@@ -1331,12 +1328,13 @@ fn war_participants(save: &Eu4Save, tag_resolver: &TagResolver) -> Vec<ResolvedW
 }
 
 fn province_owners(save: &Eu4Save) -> ProvinceOwners {
-    let mut initial = vec![None; save.game.provinces.len() + 1];
-    let mut owners = vec![None; save.game.provinces.len() + 1];
+    let mut initial = vec![CountryTag::NONE; save.game.provinces.len() + 1];
+    let mut owners = vec![CountryTag::NONE; save.game.provinces.len() + 1];
     let mut changes = Vec::with_capacity(save.game.provinces.len() * 2);
     for (&id, province) in &save.game.provinces {
-        initial[usize::from(id.as_u16())] = province.history.owner;
-        owners[usize::from(id.as_u16())] = province.history.owner;
+        let prov_id = usize::from(id.as_u16());
+        initial[prov_id] = province.history.owner.unwrap_or(CountryTag::NONE);
+        owners[prov_id] = province.history.owner.unwrap_or(CountryTag::NONE);
 
         for (date, event) in &province.history.events {
             if let ProvinceEvent::Owner(new_owner) = *event {
@@ -1344,13 +1342,14 @@ fn province_owners(save: &Eu4Save) -> ProvinceOwners {
                 // change owner events if the owner didn't change hands.
                 // In the trycone save, Leinster is listed as the new owner of
                 // Laighin in 1444.11.12 even though they already owned it
-                let prov_id = usize::from(id.as_u16());
-                let old_owner = owners[prov_id].replace(new_owner);
-                if old_owner.map_or(true, |x| new_owner != x) {
+
+                let prev_owner = std::mem::replace(&mut owners[prov_id], new_owner);
+                if prev_owner != new_owner {
                     changes.push(ProvinceOwnerChange {
                         date: *date,
                         province: id,
-                        tag: new_owner,
+                        from: prev_owner,
+                        to: new_owner,
                     });
                 }
             }
