@@ -863,7 +863,7 @@ pub struct Leader {
     pub id: Option<ObjId>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub enum NationalFocus {
     #[serde(rename = "ADM")]
     Adm,
@@ -872,13 +872,8 @@ pub enum NationalFocus {
     #[serde(rename = "MIL")]
     Mil,
     #[serde(rename = "none")]
+    #[default]
     None,
-}
-
-impl Default for NationalFocus {
-    fn default() -> Self {
-        NationalFocus::None
-    }
 }
 
 impl<'de> Deserialize<'de> for NationalFocus {
