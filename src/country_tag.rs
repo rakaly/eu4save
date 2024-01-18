@@ -8,9 +8,10 @@ use std::{fmt, str::FromStr};
 /// use eu4save::CountryTag;
 /// let tag: CountryTag = "ENG".parse()?;
 /// assert_eq!(tag.to_string(), String::from("ENG"));
+/// assert_eq!(tag, b"ENG");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Hash, Eq, PartialOrd, Ord)]
 pub struct CountryTag([u8; 3]);
 
 impl CountryTag {
@@ -22,6 +23,7 @@ impl CountryTag {
     /// let tag: CountryTag = CountryTag::create(b"ENG")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[inline]
     pub fn create<T: AsRef<[u8]>>(s: T) -> Result<Self, Eu4Error> {
         if let [a, b, c] = *s.as_ref() {
             if is_tagc(a) && is_tagc(b) && is_tagc(c) {
@@ -34,6 +36,32 @@ impl CountryTag {
         }
     }
 
+    pub const NONE: CountryTag = CountryTag(*b"---");
+
+    /// Returns if a country tag is the "none" tag
+    /// ```
+    /// use eu4save::CountryTag;
+    /// let tag: CountryTag = CountryTag::create(b"---")?;
+    /// assert!(tag.is_none());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[inline]
+    pub fn is_none(&self) -> bool {
+        self.as_bytes() == Self::NONE.as_bytes()
+    }
+
+    /// Returns if a country tag is not the "none" tag
+    /// ```
+    /// use eu4save::CountryTag;
+    /// let tag: CountryTag = CountryTag::create(b"ENG")?;
+    /// assert!(tag.is_some());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[inline]
+    pub fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+
     /// An ergonomic shortcut to determine if input byte slice contains the same
     /// data as the tag
     /// ```
@@ -42,6 +70,7 @@ impl CountryTag {
     /// assert!(tag.is(b"ENG"));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[inline]
     pub fn is<T: AsRef<[u8]>>(&self, s: T) -> bool {
         self.as_bytes() == s.as_ref()
     }
@@ -53,7 +82,8 @@ impl CountryTag {
     /// assert_eq!(tag.as_bytes(), b"ENG");
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn as_bytes(&self) -> &[u8] {
+    #[inline]
+    pub const fn as_bytes(&self) -> &[u8] {
         &self.0
     }
 
@@ -64,6 +94,7 @@ impl CountryTag {
     /// assert_eq!(tag.as_str(), "ENG");
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[inline]
     pub fn as_str(&self) -> &str {
         // We know that this is safe as the CountryTag constructor only allows
         // ascii alphanumeric and dashes
@@ -82,6 +113,18 @@ impl FromStr for CountryTag {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         CountryTag::create(s)
+    }
+}
+
+impl<R> PartialEq<R> for CountryTag where R: AsRef<[u8]> {
+    fn eq(&self, other: &R) -> bool {
+        self.as_bytes() == other.as_ref()
+    }
+}
+
+impl AsRef<[u8]> for CountryTag {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 

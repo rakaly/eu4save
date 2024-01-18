@@ -19,7 +19,7 @@ fn test_eu4_bin() {
     let file = Eu4File::from_slice(&data).unwrap();
     let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
-    assert_eq!(save.meta.player, "CRO".parse().unwrap());
+    assert_eq!(save.meta.player, "CRO");
 
     let query = Query::from_save(save);
     let province_owners = query.province_owners();
@@ -53,7 +53,7 @@ fn test_eu4_kandy_bin() {
     let file = Eu4File::from_slice(&data).unwrap();
     let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
-    assert_eq!(save.meta.player, "BHA".parse().unwrap());
+    assert_eq!(save.meta.player, "BHA");
 
     let query = Query::from_save(save);
     let province_owners = query.province_owners();
@@ -78,7 +78,7 @@ fn test_eu4_kandy_bin() {
             .owner
             .as_ref()
             .unwrap(),
-        &"SCA".parse().unwrap()
+        &"SCA"
     );
 
     assert_eq!(
@@ -152,7 +152,7 @@ fn test_eu4_kandy_bin_zst() {
     let file = Eu4File::from_slice(&data).unwrap();
     let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
-    assert_eq!(save.meta.player, "BHA".parse().unwrap());
+    assert_eq!(save.meta.player, "BHA");
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn test_eu4_ita1() {
     let file = Eu4File::from_slice(&data).unwrap();
     let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
-    assert_eq!(save.meta.player, "ITA".parse().unwrap());
+    assert_eq!(save.meta.player, "ITA");
     let settings = &save.game.gameplay_settings.options;
     assert_eq!(settings.difficulty, GameDifficulty::Normal);
     assert_eq!(
@@ -239,7 +239,7 @@ fn test_roundtrip_melt() {
     let file = Eu4File::from_slice(out.get_ref().as_slice()).unwrap();
     let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
-    assert_eq!(save.meta.player, "BHA".parse().unwrap());
+    assert_eq!(save.meta.player, "BHA");
 }
 
 macro_rules! ironman_test {
@@ -412,7 +412,7 @@ ironman_test!(
                 .resolve("IRE".parse().unwrap(), Eu4Date::from_ymd(1529, 3, 1))
                 .unwrap()
                 .stored,
-            "GBR".parse().unwrap()
+            "GBR"
         );
 
         let lei_income = query.income_statistics_ledger(&lei_events);

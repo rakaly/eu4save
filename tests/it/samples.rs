@@ -24,7 +24,7 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     let save = file.parse_save(&EnvTokens)?;
 
     assert_eq!(file.encoding(), Encoding::Text);
-    assert_eq!(save.meta.player, "ENG".parse()?);
+    assert_eq!(save.meta.player, "ENG");
 
     let query = Query::from_save(save);
     let province_owners = query.province_owners();
@@ -88,7 +88,7 @@ fn test_eu4_compressed_text() -> Result<(), Box<dyn Error>> {
     let file = Eu4File::from_slice(&data)?;
     let save = file.parse_save(&EnvTokens)?;
     assert_eq!(file.encoding(), Encoding::TextZip);
-    assert_eq!(save.meta.player, "ENG".parse()?);
+    assert_eq!(save.meta.player, "ENG");
 
     Ok(())
 }
@@ -102,7 +102,7 @@ fn test_eu4_compressed_text_raw() -> Result<(), Box<dyn Error>> {
     assert_eq!(meta_entry.name(), Some(Eu4FileEntryName::Meta));
     let meta: Meta = meta_entry.deserialize(&EnvTokens)?;
     assert_eq!(file.encoding(), Encoding::TextZip);
-    assert_eq!(meta.player, "ENG".parse()?);
+    assert_eq!(meta.player, "ENG");
     Ok(())
 }
 
@@ -333,7 +333,7 @@ fn test_missing_leader_activation_save() -> Result<(), Box<dyn Error>> {
     let file = Eu4File::from_slice(&buffer)?;
     let save = file.parse_save(&EnvTokens)?;
     assert_eq!(file.encoding(), Encoding::Text);
-    assert_eq!(save.meta.player, "NED".parse()?);
+    assert_eq!(save.meta.player, "NED");
 
     let none_activation: Vec<_> = save
         .game
@@ -379,7 +379,7 @@ fn test_paperman_text() -> Result<(), Box<dyn Error>> {
     let file = Eu4File::from_slice(&buffer).unwrap();
     let save = file.parse_save(&EnvTokens).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
-    assert_eq!(save.meta.player, "GER".parse()?);
+    assert_eq!(save.meta.player, "GER");
     Ok(())
 }
 

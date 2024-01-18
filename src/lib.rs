@@ -8,7 +8,7 @@ let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let file = Eu4File::from_slice(&data)?;
 let save = file.parse_save(&EnvTokens)?;
 assert_eq!(file.encoding(), Encoding::TextZip);
-assert_eq!(save.meta.player, "ENG".parse()?);
+assert_eq!(save.meta.player, "ENG");
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
