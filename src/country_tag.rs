@@ -36,7 +36,21 @@ impl CountryTag {
         }
     }
 
-    pub const NONE: CountryTag = CountryTag(*b"---");
+    /// Create a country tag from 3 bytes. Will panic if invalid
+    /// ```
+    /// use eu4save::CountryTag;
+    /// let tag = CountryTag::new(*b"ENG");
+    /// assert_eq!(tag, "ENG");
+    /// ```
+    #[inline]
+    pub const fn new(s: [u8; 3]) -> Self {
+        if !is_tagc(s[0]) || !is_tagc(s[1]) || !is_tagc(s[2]) {
+            panic!("Invalid country tag")
+        }
+        CountryTag(s)
+    }
+
+    pub const NONE: CountryTag = CountryTag::new(*b"---");
 
     /// Returns if a country tag is the "none" tag
     /// ```
@@ -116,7 +130,10 @@ impl FromStr for CountryTag {
     }
 }
 
-impl<R> PartialEq<R> for CountryTag where R: AsRef<[u8]> {
+impl<R> PartialEq<R> for CountryTag
+where
+    R: AsRef<[u8]>,
+{
     fn eq(&self, other: &R) -> bool {
         self.as_bytes() == other.as_ref()
     }
