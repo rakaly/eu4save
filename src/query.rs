@@ -9,6 +9,7 @@ use crate::{CountryTag, Eu4Date, PdsDate};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::{
+    cmp::Ordering,
     collections::{HashMap, HashSet},
     num::NonZeroU16,
 };
@@ -175,6 +176,27 @@ pub struct ProvinceOwners {
 
     /// Sorted by date and then province id    
     pub changes: Vec<ProvinceOwnerChange>,
+}
+
+// From a sorted slice, find all the matching elements
+fn binary_search_all<T, F>(data: &[T], mut f: F) -> &[T]
+where
+    F: FnMut(&T) -> Ordering,
+{
+    let start = data.partition_point(|x| f(x) == Ordering::Less);
+    for i in start..data.len() {
+        if f(&data[i]) == Ordering::Greater {
+            return &data[start..i];
+        }
+    }
+
+    &data[start..]
+}
+
+impl ProvinceOwners {
+    pub fn events_on(&self, date: Eu4Date) -> &[ProvinceOwnerChange] {
+        binary_search_all(&self.changes, |x| x.date.cmp(&date))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize)]
@@ -1202,10 +1224,8 @@ fn nation_events(save: &Eu4Save, province_owners: &ProvinceOwners) -> Vec<Nation
 
     let mut counts: HashMap<CountryTag, i32> = HashMap::with_capacity(save.game.countries.len());
     let mut owners: Vec<Option<CountryTag>> = vec![None; save.game.provinces.len() + 1];
-    let initial_owners = province_owners.initial.iter().enumerate();
-
-    for (id, tag) in initial_owners {
-        if let Some(&stored) = initial_to_stored.get(&tag) {
+    for (id, tag) in province_owners.initial.iter().enumerate() {
+        if let Some(&stored) = initial_to_stored.get(tag) {
             owners[id] = Some(stored);
             *counts.entry(stored).or_insert(0) += 1;
         } else {
@@ -1443,5 +1463,45 @@ impl ReligionLookup {
 
     pub fn resolve(&self, index: ReligionIndex) -> &str {
         self.religions[usize::from(index.0.get() - 1)].as_str()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_binary_search_all_start() {
+        let data = [1, 1, 3, 3, 4, 4];
+        let result = binary_search_all(&data, |x| x.cmp(&3));
+        assert_eq!(result, &[3, 3]);
+    }
+
+    #[test]
+    fn test_binary_search_all_end() {
+        let data = [1, 1, 3, 3, 4, 4];
+        let result = binary_search_all(&data, |x| x.cmp(&4));
+        assert_eq!(result, &[4, 4]);
+    }
+
+    #[test]
+    fn test_binary_search_all_past() {
+        let data = [1, 1, 3, 3, 4, 4];
+        let result = binary_search_all(&data, |x| x.cmp(&5));
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_binary_search_all_before() {
+        let data = [1, 1, 3, 3, 4, 4];
+        let result = binary_search_all(&data, |x| x.cmp(&0));
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_binary_search_all_not_found() {
+        let data = [1, 1, 3, 3, 4, 4];
+        let result = binary_search_all(&data, |x| x.cmp(&2));
+        assert!(result.is_empty());
     }
 }
