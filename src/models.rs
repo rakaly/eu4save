@@ -115,6 +115,8 @@ impl<'de> Deserialize<'de> for Eu4Save {
             #[jomini(alias = "gameplaysettings")]
             pub gameplay_settings: GameplaySettings,
             pub diplomacy: Diplomacy,
+            #[jomini(default)]
+            pub institutions: Vec<i32>,
         }
 
         let result = Eu4SaveFlatten::deserialize(deserializer)?;
@@ -162,6 +164,7 @@ impl<'de> Deserialize<'de> for Eu4Save {
                 completed_achievements: result.completed_achievements,
                 gameplay_settings: result.gameplay_settings,
                 diplomacy: result.diplomacy,
+                institutions: result.institutions,
             },
         })
     }
@@ -216,6 +219,8 @@ pub struct GameState {
     #[jomini(alias = "gameplaysettings")]
     pub gameplay_settings: GameplaySettings,
     pub diplomacy: Diplomacy,
+    #[jomini(default)]
+    pub institutions: Vec<i32>,
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
