@@ -863,26 +863,30 @@ impl Query {
     pub fn country_income_breakdown(&self, country: &Country) -> CountryIncomeLedger {
         let ledger = &country.ledger.lastmonthincometable;
         CountryIncomeLedger {
-            taxation: *ledger.first().unwrap_or(&0.0),
-            production: *ledger.get(1).unwrap_or(&0.0),
-            trade: *ledger.get(2).unwrap_or(&0.0),
-            gold: *ledger.get(3).unwrap_or(&0.0),
-            tariffs: *ledger.get(4).unwrap_or(&0.0),
-            vassals: *ledger.get(5).unwrap_or(&0.0),
-            harbor_fees: *ledger.get(6).unwrap_or(&0.0),
-            subsidies: *ledger.get(7).unwrap_or(&0.0),
-            war_reparations: *ledger.get(8).unwrap_or(&0.0),
-            interest: *ledger.get(9).unwrap_or(&0.0),
-            gifts: *ledger.get(10).unwrap_or(&0.0),
-            events: *ledger.get(11).unwrap_or(&0.0),
-            spoils_of_war: *ledger.get(12).unwrap_or(&0.0),
-            treasure_fleet: *ledger.get(13).unwrap_or(&0.0),
-            siphoning_income: *ledger.get(14).unwrap_or(&0.0),
-            condottieri: *ledger.get(15).unwrap_or(&0.0),
-            knowledge_sharing: *ledger.get(16).unwrap_or(&0.0),
-            blockading_foreign_ports: *ledger.get(17).unwrap_or(&0.0),
-            looting_foreign_cities: *ledger.get(18).unwrap_or(&0.0),
-            other: ledger.get(19..).iter().flat_map(|x| x.iter()).sum(),
+            taxation: ledger.first().unwrap_or(&0.0).max(0.0),
+            production: ledger.get(1).unwrap_or(&0.0).max(0.0),
+            trade: ledger.get(2).unwrap_or(&0.0).max(0.0),
+            gold: ledger.get(3).unwrap_or(&0.0).max(0.0),
+            tariffs: ledger.get(4).unwrap_or(&0.0).max(0.0),
+            vassals: ledger.get(5).unwrap_or(&0.0).max(0.0),
+            harbor_fees: ledger.get(6).unwrap_or(&0.0).max(0.0),
+            subsidies: ledger.get(7).unwrap_or(&0.0).max(0.0),
+            war_reparations: ledger.get(8).unwrap_or(&0.0).max(0.0),
+            interest: ledger.get(9).unwrap_or(&0.0).max(0.0),
+            gifts: ledger.get(10).unwrap_or(&0.0).max(0.0),
+            events: ledger.get(11).unwrap_or(&0.0).max(0.0),
+            spoils_of_war: ledger.get(12).unwrap_or(&0.0).max(0.0),
+            treasure_fleet: ledger.get(13).unwrap_or(&0.0).max(0.0),
+            siphoning_income: ledger.get(14).unwrap_or(&0.0).max(0.0),
+            condottieri: ledger.get(15).unwrap_or(&0.0).max(0.0),
+            knowledge_sharing: ledger.get(16).unwrap_or(&0.0).max(0.0),
+            blockading_foreign_ports: ledger.get(17).unwrap_or(&0.0).max(0.0),
+            looting_foreign_cities: ledger.get(18).unwrap_or(&0.0).max(0.0),
+            other: ledger
+                .get(19..)
+                .iter()
+                .flat_map(|x| x.iter().map(|y| y.max(0.0)))
+                .sum(),
         }
     }
 
@@ -918,45 +922,49 @@ impl Query {
 
     fn expense_ledger_breakdown(&self, ledger: &[f32]) -> CountryExpenseLedger {
         CountryExpenseLedger {
-            advisor_maintenance: *ledger.first().unwrap_or(&0.0),
-            interest: *ledger.get(1).unwrap_or(&0.0),
-            state_maintenance: *ledger.get(2).unwrap_or(&0.0),
-            subsidies: *ledger.get(4).unwrap_or(&0.0),
-            war_reparations: *ledger.get(5).unwrap_or(&0.0),
-            army_maintenance: *ledger.get(6).unwrap_or(&0.0),
-            fleet_maintenance: *ledger.get(7).unwrap_or(&0.0),
-            fort_maintenance: *ledger.get(8).unwrap_or(&0.0),
-            colonists: *ledger.get(9).unwrap_or(&0.0),
-            missionaries: *ledger.get(10).unwrap_or(&0.0),
-            raising_armies: *ledger.get(11).unwrap_or(&0.0),
-            building_fleets: *ledger.get(12).unwrap_or(&0.0),
-            building_fortresses: *ledger.get(13).unwrap_or(&0.0),
-            buildings: *ledger.get(14).unwrap_or(&0.0),
-            repaid_loans: *ledger.get(16).unwrap_or(&0.0),
-            gifts: *ledger.get(17).unwrap_or(&0.0),
-            advisors: *ledger.get(18).unwrap_or(&0.0),
-            events: *ledger.get(19).unwrap_or(&0.0),
-            peace: *ledger.get(20).unwrap_or(&0.0),
-            vassal_fee: *ledger.get(21).unwrap_or(&0.0),
-            tariffs: *ledger.get(22).unwrap_or(&0.0),
-            support_loyalists: *ledger.get(23).unwrap_or(&0.0),
-            condottieri: *ledger.get(26).unwrap_or(&0.0),
-            root_out_corruption: *ledger.get(27).unwrap_or(&0.0),
-            embrace_institution: *ledger.get(28).unwrap_or(&0.0),
-            knowledge_sharing: *ledger.get(30).unwrap_or(&0.0),
-            trade_company_investments: *ledger.get(31).unwrap_or(&0.0),
-            ports_blockaded: *ledger.get(33).unwrap_or(&0.0),
-            cities_looted: *ledger.get(34).unwrap_or(&0.0),
-            monuments: *ledger.get(35).unwrap_or(&0.0),
-            cot_upgrades: *ledger.get(36).unwrap_or(&0.0),
-            colony_changes: *ledger.get(37).unwrap_or(&0.0),
-            other: *ledger.get(3).unwrap_or(&0.0)
-                + *ledger.get(15).unwrap_or(&0.0)
-                + *ledger.get(24).unwrap_or(&0.0)
-                + *ledger.get(25).unwrap_or(&0.0)
-                + *ledger.get(29).unwrap_or(&0.0)
-                + *ledger.get(32).unwrap_or(&0.0)
-                + ledger.get(38..).iter().flat_map(|x| x.iter()).sum::<f32>(),
+            advisor_maintenance: ledger.first().unwrap_or(&0.0).max(0.0),
+            interest: ledger.get(1).unwrap_or(&0.0).max(0.0),
+            state_maintenance: ledger.get(2).unwrap_or(&0.0).max(0.0),
+            subsidies: ledger.get(4).unwrap_or(&0.0).max(0.0),
+            war_reparations: ledger.get(5).unwrap_or(&0.0).max(0.0),
+            army_maintenance: ledger.get(6).unwrap_or(&0.0).max(0.0),
+            fleet_maintenance: ledger.get(7).unwrap_or(&0.0).max(0.0),
+            fort_maintenance: ledger.get(8).unwrap_or(&0.0).max(0.0),
+            colonists: ledger.get(9).unwrap_or(&0.0).max(0.0),
+            missionaries: ledger.get(10).unwrap_or(&0.0).max(0.0),
+            raising_armies: ledger.get(11).unwrap_or(&0.0).max(0.0),
+            building_fleets: ledger.get(12).unwrap_or(&0.0).max(0.0),
+            building_fortresses: ledger.get(13).unwrap_or(&0.0).max(0.0),
+            buildings: ledger.get(14).unwrap_or(&0.0).max(0.0),
+            repaid_loans: ledger.get(16).unwrap_or(&0.0).max(0.0),
+            gifts: ledger.get(17).unwrap_or(&0.0).max(0.0),
+            advisors: ledger.get(18).unwrap_or(&0.0).max(0.0),
+            events: ledger.get(19).unwrap_or(&0.0).max(0.0),
+            peace: ledger.get(20).unwrap_or(&0.0).max(0.0),
+            vassal_fee: ledger.get(21).unwrap_or(&0.0).max(0.0),
+            tariffs: ledger.get(22).unwrap_or(&0.0).max(0.0),
+            support_loyalists: ledger.get(23).unwrap_or(&0.0).max(0.0),
+            condottieri: ledger.get(26).unwrap_or(&0.0).max(0.0),
+            root_out_corruption: ledger.get(27).unwrap_or(&0.0).max(0.0),
+            embrace_institution: ledger.get(28).unwrap_or(&0.0).max(0.0),
+            knowledge_sharing: ledger.get(30).unwrap_or(&0.0).max(0.0),
+            trade_company_investments: ledger.get(31).unwrap_or(&0.0).max(0.0),
+            ports_blockaded: ledger.get(33).unwrap_or(&0.0).max(0.0),
+            cities_looted: ledger.get(34).unwrap_or(&0.0).max(0.0),
+            monuments: ledger.get(35).unwrap_or(&0.0).max(0.0),
+            cot_upgrades: ledger.get(36).unwrap_or(&0.0).max(0.0),
+            colony_changes: ledger.get(37).unwrap_or(&0.0).max(0.0),
+            other: ledger.get(3).unwrap_or(&0.0).max(0.0)
+                + ledger.get(15).unwrap_or(&0.0).max(0.0)
+                + ledger.get(24).unwrap_or(&0.0).max(0.0)
+                + ledger.get(25).unwrap_or(&0.0).max(0.0)
+                + ledger.get(29).unwrap_or(&0.0).max(0.0)
+                + ledger.get(32).unwrap_or(&0.0).max(0.0)
+                + ledger
+                    .get(38..)
+                    .iter()
+                    .flat_map(|x| x.iter().map(|y| y.max(0.0)))
+                    .sum::<f32>(),
         }
     }
 

@@ -735,14 +735,14 @@ pub struct Envoy {
 #[derive(Debug, Clone, Deserialize, Default)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub struct CountryLedger {
-    #[serde(default, deserialize_with = "positive_vec_f32")]
+    #[serde(default)]
     pub income: Vec<f32>,
-    #[serde(default, deserialize_with = "positive_vec_f32")]
+    #[serde(default)]
     pub expense: Vec<f32>,
     pub lastmonthincome: Option<f32>,
-    #[serde(default, deserialize_with = "positive_vec_f32")]
+    #[serde(default)]
     pub lastmonthincometable: Vec<f32>,
-    #[serde(default, deserialize_with = "positive_vec_f32")]
+    #[serde(default)]
     pub lastmonthexpensetable: Vec<f32>,
     #[serde(default, deserialize_with = "positive_vec_f32")]
     pub totalexpensetable: Vec<f32>,
