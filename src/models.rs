@@ -117,6 +117,7 @@ impl<'de> Deserialize<'de> for Eu4Save {
             pub diplomacy: Diplomacy,
             #[jomini(default)]
             pub institutions: Vec<i32>,
+            pub random_world: Option<i32>,
         }
 
         let result = Eu4SaveFlatten::deserialize(deserializer)?;
@@ -165,6 +166,7 @@ impl<'de> Deserialize<'de> for Eu4Save {
                 gameplay_settings: result.gameplay_settings,
                 diplomacy: result.diplomacy,
                 institutions: result.institutions,
+                random_world: result.random_world,
             },
         })
     }
@@ -221,6 +223,7 @@ pub struct GameState {
     pub diplomacy: Diplomacy,
     #[jomini(default)]
     pub institutions: Vec<i32>,
+    pub random_world: Option<i32>,
 }
 
 #[derive(Debug, Clone, JominiDeserialize)]
