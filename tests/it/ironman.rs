@@ -1078,3 +1078,17 @@ ironman_test!(
         assertions(m)
     }
 );
+
+ironman_test!(
+    random_new_world,
+    "rnw.eu4",
+    IronmanQuery {
+        starting: "QOM",
+        player: "PER",
+        patch: "1.35.6.0",
+        date: Eu4Date::parse("1565.8.1").unwrap()
+    },
+    |query: Query, _melted_data: &[u8]| {
+        assert_eq!(query.save().game.random_world, Some(381160688));
+    }
+);
