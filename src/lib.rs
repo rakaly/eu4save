@@ -65,7 +65,6 @@ for inspiration.
 mod country_tag;
 pub mod de;
 mod deflate;
-mod dlc;
 mod errors;
 mod eu4date;
 mod extraction;
@@ -82,7 +81,6 @@ mod tokens;
 
 pub use country_tag::*;
 pub use deflate::*;
-pub use dlc::*;
 pub use errors::*;
 pub use eu4date::*;
 pub use extraction::*;

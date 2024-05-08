@@ -181,14 +181,6 @@ fn test_eu4_ita1() {
         TaxManpowerModifier::Historical
     );
 
-    let all_dlc_recognized = save
-        .meta
-        .dlc_enabled
-        .iter()
-        .map(|x| eu4save::dlc_id(x.as_str()))
-        .all(|x| x.is_some());
-    assert!(all_dlc_recognized);
-
     let query = Query::from_save(save);
     let province_owners = query.province_owners();
     let nation_events = query.nation_events(&province_owners);
