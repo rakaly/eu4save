@@ -607,6 +607,7 @@ pub struct Country {
     pub unit_type: Option<String>,
     pub tribute_type: Option<i32>,
     pub technology: CountryTechnology,
+    pub colonial_parent: Option<CountryTag>,
     pub ledger: CountryLedger,
     #[jomini(duplicated, alias = "loan")]
     pub loans: Vec<Loan>,
