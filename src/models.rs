@@ -628,6 +628,8 @@ pub struct Country {
     #[jomini(default)]
     pub total_war_worth: u32,
     #[jomini(default)]
+    pub war_exhaustion: f32,
+    #[jomini(default)]
     pub army_tradition: f32,
     #[jomini(default)]
     pub navy_tradition: f32,
