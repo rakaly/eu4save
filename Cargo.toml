@@ -21,7 +21,7 @@ tsify = ["dep:tsify", "dep:wasm-bindgen"]
 specta = ["dep:specta"]
 
 [dependencies]
-jomini =  { version = "0.25.6", features = ["json"] }
+jomini = { version = "0.26.0", features = ["json"] }
 once_cell = "1"
 zip = { version =  "0.6", default-features = false }
 serde = { version = "1", features = ["derive"] }
