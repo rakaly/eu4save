@@ -1,6 +1,4 @@
-#![cfg(ironman)]
-
-use std::io::Cursor;
+use std::{io::Cursor, sync::LazyLock};
 
 use crate::utils;
 use eu4save::{
@@ -9,15 +7,31 @@ use eu4save::{
         CountryManaUsage, LedgerPoint, NationEvent, NationEventKind, NationEvents, PlayerHistory,
         Query,
     },
-    CountryTag, Encoding, EnvTokens, Eu4Date, Eu4File, FailedResolveStrategy, PdsDate, ProvinceId,
+    BasicTokenResolver, CountryTag, Encoding, Eu4Date, Eu4File, FailedResolveStrategy, PdsDate,
+    ProvinceId,
 };
+use jomini::binary::TokenResolver;
 use paste::paste;
+
+static TOKENS: LazyLock<BasicTokenResolver> = LazyLock::new(|| {
+    let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();
+    BasicTokenResolver::from_text_lines(file_data.as_slice()).unwrap()
+});
+
+macro_rules! skip_if_no_tokens {
+    () => {
+        if TOKENS.is_empty() {
+            return;
+        }
+    };
+}
 
 #[test]
 fn test_eu4_bin() {
+    skip_if_no_tokens!();
     let data = utils::request("ragusa2.bin.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let save = file.parse_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&*TOKENS).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "CRO");
 
@@ -49,9 +63,10 @@ fn test_eu4_bin() {
 
 #[test]
 fn test_eu4_kandy_bin() {
+    skip_if_no_tokens!();
     let data = utils::request("kandy2.bin.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let save = file.parse_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&*TOKENS).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "BHA");
 
@@ -148,30 +163,33 @@ fn test_eu4_kandy_bin() {
 #[cfg(feature = "zstd")]
 #[test]
 fn test_eu4_kandy_bin_zst() {
+    skip_if_no_tokens!();
     let data = utils::request("kandy2.bin.zst.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let save = file.parse_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&*TOKENS).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "BHA");
 }
 
 #[test]
 fn test_eu4_same_campaign_id() {
+    skip_if_no_tokens!();
     let data = utils::request("ita2.eu4");
     let data2 = utils::request("ita2_later.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
     let file2 = Eu4File::from_slice(&data2).unwrap();
-    let save = file.parse_save(&EnvTokens).unwrap();
-    let save2 = file2.parse_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&*TOKENS).unwrap();
+    let save2 = file2.parse_save(&*TOKENS).unwrap();
     assert_eq!(save.meta.campaign_id, save2.meta.campaign_id);
     assert!(save.meta.date < save2.meta.date);
 }
 
 #[test]
 fn test_eu4_ita1() {
+    skip_if_no_tokens!();
     let data = utils::request("ita1.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let save = file.parse_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&*TOKENS).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "ITA");
     let settings = &save.game.gameplay_settings.options;
@@ -201,9 +219,10 @@ fn test_eu4_ita1() {
 
 #[test]
 fn test_inheritance_values() {
+    skip_if_no_tokens!();
     let data = utils::request("patch132.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
-    let save = file.parse_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&*TOKENS).unwrap();
     let query = Query::from_save(save);
 
     let inherit = query.inherit(&query.save_country(&"WUR".parse().unwrap()).unwrap());
@@ -220,16 +239,17 @@ fn test_inheritance_values() {
 
 #[test]
 fn test_roundtrip_melt() {
+    skip_if_no_tokens!();
     let data = utils::request("kandy2.bin.eu4");
     let file = Eu4File::from_slice(&data).unwrap();
     let mut out = Cursor::new(Vec::new());
     file.melter()
         .on_failed_resolve(FailedResolveStrategy::Error)
-        .melt(&mut out, &EnvTokens)
+        .melt(&mut out, &*TOKENS)
         .unwrap();
 
     let file = Eu4File::from_slice(out.get_ref().as_slice()).unwrap();
-    let save = file.parse_save(&EnvTokens).unwrap();
+    let save = file.parse_save(&*TOKENS).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "BHA");
 }
@@ -239,6 +259,7 @@ macro_rules! ironman_test {
         paste! {
             #[test]
             fn [<test_ $name>]() {
+                skip_if_no_tokens!();
                 let data = utils::request($fp);
                 let file = Eu4File::from_slice(&data).unwrap();
 
@@ -248,10 +269,10 @@ macro_rules! ironman_test {
                 let mut out = Cursor::new(Vec::new());
                 file.melter()
                     .on_failed_resolve(FailedResolveStrategy::Error)
-                    .melt(&mut out, &EnvTokens)
+                    .melt(&mut out, &*TOKENS)
                     .unwrap();
 
-                let save = file.parse_save(&EnvTokens).unwrap();
+                let save = file.parse_save(&*TOKENS).unwrap();
 
                 assert_eq!(file.encoding(), Encoding::BinaryZip);
                 let expected = $query;

@@ -1,11 +1,13 @@
-use eu4save::{EnvTokens, Eu4File};
+use eu4save::{BasicTokenResolver, Eu4File};
 use std::{error::Error, time::Instant};
 
 pub fn run(data: &[u8]) -> Result<(), Box<dyn Error>> {
     let file = Eu4File::from_slice(data)?;
 
     let start = Instant::now();
-    let save = file.parse_save(&EnvTokens)?;
+    let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();
+    let resolver = BasicTokenResolver::from_text_lines(file_data.as_slice())?;
+    let save = file.parse_save(&resolver)?;
     let after_parse = Instant::now();
     println!("parse: {}ms", after_parse.duration_since(start).as_millis());
 

@@ -1015,8 +1015,7 @@ impl<'de, 'tape, RES: TokenResolver> Eu4BinaryDeserializer<'de, 'tape, RES> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::EnvTokens;
-    use std::io::Write;
+    use std::{collections::HashMap, io::Write};
     use zip::{write::FileOptions, ZipWriter};
 
     fn create_zip(meta: &[u8], gamestate: &[u8], ai: &[u8]) -> Vec<u8> {
@@ -1080,7 +1079,8 @@ mod tests {
                 let out = text.reader().json().to_string();
                 assert_eq!(&out, r#"{"date":"1463.5.28"}"#);
 
-                let actual: MyMeta = Eu4Modeller::from_reader(sink.as_slice(), &EnvTokens)
+                let tokens: HashMap<u16, String> = HashMap::new();
+                let actual: MyMeta = Eu4Modeller::from_reader(sink.as_slice(), &tokens)
                     .deserialize()
                     .unwrap();
                 assert_eq!(actual.date, "1463.5.28");
@@ -1105,7 +1105,8 @@ mod tests {
         let file = Eu4File::from_slice(&zip_data).unwrap();
         let mut sink = Vec::new();
         let _eu4 = file.parse(&mut sink).unwrap();
-        let actual: MySave = Eu4Modeller::from_reader(sink.as_slice(), &EnvTokens)
+        let tokens: HashMap<u16, String> = HashMap::new();
+        let actual: MySave = Eu4Modeller::from_reader(sink.as_slice(), &tokens)
             .deserialize()
             .unwrap();
         assert_eq!(actual.date, "1463.5.28");

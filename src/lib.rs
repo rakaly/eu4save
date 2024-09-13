@@ -2,11 +2,13 @@
 EU4 Save is a library to ergonomically work with EU4 saves (ironman + mp).
 
 ```rust
-use eu4save::{Eu4File, Encoding, CountryTag, EnvTokens};
+use std::collections::HashMap;
+use eu4save::{Eu4File, Encoding, CountryTag};
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let file = Eu4File::from_slice(&data)?;
-let save = file.parse_save(&EnvTokens)?;
+let resolver = HashMap::<u16, &str>::new();
+let save = file.parse_save(&resolver)?;
 assert_eq!(file.encoding(), Encoding::TextZip);
 assert_eq!(save.meta.player, "ENG");
 # Ok::<(), Box<dyn std::error::Error>>(())
@@ -28,11 +30,13 @@ trade?
 To help solve questions like these, the `Query` API was created
 
 ```rust
-use eu4save::{Eu4File, Encoding, CountryTag, EnvTokens, query::Query};
+use std::collections::HashMap;
+use eu4save::{Eu4File, Encoding, CountryTag, query::Query};
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let file = Eu4File::from_slice(&data)?;
-let save = file.parse_save(&EnvTokens)?;
+let resolver = HashMap::<u16, &str>::new();
+let save = file.parse_save(&resolver)?;
 let save_query = Query::from_save(save);
 let trade = save_query.country(&"ENG".parse()?)
     .map(|country| save_query.country_income_breakdown(country))
@@ -43,20 +47,7 @@ assert_eq!(Some(17.982), trade);
 
 ## Ironman
 
-By default, ironman saves will not be decoded properly.
-
-To enable support, one must supply an environment variable
-(`EU4_IRONMAN_TOKENS`) that points to a newline delimited
-text file of token descriptions. For instance:
-
-```ignore
-0xffff my_test_token
-0xeeee my_test_token2
-```
-
-PDS has declared that in order to comply with EU4's terms of use, the list of
-tokens must not be shared. I am also restricted from divulging how the
-list of tokens can be derived.
+Ironman saves are supported through a provided `TokenResolver`. Per PDS counsel, the data to construct such a `TokenResolver` is not distributed here.
 
 You may look to other projects EU4 ironman projects like ironmelt or paperman
 for inspiration.
@@ -77,7 +68,6 @@ mod province_id;
 /// Ergonomic module for querying info from a save file
 pub mod query;
 mod tag_resolver;
-mod tokens;
 
 pub use country_tag::*;
 pub use deflate::*;
@@ -86,8 +76,7 @@ pub use eu4date::*;
 pub use extraction::*;
 #[doc(inline)]
 pub use file::Eu4File;
-pub use jomini::binary::FailedResolveStrategy;
+pub use jomini::binary::{BasicTokenResolver, FailedResolveStrategy};
 pub use melt::*;
 pub use province_id::*;
 pub use tag_resolver::*;
-pub use tokens::EnvTokens;

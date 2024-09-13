@@ -1,4 +1,4 @@
-use eu4save::{CountryTag, EnvTokens, Eu4File};
+use eu4save::{BasicTokenResolver, CountryTag, Eu4File};
 use std::{collections::HashSet, error::Error, fmt::Display};
 
 #[derive(Debug)]
@@ -47,7 +47,9 @@ where
 
 pub fn run(data: &[u8]) -> Result<(), Box<dyn Error>> {
     let file = Eu4File::from_slice(data)?;
-    let save = file.parse_save(&EnvTokens)?;
+    let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();
+    let resolver = BasicTokenResolver::from_text_lines(file_data.as_slice())?;
+    let save = file.parse_save(&resolver)?;
     deduce_vec(
         save.game
             .countries

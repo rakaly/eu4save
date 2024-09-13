@@ -498,28 +498,40 @@ where
     Ok(MeltedDocument { unknown_tokens })
 }
 
-#[cfg(all(test, ironman))]
+#[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
     use super::*;
-    use crate::{EnvTokens, Eu4File};
+    use crate::{BasicTokenResolver, Eu4File};
+    use std::{io::Cursor, sync::LazyLock};
+
+    static TOKENS: LazyLock<BasicTokenResolver> = LazyLock::new(|| {
+        let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();
+        BasicTokenResolver::from_text_lines(file_data.as_slice()).unwrap()
+    });
 
     #[test]
     fn test_melt_meta() {
+        if TOKENS.is_empty() {
+            return;
+        }
+
         let meta = include_bytes!("../tests/it/fixtures/meta.bin");
         let expected = include_bytes!("../tests/it/fixtures/meta.bin.melted");
         let file = Eu4File::from_slice(&meta[..]).unwrap();
         let mut out = Cursor::new(Vec::new());
         file.melter()
             .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&mut out, &EnvTokens)
+            .melt(&mut out, &*TOKENS)
             .unwrap();
         assert_eq!(out.into_inner().as_slice(), &expected[..]);
     }
 
     #[test]
     fn test_melt_skip_ironman() {
+        if TOKENS.is_empty() {
+            return;
+        }
+
         let data = [
             0x45, 0x55, 0x34, 0x62, 0x69, 0x6e, 0x4d, 0x28, 0x01, 0x00, 0x0c, 0x00, 0x70, 0x98,
             0x8d, 0x03, 0x89, 0x35, 0x01, 0x00, 0x0e, 0x00, 0x01, 0x38, 0x2a, 0x01, 0x00, 0x0f,
@@ -531,13 +543,17 @@ mod tests {
         let mut out = Cursor::new(Vec::new());
         file.melter()
             .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&mut out, &EnvTokens)
+            .melt(&mut out, &*TOKENS)
             .unwrap();
         assert_eq!(out.into_inner().as_slice(), &expected[..]);
     }
 
     #[test]
     fn test_melt_skip_ironman_in_object() {
+        if TOKENS.is_empty() {
+            return;
+        }
+
         let data = [
             0x45, 0x55, 0x34, 0x62, 0x69, 0x6e, 0x4d, 0x28, 0x01, 0x00, 0x0c, 0x00, 0x70, 0x98,
             0x8d, 0x03, 0x23, 0x2d, 0x01, 0x00, 0x03, 0x00, 0x89, 0x35, 0x01, 0x00, 0x0e, 0x00,
@@ -549,7 +565,7 @@ mod tests {
         let mut out = Cursor::new(Vec::new());
         file.melter()
             .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&mut out, &EnvTokens)
+            .melt(&mut out, &*TOKENS)
             .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
@@ -559,6 +575,10 @@ mod tests {
 
     #[test]
     fn test_skip_quoting_flags() {
+        if TOKENS.is_empty() {
+            return;
+        }
+
         let mut data = vec![];
         data.extend_from_slice(b"EU4bin");
         data.extend_from_slice(&[0xcc, 0x29, 0x01, 0x00, 0x03, 0x00, 0x0f, 0x00, 0x11, 0x00]);
@@ -573,7 +593,7 @@ mod tests {
         let mut out = Cursor::new(Vec::new());
         file.melter()
             .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&mut out, &EnvTokens)
+            .melt(&mut out, &*TOKENS)
             .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
@@ -583,6 +603,10 @@ mod tests {
 
     #[test]
     fn test_melt_skip_unknown_key() {
+        if TOKENS.is_empty() {
+            return;
+        }
+
         let data = [
             0x45, 0x55, 0x34, 0x62, 0x69, 0x6e, 0xff, 0xff, 0x01, 0x00, 0x0c, 0x00, 0x70, 0x98,
             0x8d, 0x03, 0x89, 0x35, 0x01, 0x00, 0x0e, 0x00, 0x01, 0x38, 0x2a, 0x01, 0x00, 0x0f,
@@ -594,7 +618,7 @@ mod tests {
         let mut out = Cursor::new(Vec::new());
         file.melter()
             .on_failed_resolve(FailedResolveStrategy::Ignore)
-            .melt(&mut out, &EnvTokens)
+            .melt(&mut out, &*TOKENS)
             .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
@@ -604,6 +628,10 @@ mod tests {
 
     #[test]
     fn test_melt_skip_unknown_value() {
+        if TOKENS.is_empty() {
+            return;
+        }
+
         let data = [
             0x45, 0x55, 0x34, 0x62, 0x69, 0x6e, 0x4d, 0x28, 0x01, 0x00, 0xff, 0xff, 0x89, 0x35,
             0x01, 0x00, 0x0e, 0x00, 0x01, 0x38, 0x2a, 0x01, 0x00, 0x0f, 0x00, 0x03, 0x00, 0x42,
@@ -615,7 +643,7 @@ mod tests {
         let mut out = Cursor::new(Vec::new());
         file.melter()
             .on_failed_resolve(FailedResolveStrategy::Ignore)
-            .melt(&mut out, &EnvTokens)
+            .melt(&mut out, &*TOKENS)
             .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),

@@ -43,20 +43,7 @@ assert_eq!(Some(17.982), trade);
 
 ## Ironman
 
-By default, ironman saves will not be decoded properly.
-
-To enable support, one must supply an environment variable
-(`EU4_IRONMAN_TOKENS`) that points to a newline delimited
-text file of token descriptions. For instance:
-
-```ignore
-0xffff my_test_token
-0xeeee my_test_token2
-```
-
-PDS has declared that in order to comply with EU4's terms of use, the list of
-tokens must not be shared. I am also restricted from divulging how the
-list of tokens can be derived.
+Ironman saves are supported, but not by default, as the token resolver can't be distributed, per PDS counsel.
 
 You may look to other projects EU4 ironman projects like ironmelt or paperman
 for inspiration.
