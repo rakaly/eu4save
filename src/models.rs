@@ -630,6 +630,14 @@ pub struct Country {
     #[jomini(default)]
     pub war_exhaustion: f32,
     #[jomini(default)]
+    pub land_maintenance: f32,
+    #[jomini(default)]
+    pub naval_maintenance: f32,
+    #[jomini(default)]
+    pub colonial_maintenance: f32,
+    #[jomini(default)]
+    pub missionary_maintenance: f32,
+    #[jomini(default)]
     pub army_tradition: f32,
     #[jomini(default)]
     pub navy_tradition: f32,
