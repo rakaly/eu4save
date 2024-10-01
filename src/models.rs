@@ -745,17 +745,30 @@ pub struct CountryLedger {
     pub income: Vec<f32>,
     #[serde(default)]
     pub expense: Vec<f32>,
-    pub lastmonthincome: Option<f32>,
-    #[serde(default)]
-    pub lastmonthincometable: Vec<f32>,
-    #[serde(default)]
-    pub lastmonthexpensetable: Vec<f32>,
-    #[serde(default, deserialize_with = "positive_vec_f32")]
-    pub totalexpensetable: Vec<f32>,
-    #[serde(default, deserialize_with = "positive_vec_f32")]
-    pub lastyearincome: Vec<f32>,
-    #[serde(default, deserialize_with = "positive_vec_f32")]
-    pub lastyearexpense: Vec<f32>,
+    #[serde(alias = "lastmonthincome")]
+    pub last_month_income: Option<f32>,
+    #[serde(default, alias = "lastmonthincometable")]
+    pub last_month_income_table: Vec<f32>,
+    #[serde(default, alias = "lastmonthexpensetable")]
+    pub last_month_expense_table: Vec<f32>,
+    #[serde(
+        default,
+        alias = "totalexpensetable",
+        deserialize_with = "positive_vec_f32"
+    )]
+    pub total_expense_table: Vec<f32>,
+    #[serde(
+        default,
+        alias = "lastyearincome",
+        deserialize_with = "positive_vec_f32"
+    )]
+    pub last_year_income: Vec<f32>,
+    #[serde(
+        default,
+        alias = "lastyearexpense",
+        deserialize_with = "positive_vec_f32"
+    )]
+    pub last_year_expense: Vec<f32>,
 }
 
 #[derive(Debug, Clone, Default)]

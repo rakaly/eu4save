@@ -861,7 +861,7 @@ impl Query {
     }
 
     pub fn country_income_breakdown(&self, country: &Country) -> CountryIncomeLedger {
-        let ledger = &country.ledger.lastmonthincometable;
+        let ledger = &country.ledger.last_month_income_table;
         CountryIncomeLedger {
             taxation: ledger.first().unwrap_or(&0.0).max(0.0),
             production: ledger.get(1).unwrap_or(&0.0).max(0.0),
@@ -915,7 +915,7 @@ impl Query {
             .game
             .countries
             .iter()
-            .filter(|(_, c)| c.ledger.totalexpensetable.iter().any(|&x| x > 0.0))
+            .filter(|(_, c)| c.ledger.total_expense_table.iter().any(|&x| x > 0.0))
             .map(|(tag, country)| (*tag, self.country_total_expense_breakdown(country)))
             .collect()
     }
@@ -969,11 +969,11 @@ impl Query {
     }
 
     pub fn country_expense_breakdown(&self, country: &Country) -> CountryExpenseLedger {
-        self.expense_ledger_breakdown(&country.ledger.lastmonthexpensetable)
+        self.expense_ledger_breakdown(&country.ledger.last_month_expense_table)
     }
 
     pub fn country_total_expense_breakdown(&self, country: &Country) -> CountryExpenseLedger {
-        self.expense_ledger_breakdown(&country.ledger.totalexpensetable)
+        self.expense_ledger_breakdown(&country.ledger.total_expense_table)
     }
 
     fn mana_spent_indexed(&self, data: &[(i32, i32)]) -> CountryManaSpend {
