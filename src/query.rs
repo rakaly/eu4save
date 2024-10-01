@@ -860,8 +860,7 @@ impl Query {
         format!("#{:02x}{:02x}{:02x}", colors[0], colors[1], colors[2])
     }
 
-    pub fn country_income_breakdown(&self, country: &Country) -> CountryIncomeLedger {
-        let ledger = &country.ledger.last_month_income_table;
+    fn income_ledger_breakdown(&self, ledger: &[f32]) -> CountryIncomeLedger {
         CountryIncomeLedger {
             taxation: ledger.first().unwrap_or(&0.0).max(0.0),
             production: ledger.get(1).unwrap_or(&0.0).max(0.0),
@@ -888,6 +887,21 @@ impl Query {
                 .flat_map(|x| x.iter().map(|y| y.max(0.0)))
                 .sum(),
         }
+    }
+
+    pub fn country_income_breakdown(&self, country: &Country) -> CountryIncomeLedger {
+        let ledger = &country.ledger.last_month_income_table;
+        self.income_ledger_breakdown(ledger)
+    }
+
+    pub fn country_last_year_income_breakdown(&self, country: &Country) -> CountryIncomeLedger {
+        let ledger = &country.ledger.last_year_income;
+        self.income_ledger_breakdown(ledger)
+    }
+
+    pub fn country_ytd_income_breakdown(&self, country: &Country) -> CountryIncomeLedger {
+        let ledger = &country.ledger.income;
+        self.income_ledger_breakdown(ledger)
     }
 
     pub fn countries_income_breakdown(&self) -> HashMap<CountryTag, CountryIncomeLedger> {
@@ -970,6 +984,14 @@ impl Query {
 
     pub fn country_expense_breakdown(&self, country: &Country) -> CountryExpenseLedger {
         self.expense_ledger_breakdown(&country.ledger.last_month_expense_table)
+    }
+
+    pub fn country_last_year_expense_breakdown(&self, country: &Country) -> CountryExpenseLedger {
+        self.expense_ledger_breakdown(&country.ledger.last_year_expense)
+    }
+
+    pub fn country_ytd_expense_breakdown(&self, country: &Country) -> CountryExpenseLedger {
+        self.expense_ledger_breakdown(&country.ledger.expense)
     }
 
     pub fn country_total_expense_breakdown(&self, country: &Country) -> CountryExpenseLedger {
