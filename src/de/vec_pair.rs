@@ -8,8 +8,21 @@ where
     K: Deserialize<'de>,
     V: Deserialize<'de>,
 {
+    deserialize_vec_pair_with_capacity::<'_, D, K, V, 0>(deserializer)
+}
+
+#[inline]
+pub fn deserialize_vec_pair_with_capacity<'de, D, K, V, const CAPACITY: usize>(
+    deserializer: D,
+) -> Result<Vec<(K, V)>, D::Error>
+where
+    D: Deserializer<'de>,
+    K: Deserialize<'de>,
+    V: Deserialize<'de>,
+{
     struct VecPairVisitor<K1, V1> {
         marker: PhantomData<Vec<(K1, V1)>>,
+        capacity: usize,
     }
 
     impl<'de, K1, V1> de::Visitor<'de> for VecPairVisitor<K1, V1>
@@ -30,7 +43,7 @@ where
             let mut values = if let Some(size) = map.size_hint() {
                 Vec::with_capacity(size)
             } else {
-                Vec::new()
+                Vec::with_capacity(self.capacity)
             };
 
             while let Some((key, value)) = map.next_entry()? {
@@ -42,6 +55,7 @@ where
     }
 
     deserializer.deserialize_map(VecPairVisitor {
+        capacity: CAPACITY,
         marker: PhantomData,
     })
 }

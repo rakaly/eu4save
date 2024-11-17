@@ -1,11 +1,29 @@
-pub fn positive_vec_f32<'de, D>(deserializer: D) -> Result<Vec<f32>, D::Error>
+use smallvec::SmallVec;
+
+pub fn positive_vec_f32_38<'de, D>(deserializer: D) -> Result<SmallVec<[f32; 38]>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    struct VecVisitor;
+    positive_vec_f32::<_, 38>(deserializer)
+}
 
-    impl<'de> serde::de::Visitor<'de> for VecVisitor {
-        type Value = Vec<f32>;
+pub fn positive_vec_f32_19<'de, D>(deserializer: D) -> Result<SmallVec<[f32; 19]>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    positive_vec_f32::<_, 19>(deserializer)
+}
+
+pub fn positive_vec_f32<'de, D, const SIZE: usize>(
+    deserializer: D,
+) -> Result<SmallVec<[f32; SIZE]>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct VecVisitor<const SIZE: usize>;
+
+    impl<'de, const SIZE: usize> serde::de::Visitor<'de> for VecVisitor<SIZE> {
+        type Value = SmallVec<[f32; SIZE]>;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
             formatter.write_str("a seq of wrapping floats")
@@ -15,12 +33,7 @@ where
         where
             A: serde::de::SeqAccess<'de>,
         {
-            let mut values = if let Some(size) = seq.size_hint() {
-                Vec::with_capacity(size)
-            } else {
-                Vec::new()
-            };
-
+            let mut values = SmallVec::with_capacity(seq.size_hint().unwrap_or(SIZE));
             let losses_max = (i32::MAX / 1000) as f32;
             let losses_min = -losses_max;
 
@@ -39,5 +52,5 @@ where
         }
     }
 
-    deserializer.deserialize_seq(VecVisitor)
+    deserializer.deserialize_seq(VecVisitor::<SIZE>)
 }

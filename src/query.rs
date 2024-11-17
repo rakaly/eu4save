@@ -1,7 +1,7 @@
 use crate::{
     models::{
-        Country, CountryEvent, Eu4Save, LedgerData, LedgerDatum, Province, ProvinceEvent,
-        ProvinceEventValue, WarEvent,
+        Country, CountryEvent, Eu4Save, Eu4String, LedgerData, LedgerDatum, Province,
+        ProvinceEvent, ProvinceEventValue, WarEvent,
     },
     ProvinceId, TagResolver,
 };
@@ -220,7 +220,7 @@ pub struct ProvinceReligionChange {
 }
 
 pub struct ReligionLookup {
-    religions: Vec<String>,
+    religions: Vec<Eu4String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -402,7 +402,7 @@ pub struct Query {
     save: Eu4Save,
     tag_ids: Vec<TagId>,
     tag_lookup: HashMap<CountryTag, TagId>,
-    buildings: OnceCell<HashSet<String>>,
+    buildings: OnceCell<HashSet<Eu4String>>,
 }
 
 impl Query {
@@ -1123,7 +1123,7 @@ impl Query {
     }
 
     /// Return all unique buildings in the world that are built
-    pub fn built_buildings(&self) -> &HashSet<String> {
+    pub fn built_buildings(&self) -> &HashSet<Eu4String> {
         self.buildings.get_or_init(|| {
             self.save
                 .game
@@ -1372,7 +1372,7 @@ fn war_participants(save: &Eu4Save, tag_resolver: &TagResolver) -> Vec<ResolvedW
         }
 
         war_participants.push(ResolvedWarParticipants {
-            war: name.clone(),
+            war: name.to_string(),
             participants: tags,
         })
     }
@@ -1439,7 +1439,7 @@ fn players(save: &Eu4Save) -> Vec<Player> {
         };
 
         players.push(Player {
-            name: player_name.clone(),
+            name: player_name.to_string(),
             tag: country_tag,
         })
     }
@@ -1484,7 +1484,7 @@ fn province_religions(save: &Eu4Save, lookup: &ReligionLookup) -> ProvinceReligi
 }
 
 impl ReligionLookup {
-    pub fn index(&self, religion: &String) -> Option<ReligionIndex> {
+    pub fn index(&self, religion: &Eu4String) -> Option<ReligionIndex> {
         self.religions
             .binary_search(religion)
             .ok()
