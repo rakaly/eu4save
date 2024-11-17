@@ -21,6 +21,21 @@ pub fn run(data: &[u8]) -> Result<(), Box<dyn Error>> {
         "rest: {}ms",
         after_rest.duration_since(after_parse).as_millis()
     );
+    println!("{}", query.save().game.provinces.len());
+    println!("{}", query.save().game.countries.len());
     println!("{}", ledger.len());
+
+    // Calculate stats number of non-zero history events
+    let mut history_events = query
+        .save()
+        .game
+        .countries
+        .iter()
+        .map(|(_, country)| country.history.events.len())
+        .filter(|&x| x > 0)
+        .collect::<Vec<_>>();
+    history_events.sort_unstable();
+    let sum = history_events.iter().sum::<usize>();
+    println!("median: {}, avg: {}", history_events[history_events.len() / 2], sum / history_events.len());
     Ok(())
 }
