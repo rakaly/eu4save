@@ -1,4 +1,4 @@
-use crate::models::ProvinceEventValue;
+use crate::models::{Eu4String, ProvinceEventValue};
 use serde::{de, Deserialize, Deserializer};
 use std::fmt;
 
@@ -20,7 +20,7 @@ impl<'de> Deserialize<'de> for ProvinceEventValue {
                 if v == "yes" || v == "no" {
                     Ok(ProvinceEventValue::Bool(v == "yes"))
                 } else {
-                    Ok(ProvinceEventValue::String(v))
+                    Ok(ProvinceEventValue::String(Eu4String::from(v)))
                 }
             }
 
@@ -28,7 +28,7 @@ impl<'de> Deserialize<'de> for ProvinceEventValue {
                 if v == "yes" || v == "no" {
                     Ok(ProvinceEventValue::Bool(v == "yes"))
                 } else {
-                    Ok(ProvinceEventValue::String(v.to_string()))
+                    Ok(ProvinceEventValue::String(Eu4String::from(v)))
                 }
             }
 

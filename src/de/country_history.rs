@@ -43,7 +43,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                 let mut add_government_reform = Vec::new();
                 let mut events = Vec::new();
                 let hint = map.size_hint().unwrap_or_default();
-                let estimate = hint.max(8);
+                let estimate = hint.max(32);
 
                 while let Some(key) = map.next_key::<Chf>()? {
                     match key {
@@ -266,7 +266,7 @@ impl<'de> de::DeserializeSeed<'de> for ExtendVec<'_> {
                         }
                     };
 
-                    // Most countries tend to have 32 around events
+                    // We lazily reserve capacity when we know there is at least one entry.
                     if self.events.is_empty() {
                         self.events.reserve(self.estimate);
                     }

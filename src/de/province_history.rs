@@ -1,4 +1,4 @@
-use crate::models::{ProvinceEvent, ProvinceEventValue};
+use crate::models::{Eu4String, ProvinceEvent, ProvinceEventValue};
 use crate::{models::ProvinceHistory, Eu4Date};
 use serde::{de, Deserialize, Deserializer};
 use std::collections::HashMap;
@@ -59,7 +59,7 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                         })?,
                         Phf::Other(key) => {
                             if let x @ ProvinceEventValue::Bool(_) = map.next_value()? {
-                                other.insert(key.to_string(), x);
+                                other.insert(Eu4String::from(key), x);
                             }
                         }
                         _ => {
@@ -95,7 +95,7 @@ enum Phf {
     Date(Eu4Date),
     DiscoveredBy,
     Hre,
-    Other(String),
+    Other(Eu4String),
     Owner,
     Religion,
     TradeGoods,
@@ -134,7 +134,7 @@ impl<'de> de::Deserialize<'de> for Phf {
                         if let Ok(date) = Eu4Date::parse(x) {
                             Ok(Phf::Date(date))
                         } else {
-                            Ok(Phf::Other(String::from(x)))
+                            Ok(Phf::Other(Eu4String::from(x)))
                         }
                     }
                 }
@@ -156,7 +156,7 @@ enum Pef {
     Culture,
     DiscoveredBy,
     IsCity,
-    Other(String),
+    Other(Eu4String),
     Owner,
     Religion,
     RemoveClaim,
@@ -197,7 +197,7 @@ impl<'de> de::Deserialize<'de> for Pef {
                     "discovered_by" => Ok(Pef::DiscoveredBy),
                     "culture" => Ok(Pef::Culture),
                     "is_city" => Ok(Pef::IsCity),
-                    x => Ok(Pef::Other(String::from(x))),
+                    x => Ok(Pef::Other(Eu4String::from(x))),
                 }
             }
         }
