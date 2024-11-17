@@ -1135,7 +1135,10 @@ impl Query {
         })
     }
 
-    pub fn province_building_history<'a>(&'a self, province: &'a Province) -> Vec<BuildingEvent> {
+    pub fn province_building_history<'a>(
+        &'a self,
+        province: &'a Province,
+    ) -> Vec<BuildingEvent<'a>> {
         let buildings = self.built_buildings();
         let initial_buildings = province.history.other.iter().filter_map(|(key, _event)| {
             if buildings.contains(key) {

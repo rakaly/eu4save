@@ -173,11 +173,11 @@ impl<'de> Deserialize<'de> for Eu4Save {
 }
 
 impl Eu4Save {
-    pub fn from_deserializer<'a, 'de, D>(
-        deser: &'a D,
-    ) -> Result<Self, <&D as serde::de::Deserializer<'de>>::Error>
+    pub fn from_deserializer<'de, D>(
+        deser: D,
+    ) -> Result<Self, <D as serde::de::Deserializer<'de>>::Error>
     where
-        &'a D: serde::de::Deserializer<'de>,
+        D: serde::de::Deserializer<'de>,
     {
         Eu4Save::deserialize(deser)
     }
