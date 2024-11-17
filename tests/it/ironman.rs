@@ -154,10 +154,9 @@ fn test_eu4_kandy_bin() {
     assert_eq!(building_date, Some(query.save().game.start_date));
 
     assert_eq!(player.active_idea_groups.len(), 9);
-    assert_eq!(
-        player.active_idea_groups[8],
-        (String::from("economic_ideas"), 2)
-    );
+    let (idea_group_name, completed) = &player.active_idea_groups[8];
+    assert_eq!(idea_group_name.as_str(), "economic_ideas");
+    assert_eq!(*completed, 2);
 }
 
 #[cfg(feature = "zstd")]
