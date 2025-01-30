@@ -13,7 +13,7 @@ categories = ["parsing"]
 
 [features]
 default = ["miniz", "zstd"]
-miniz = ["miniz_oxide", "flate2/rust_backend"]
+miniz = ["miniz_oxide", "flate2/zlib-rs"]
 libdeflate = ["libdeflater/freestanding"]
 zstd = ["dep:zstd"]
 serialize = []
