@@ -1,23 +1,29 @@
 #![no_main]
-use eu4save::EnvTokens;
 use libfuzzer_sys::fuzz_target;
+use eu4save::BasicTokenResolver;
+use std::sync::LazyLock;
+
+static TOKENS: LazyLock<BasicTokenResolver> = LazyLock::new(|| {
+    let file_data = std::fs::read("assets/eu4.txt").unwrap();
+    BasicTokenResolver::from_text_lines(file_data.as_slice()).unwrap()
+});
 
 fn run(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let file = eu4save::Eu4File::from_slice(&data)?;
+    let _ = file.parse_save(&*TOKENS);
+
     let mut zip_sink = Vec::new();
     let parsed_file = file.parse(&mut zip_sink)?;
+
+    let mut sink = std::io::sink();
+    let _ = file.melter().melt(&mut sink, &*TOKENS);
 
     match parsed_file.kind() {
         eu4save::file::Eu4ParsedFileKind::Text(x) => {
             x.reader().json().to_writer(std::io::sink())?;
         }
-        eu4save::file::Eu4ParsedFileKind::Binary(x) => {
-            x.melter().melt(&EnvTokens)?;
-        }
+        _ => {}
     }
-
-    let _meta: Result<eu4save::models::Meta, _> = parsed_file.deserializer(&EnvTokens).deserialize();
-    let _game: Result<eu4save::models::GameState, _> = parsed_file.deserializer(&EnvTokens).deserialize();
 
     Ok(())
 }
