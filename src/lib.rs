@@ -55,7 +55,6 @@ for inspiration.
 
 mod country_tag;
 pub mod de;
-mod deflate;
 mod errors;
 mod eu4date;
 mod extraction;
@@ -70,7 +69,6 @@ pub mod query;
 mod tag_resolver;
 
 pub use country_tag::*;
-pub use deflate::*;
 pub use errors::*;
 pub use eu4date::*;
 pub use extraction::*;

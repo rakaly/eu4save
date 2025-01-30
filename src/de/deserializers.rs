@@ -21,8 +21,10 @@ fn translate_deserialize_error(e: jomini::Error) -> Eu4Error {
     Eu4Error::new(kind)
 }
 
-impl<'de, 'tape, RES: TokenResolver> Deserializer<'de>
-    for &'_ Eu4BinaryDeserializer<'de, 'tape, RES>
+impl<'de, 'res: 'de, RES: TokenResolver, R> Deserializer<'de>
+    for &'_ mut Eu4BinaryDeserializer<'res, RES, R>
+where
+    R: std::io::Read,
 {
     type Error = Eu4Error;
 
