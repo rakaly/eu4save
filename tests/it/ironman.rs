@@ -7,8 +7,8 @@ use eu4save::{
         CountryManaUsage, LedgerPoint, NationEvent, NationEventKind, NationEvents, PlayerHistory,
         Query,
     },
-    BasicTokenResolver, CountryTag, Encoding, Eu4Date, Eu4File, FailedResolveStrategy, PdsDate,
-    ProvinceId,
+    BasicTokenResolver, CountryTag, Encoding, Eu4Date, FailedResolveStrategy, MeltOptions,
+    PdsDate, ProvinceId,
 };
 use jomini::binary::TokenResolver;
 use paste::paste;
@@ -240,15 +240,17 @@ fn test_inheritance_values() {
 #[test]
 fn test_roundtrip_melt() {
     skip_if_no_tokens!();
-    let data = utils::request("kandy2.bin.eu4");
-    let file = Eu4File::from_slice(&data).unwrap();
+    let file = utils::request_file("kandy2.bin.eu4");
+    let mut file = eu4save::file2::Eu4File::from_file(file).unwrap();
     let mut out = Cursor::new(Vec::new());
-    file.melter()
-        .on_failed_resolve(FailedResolveStrategy::Error)
-        .melt(&mut out, &*TOKENS)
-        .unwrap();
+    file.melt(
+        MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Error),
+        &*TOKENS,
+        &mut out,
+    )
+    .unwrap();
 
-    let file = Eu4File::from_slice(out.get_ref().as_slice()).unwrap();
+    let file = eu4save::file2::Eu4File::from_slice(out.get_ref().as_slice()).unwrap();
     let save = file.parse_save(&*TOKENS).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "BHA");
@@ -260,17 +262,18 @@ macro_rules! ironman_test {
             #[test]
             fn [<test_ $name>]() {
                 skip_if_no_tokens!();
-                let data = utils::request($fp);
-                let file = Eu4File::from_slice(&data).unwrap();
+                let file = utils::request_file($fp);
+                let mut file = eu4save::file2::Eu4File::from_file(file).unwrap();
 
                 // Ensure that every ironman can be melted with all tokens resolvable.
                 // Deserialization will not try and resolve tokens that aren't used. Melting
                 // ensures that every token is seen
                 let mut out = Cursor::new(Vec::new());
-                file.melter()
-                    .on_failed_resolve(FailedResolveStrategy::Error)
-                    .melt(&mut out, &*TOKENS)
-                    .unwrap();
+                file.melt(
+                    MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Error),
+                    &*TOKENS,
+                    &mut out,
+                ).unwrap();
 
                 let save = file.parse_save(&*TOKENS).unwrap();
 

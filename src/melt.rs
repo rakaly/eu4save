@@ -10,6 +10,7 @@ use jomini::{
 };
 use std::{
     collections::HashSet,
+    fs::File,
     io::{Read, Write},
 };
 
@@ -96,7 +97,7 @@ impl MeltOptions {
         }
     }
 
-    pub fn skip_checksum(self, skip_checksum: bool) -> Self {
+    pub(crate) fn skip_checksum(self, skip_checksum: bool) -> Self {
         MeltOptions {
             skip_checksum,
             ..self
@@ -107,7 +108,7 @@ impl MeltOptions {
         MeltOptions { verbatim, ..self }
     }
 
-    pub fn check_header(self, check_header: bool) -> Self {
+    pub(crate) fn check_header(self, check_header: bool) -> Self {
         MeltOptions {
             check_header,
             ..self
@@ -122,12 +123,13 @@ impl MeltOptions {
     }
 }
 
-#[derive(Debug)]
 enum MeltInput<'data> {
     Text(Eu4Text<'data>),
     Binary(Eu4Binary<'data>),
     TextStream(crate::DeflateReader<'data>),
     BinaryStream(crate::DeflateReader<'data>),
+    TextRead(File),
+    BinaryRead(File),
     Zip(Eu4Zip<'data>),
 }
 
@@ -178,10 +180,28 @@ impl<'data> Eu4Melter<'data> {
         }
     }
 
+    pub fn from_file(file: File, is_text: bool) -> Self {
+        if is_text {
+            Eu4Melter {
+                input: MeltInput::TextRead(file),
+                options: MeltOptions::new(),
+            }
+        } else {
+            Eu4Melter {
+                input: MeltInput::BinaryRead(file),
+                options: MeltOptions::new(),
+            }
+        }
+    }
+
     pub fn input_encoding(&self) -> Encoding {
         match &self.input {
-            MeltInput::Text(_) | MeltInput::TextStream(_) => Encoding::Text,
-            MeltInput::Binary(_) | MeltInput::BinaryStream(_) => Encoding::Binary,
+            MeltInput::Text(_) | MeltInput::TextStream(_) | MeltInput::TextRead(_) => {
+                Encoding::Text
+            }
+            MeltInput::Binary(_) | MeltInput::BinaryStream(_) | MeltInput::BinaryRead(_) => {
+                Encoding::Binary
+            }
             MeltInput::Zip(x) if x.is_text() => Encoding::TextZip,
             MeltInput::Zip(_) => Encoding::BinaryZip,
         }
@@ -216,12 +236,22 @@ impl<'data> Eu4Melter<'data> {
                 std::io::copy(x, &mut output)?;
                 Ok(MeltedDocument::new())
             }
+            MeltInput::TextRead(x) => {
+                output.write_all(b"EU4txt\n")?;
+                let result = melt(x, output, resolver, self.options.check_header(false))?;
+                Ok(result)
+            }
             MeltInput::Binary(x) => {
                 output.write_all(b"EU4txt\n")?;
                 let result = melt(x.data(), output, resolver, self.options.check_header(false))?;
                 Ok(result)
             }
             MeltInput::BinaryStream(x) => {
+                output.write_all(b"EU4txt\n")?;
+                let result = melt(x, output, resolver, self.options)?;
+                Ok(result)
+            }
+            MeltInput::BinaryRead(x) => {
                 output.write_all(b"EU4txt\n")?;
                 let result = melt(x, output, resolver, self.options)?;
                 Ok(result)
@@ -288,7 +318,7 @@ impl<'data> Eu4Melter<'data> {
 
 #[derive(Debug, Default)]
 pub struct MeltedDocument {
-    unknown_tokens: HashSet<u16>,
+    pub(crate) unknown_tokens: HashSet<u16>,
 }
 
 impl MeltedDocument {
@@ -302,7 +332,7 @@ impl MeltedDocument {
     }
 }
 
-fn melt<Reader, Writer, Resolver>(
+pub(crate) fn melt<Reader, Writer, Resolver>(
     input: Reader,
     output: Writer,
     resolver: Resolver,
