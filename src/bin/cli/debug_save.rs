@@ -1,8 +1,9 @@
 use eu4save::{BasicTokenResolver, Eu4File};
 use std::{error::Error, time::Instant};
 
-pub fn run(data: &[u8]) -> Result<(), Box<dyn Error>> {
-    let file = Eu4File::from_slice(data)?;
+pub fn run(path: &str) -> Result<(), Box<dyn Error>> {
+    let file = std::fs::File::open(path)?;
+    let file = Eu4File::from_file(file)?;
 
     let start = Instant::now();
     let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();

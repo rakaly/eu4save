@@ -1,6 +1,6 @@
 use crate::utils;
 use eu4save::{
-    file::Eu4FileEntryName,
+    file::{Eu4FileEntryName, Eu4FsFileKind},
     models::{CountryEvent, Meta},
     query::{
         BuildingConstruction, BuildingEvent, NationEvent, NationEventKind, NationEvents,
@@ -8,19 +8,14 @@ use eu4save::{
     },
     Encoding, Eu4Date, Eu4File, PdsDate, ProvinceId,
 };
-use std::io::{Cursor, Read};
 use std::{collections::HashMap, error::Error};
 
 #[test]
 fn test_eu4_text() -> Result<(), Box<dyn Error>> {
-    let data = utils::request("eng.txt.eu4.zip");
-    let reader = Cursor::new(&data[..]);
-    let mut zip = zip::ZipArchive::new(reader)?;
-    let mut zip_file = zip.by_index(0)?;
-    let mut buffer = Vec::with_capacity(0);
-    zip_file.read_to_end(&mut buffer)?;
+    let file = utils::request_file("eng.txt.eu4.zip");
+    let data = utils::inflate(file);
 
-    let file = Eu4File::from_slice(&buffer)?;
+    let file = Eu4File::from_slice(&data)?;
     let save = file.parse_save(&HashMap::<u16, &str>::new())?;
 
     assert_eq!(file.encoding(), Encoding::Text);
@@ -84,8 +79,8 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_eu4_compressed_text() -> Result<(), Box<dyn Error>> {
-    let data = utils::request("eng.txt.compressed.eu4");
-    let file = Eu4File::from_slice(&data)?;
+    let data = utils::request_file("eng.txt.compressed.eu4");
+    let file = Eu4File::from_file(data)?;
     let save = file.parse_save(&HashMap::<u16, &str>::new())?;
     assert_eq!(file.encoding(), Encoding::TextZip);
     assert_eq!(save.meta.player, "ENG");
@@ -95,12 +90,16 @@ fn test_eu4_compressed_text() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_eu4_compressed_text_raw() -> Result<(), Box<dyn Error>> {
-    let data = utils::request("eng.txt.compressed.eu4");
-    let file = Eu4File::from_slice(&data)?;
-    let mut entries = file.entries();
-    let meta_entry = entries.next_entry().unwrap();
-    assert_eq!(meta_entry.name(), Some(Eu4FileEntryName::Meta));
+    let file = utils::request_file("eng.txt.compressed.eu4");
+    let file = Eu4File::from_file(file)?;
+    let zip = match file.kind() {
+        Eu4FsFileKind::Zip(x) => x,
+        _ => panic!("Expected zip file"),
+    };
+
+    let mut meta_entry = zip.get(Eu4FileEntryName::Meta)?;
     let meta: Meta = meta_entry.deserialize(&HashMap::<u16, &str>::new())?;
+
     assert_eq!(file.encoding(), Encoding::TextZip);
     assert_eq!(meta.player, "ENG");
     Ok(())
@@ -108,8 +107,8 @@ fn test_eu4_compressed_text_raw() -> Result<(), Box<dyn Error>> {
 
 #[test]
 pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
-    let data = utils::request("mp_Uesugi.eu4");
-    let file = Eu4File::from_slice(&data)?;
+    let data = utils::request_file("mp_Uesugi.eu4");
+    let file = Eu4File::from_file(data)?;
     let save = file.parse_save(&HashMap::<u16, &str>::new())?;
     assert!(save.meta.multiplayer);
 
@@ -308,8 +307,8 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
 
 #[test]
 pub fn parse_overflowing_losses() -> Result<(), Box<dyn Error>> {
-    let data = utils::request("losses.eu4");
-    let file = Eu4File::from_slice(&data)?;
+    let data = utils::request_file("losses.eu4");
+    let file = Eu4File::from_file(data)?;
     let save = file.parse_save(&HashMap::<u16, &str>::new())?;
     let country_negative_loss = save
         .game
@@ -323,14 +322,10 @@ pub fn parse_overflowing_losses() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_missing_leader_activation_save() -> Result<(), Box<dyn Error>> {
-    let data = utils::request("skan-cb25b0.eu4.zip");
-    let reader = Cursor::new(&data[..]);
-    let mut zip = zip::ZipArchive::new(reader)?;
-    let mut zip_file = zip.by_index(0)?;
-    let mut buffer = Vec::with_capacity(0);
-    zip_file.read_to_end(&mut buffer)?;
+    let file = utils::request_file("skan-cb25b0.eu4.zip");
+    let data = utils::inflate(file);
 
-    let file = Eu4File::from_slice(&buffer)?;
+    let file = Eu4File::from_slice(&data)?;
     let save = file.parse_save(&HashMap::<u16, &str>::new())?;
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "NED");
@@ -362,21 +357,17 @@ fn test_handle_heavily_nested_events() {
     // There are some events that nests inside itself every time it fires. One such event is
     // "flavor_eng.9880" or the symposium event for great britain where every ten years the event
     // fires. https://eu4.paradoxwikis.com/English_events#Symposium
-    let data = utils::request("HashMP_Game56_S7End.eu4");
-    let file = Eu4File::from_slice(&data).unwrap();
+    let data = utils::request_file("HashMP_Game56_S7End.eu4");
+    let file = Eu4File::from_file(data).unwrap();
     let _save = file.parse_save(&HashMap::<u16, &str>::new()).unwrap();
     assert_eq!(file.encoding(), Encoding::TextZip);
 }
 
 #[test]
 fn test_paperman_text() -> Result<(), Box<dyn Error>> {
-    let data = utils::request("paperman.eu4.zip");
-    let reader = Cursor::new(&data[..]);
-    let mut zip = zip::ZipArchive::new(reader)?;
-    let mut zip_file = zip.by_index(0)?;
-    let mut buffer = Vec::with_capacity(0);
-    zip_file.read_to_end(&mut buffer)?;
-    let file = Eu4File::from_slice(&buffer).unwrap();
+    let file = utils::request_file("paperman.eu4.zip");
+    let data = utils::inflate(file);
+    let file = Eu4File::from_slice(&data).unwrap();
     let save = file.parse_save(&HashMap::<u16, &str>::new()).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "GER");
@@ -385,7 +376,7 @@ fn test_paperman_text() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn fix_crash_on_long_country_tag_debug_mode() {
-    let data = include_bytes!("fixtures/crash1.bin");
-    let file = Eu4File::from_slice(data).unwrap();
+    let file = std::fs::File::open("tests/it/fixtures/crash1.bin").unwrap();
+    let file = Eu4File::from_file(file).unwrap();
     let _save = file.parse_save(&HashMap::<u16, &str>::new());
 }

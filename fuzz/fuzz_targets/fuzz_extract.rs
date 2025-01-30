@@ -1,6 +1,6 @@
 #![no_main]
+use eu4save::{file::Eu4ParsedText, BasicTokenResolver};
 use libfuzzer_sys::fuzz_target;
-use eu4save::BasicTokenResolver;
 use std::sync::LazyLock;
 
 static TOKENS: LazyLock<BasicTokenResolver> = LazyLock::new(|| {
@@ -10,17 +10,19 @@ static TOKENS: LazyLock<BasicTokenResolver> = LazyLock::new(|| {
 
 fn run(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let file = eu4save::Eu4File::from_slice(&data)?;
-    let _ = file.parse_save(&*TOKENS);
-
-    let mut zip_sink = Vec::new();
-    let parsed_file = file.parse(&mut zip_sink)?;
 
     let mut sink = std::io::sink();
-    let _ = file.melter().melt(&mut sink, &*TOKENS);
+    let _ = file.melt(eu4save::MeltOptions::new(), &*TOKENS, &mut sink);
+    let _ = file.parse_save(&*TOKENS);
+    let _ = file.size();
+    let _ = file.encoding();
 
-    match parsed_file.kind() {
-        eu4save::file::Eu4ParsedFileKind::Text(x) => {
-            x.reader().json().to_writer(std::io::sink())?;
+    match file.kind() {
+        eu4save::file::Eu4SliceFileKind::Text(x) => {
+            Eu4ParsedText::from_raw(x.get_ref())?
+                .reader()
+                .json()
+                .to_writer(std::io::sink())?;
         }
         _ => {}
     }

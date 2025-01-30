@@ -1,8 +1,4 @@
-use crate::{
-    file::{Eu4Binary, Eu4Text, Eu4Zip},
-    flavor::Eu4Flavor,
-    Encoding, Eu4Date, Eu4Error, Eu4ErrorKind,
-};
+use crate::{flavor::Eu4Flavor, Eu4Date, Eu4Error, Eu4ErrorKind};
 use jomini::{
     binary::{self, BinaryFlavor, FailedResolveStrategy, TokenReader, TokenResolver},
     common::PdsDate,
@@ -96,7 +92,7 @@ impl MeltOptions {
         }
     }
 
-    pub fn skip_checksum(self, skip_checksum: bool) -> Self {
+    pub(crate) fn skip_checksum(self, skip_checksum: bool) -> Self {
         MeltOptions {
             skip_checksum,
             ..self
@@ -107,7 +103,7 @@ impl MeltOptions {
         MeltOptions { verbatim, ..self }
     }
 
-    pub fn check_header(self, check_header: bool) -> Self {
+    pub(crate) fn check_header(self, check_header: bool) -> Self {
         MeltOptions {
             check_header,
             ..self
@@ -122,173 +118,9 @@ impl MeltOptions {
     }
 }
 
-#[derive(Debug)]
-enum MeltInput<'data> {
-    Text(Eu4Text<'data>),
-    Binary(Eu4Binary<'data>),
-    TextStream(crate::DeflateReader<'data>),
-    BinaryStream(crate::DeflateReader<'data>),
-    Zip(Eu4Zip<'data>),
-}
-
-pub struct Eu4Melter<'data> {
-    input: MeltInput<'data>,
-    options: MeltOptions,
-}
-
-impl<'data> From<Eu4Zip<'data>> for Eu4Melter<'data> {
-    fn from(value: Eu4Zip<'data>) -> Self {
-        Eu4Melter {
-            input: MeltInput::Zip(value),
-            options: MeltOptions::new(),
-        }
-    }
-}
-
-impl<'data> From<Eu4Text<'data>> for Eu4Melter<'data> {
-    fn from(value: Eu4Text<'data>) -> Self {
-        Eu4Melter {
-            input: MeltInput::Text(value),
-            options: MeltOptions::new(),
-        }
-    }
-}
-
-impl<'data> From<Eu4Binary<'data>> for Eu4Melter<'data> {
-    fn from(value: Eu4Binary<'data>) -> Self {
-        Eu4Melter {
-            input: MeltInput::Binary(value),
-            options: MeltOptions::new(),
-        }
-    }
-}
-
-impl<'data> Eu4Melter<'data> {
-    pub fn from_reader(stream: crate::DeflateReader<'data>, is_text: bool) -> Self {
-        if is_text {
-            Eu4Melter {
-                input: MeltInput::TextStream(stream),
-                options: MeltOptions::new(),
-            }
-        } else {
-            Eu4Melter {
-                input: MeltInput::BinaryStream(stream),
-                options: MeltOptions::new(),
-            }
-        }
-    }
-
-    pub fn input_encoding(&self) -> Encoding {
-        match &self.input {
-            MeltInput::Text(_) | MeltInput::TextStream(_) => Encoding::Text,
-            MeltInput::Binary(_) | MeltInput::BinaryStream(_) => Encoding::Binary,
-            MeltInput::Zip(x) if x.is_text() => Encoding::TextZip,
-            MeltInput::Zip(_) => Encoding::BinaryZip,
-        }
-    }
-
-    pub fn verbatim(&mut self, verbatim: bool) -> &mut Self {
-        self.options = self.options.verbatim(verbatim);
-        self
-    }
-
-    pub fn on_failed_resolve(&mut self, on_failed_resolve: FailedResolveStrategy) -> &mut Self {
-        self.options = self.options.on_failed_resolve(on_failed_resolve);
-        self
-    }
-
-    pub fn melt<Writer, Resolver>(
-        &mut self,
-        mut output: Writer,
-        resolver: Resolver,
-    ) -> Result<MeltedDocument, Eu4Error>
-    where
-        Writer: Write,
-        Resolver: TokenResolver,
-    {
-        match &mut self.input {
-            MeltInput::Text(x) => {
-                output.write_all(b"EU4txt\n")?;
-                output.write_all(x.data())?;
-                Ok(MeltedDocument::new())
-            }
-            MeltInput::TextStream(ref mut x) => {
-                std::io::copy(x, &mut output)?;
-                Ok(MeltedDocument::new())
-            }
-            MeltInput::Binary(x) => {
-                output.write_all(b"EU4txt\n")?;
-                let result = melt(x.data(), output, resolver, self.options.check_header(false))?;
-                Ok(result)
-            }
-            MeltInput::BinaryStream(x) => {
-                output.write_all(b"EU4txt\n")?;
-                let result = melt(x, output, resolver, self.options)?;
-                Ok(result)
-            }
-            MeltInput::Zip(zip) => {
-                if zip.is_text() {
-                    let meta = zip.meta_file()?;
-                    std::io::copy(&mut meta.reader(), &mut output)?;
-
-                    let mut header = [0u8; 7];
-                    let gamestate = zip.gamestate_file()?;
-                    let mut reader = gamestate.reader();
-                    reader.read_exact(&mut header[..])?;
-                    std::io::copy(&mut reader, &mut output)?;
-
-                    let ai = zip.ai_file()?;
-                    let mut reader = ai.reader();
-                    reader.read_exact(&mut header[..])?;
-                    std::io::copy(&mut reader, &mut output)?;
-
-                    Ok(MeltedDocument::new())
-                } else {
-                    output.write_all(b"EU4txt\n")?;
-                    let meta = zip.meta_file()?;
-                    let meta_result = melt(
-                        meta.reader(),
-                        &mut output,
-                        &resolver,
-                        self.options.skip_checksum(true),
-                    )?;
-
-                    let gamestate = zip.gamestate_file()?;
-                    let gamestate_result = melt(
-                        gamestate.reader(),
-                        &mut output,
-                        &resolver,
-                        self.options.skip_checksum(true),
-                    )?;
-
-                    let ai = zip.ai_file()?;
-                    let ai_result = melt(
-                        ai.reader(),
-                        &mut output,
-                        &resolver,
-                        self.options.skip_checksum(false),
-                    )?;
-
-                    let union = meta_result
-                        .unknown_tokens
-                        .iter()
-                        .chain(gamestate_result.unknown_tokens.iter())
-                        .chain(ai_result.unknown_tokens.iter())
-                        .copied()
-                        .collect::<HashSet<u16>>();
-
-                    Ok(MeltedDocument {
-                        unknown_tokens: union,
-                    })
-                }
-            }
-        }
-    }
-}
-
 #[derive(Debug, Default)]
 pub struct MeltedDocument {
-    unknown_tokens: HashSet<u16>,
+    pub(crate) unknown_tokens: HashSet<u16>,
 }
 
 impl MeltedDocument {
@@ -302,7 +134,7 @@ impl MeltedDocument {
     }
 }
 
-fn melt<Reader, Writer, Resolver>(
+pub(crate) fn melt<Reader, Writer, Resolver>(
     input: Reader,
     output: Writer,
     resolver: Resolver,
@@ -519,10 +351,12 @@ mod tests {
         let expected = include_bytes!("../tests/it/fixtures/meta.bin.melted");
         let file = Eu4File::from_slice(&meta[..]).unwrap();
         let mut out = Cursor::new(Vec::new());
-        file.melter()
-            .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&mut out, &*TOKENS)
-            .unwrap();
+        file.melt(
+            MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Error),
+            &*TOKENS,
+            &mut out,
+        )
+        .unwrap();
         assert_eq!(out.into_inner().as_slice(), &expected[..]);
     }
 
@@ -541,10 +375,12 @@ mod tests {
         let expected = b"EU4txt\ndate=1804.12.9\nplayer=\"BHA\"";
         let file = Eu4File::from_slice(&data).unwrap();
         let mut out = Cursor::new(Vec::new());
-        file.melter()
-            .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&mut out, &*TOKENS)
-            .unwrap();
+        file.melt(
+            MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Error),
+            &*TOKENS,
+            &mut out,
+        )
+        .unwrap();
         assert_eq!(out.into_inner().as_slice(), &expected[..]);
     }
 
@@ -563,10 +399,12 @@ mod tests {
         let expected = "EU4txt\ndate=1804.12.9\nimpassable={ }\nplayer=\"BHA\"";
         let file = Eu4File::from_slice(&data).unwrap();
         let mut out = Cursor::new(Vec::new());
-        file.melter()
-            .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&mut out, &*TOKENS)
-            .unwrap();
+        file.melt(
+            MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Error),
+            &*TOKENS,
+            &mut out,
+        )
+        .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
             &expected[..]
@@ -591,10 +429,12 @@ mod tests {
 
         let file = Eu4File::from_slice(&data).unwrap();
         let mut out = Cursor::new(Vec::new());
-        file.melter()
-            .on_failed_resolve(FailedResolveStrategy::Error)
-            .melt(&mut out, &*TOKENS)
-            .unwrap();
+        file.melt(
+            MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Error),
+            &*TOKENS,
+            &mut out,
+        )
+        .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
             &expected[..]
@@ -616,10 +456,12 @@ mod tests {
         let expected = "EU4txt\nplayer=\"BHA\"";
         let file = Eu4File::from_slice(&data).unwrap();
         let mut out = Cursor::new(Vec::new());
-        file.melter()
-            .on_failed_resolve(FailedResolveStrategy::Ignore)
-            .melt(&mut out, &*TOKENS)
-            .unwrap();
+        file.melt(
+            MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Ignore),
+            &*TOKENS,
+            &mut out,
+        )
+        .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
             &expected[..]
@@ -641,10 +483,12 @@ mod tests {
         let expected = "EU4txt\ndate=__unknown_0xffff\nplayer=\"BHA\"";
         let file = Eu4File::from_slice(&data).unwrap();
         let mut out = Cursor::new(Vec::new());
-        file.melter()
-            .on_failed_resolve(FailedResolveStrategy::Ignore)
-            .melt(&mut out, &*TOKENS)
-            .unwrap();
+        file.melt(
+            MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Ignore),
+            &*TOKENS,
+            &mut out,
+        )
+        .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
             &expected[..]
