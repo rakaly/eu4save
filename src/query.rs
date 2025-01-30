@@ -6,9 +6,9 @@ use crate::{
     ProvinceId, TagResolver,
 };
 use crate::{CountryTag, Eu4Date, PdsDate};
-use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::{
+    cell::OnceCell,
     cmp::Ordering,
     collections::{HashMap, HashSet},
     num::NonZeroU16,
