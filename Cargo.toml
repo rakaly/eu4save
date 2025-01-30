@@ -12,7 +12,7 @@ keywords = ["eu4", "ironman"]
 categories = ["parsing"]
 
 [features]
-default = ["miniz"]
+default = ["miniz", "zstd"]
 miniz = ["miniz_oxide", "flate2/rust_backend"]
 libdeflate = ["libdeflater/freestanding"]
 zstd = ["dep:zstd"]
@@ -32,6 +32,7 @@ tsify = { version = "0.4.5", default-features = false, optional = true }
 wasm-bindgen = { version = "0.2", default-features = false, optional = true }
 specta = { version = "1.0.4", optional = true }
 flate2 = { version = "1.0", default-features = false }
+rawzip = { path = "../rawzip"}
 
 [dev-dependencies]
 zip = { version =  "0.6", default-features = false, features = ["deflate"] }

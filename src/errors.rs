@@ -28,6 +28,9 @@ impl From<Eu4ErrorKind> for Eu4Error {
 /// Specific type of error
 #[derive(thiserror::Error, Debug)]
 pub enum Eu4ErrorKind {
+    #[error("zip error: {0}")]
+    Zip(#[from] rawzip::Error),
+
     #[error("unable to parse as zip: {0}")]
     ZipArchive(#[from] ZipError),
 

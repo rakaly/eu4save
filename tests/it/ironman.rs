@@ -29,8 +29,8 @@ macro_rules! skip_if_no_tokens {
 #[test]
 fn test_eu4_bin() {
     skip_if_no_tokens!();
-    let data = utils::request("ragusa2.bin.eu4");
-    let file = Eu4File::from_slice(&data).unwrap();
+    let file = utils::request_file("ragusa2.bin.eu4");
+    let file = eu4save::file2::Eu4File::from_file(file).unwrap();
     let save = file.parse_save(&*TOKENS).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "CRO");
@@ -64,8 +64,8 @@ fn test_eu4_bin() {
 #[test]
 fn test_eu4_kandy_bin() {
     skip_if_no_tokens!();
-    let data = utils::request("kandy2.bin.eu4");
-    let file = Eu4File::from_slice(&data).unwrap();
+    let file = utils::request_file("kandy2.bin.eu4");
+    let file = eu4save::file2::Eu4File::from_file(file).unwrap();
     let save = file.parse_save(&*TOKENS).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "BHA");
@@ -164,8 +164,8 @@ fn test_eu4_kandy_bin() {
 #[test]
 fn test_eu4_kandy_bin_zst() {
     skip_if_no_tokens!();
-    let data = utils::request("kandy2.bin.zst.eu4");
-    let file = Eu4File::from_slice(&data).unwrap();
+    let file = utils::request_file("kandy2.bin.zst.eu4");
+    let file = eu4save::file2::Eu4File::from_file(file).unwrap();
     let save = file.parse_save(&*TOKENS).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "BHA");
@@ -174,10 +174,10 @@ fn test_eu4_kandy_bin_zst() {
 #[test]
 fn test_eu4_same_campaign_id() {
     skip_if_no_tokens!();
-    let data = utils::request("ita2.eu4");
-    let data2 = utils::request("ita2_later.eu4");
-    let file = Eu4File::from_slice(&data).unwrap();
-    let file2 = Eu4File::from_slice(&data2).unwrap();
+    let file = utils::request_file("ita2.eu4");
+    let file2 = utils::request_file("ita2_later.eu4");
+    let file = eu4save::file2::Eu4File::from_file(file).unwrap();
+    let file2 = eu4save::file2::Eu4File::from_file(file2).unwrap();
     let save = file.parse_save(&*TOKENS).unwrap();
     let save2 = file2.parse_save(&*TOKENS).unwrap();
     assert_eq!(save.meta.campaign_id, save2.meta.campaign_id);
@@ -187,8 +187,8 @@ fn test_eu4_same_campaign_id() {
 #[test]
 fn test_eu4_ita1() {
     skip_if_no_tokens!();
-    let data = utils::request("ita1.eu4");
-    let file = Eu4File::from_slice(&data).unwrap();
+    let file = utils::request_file("ita1.eu4");
+    let file = eu4save::file2::Eu4File::from_file(file).unwrap();
     let save = file.parse_save(&*TOKENS).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "ITA");
@@ -220,8 +220,8 @@ fn test_eu4_ita1() {
 #[test]
 fn test_inheritance_values() {
     skip_if_no_tokens!();
-    let data = utils::request("patch132.eu4");
-    let file = Eu4File::from_slice(&data).unwrap();
+    let file = utils::request_file("patch132.eu4");
+    let file = eu4save::file2::Eu4File::from_file(file).unwrap();
     let save = file.parse_save(&*TOKENS).unwrap();
     let query = Query::from_save(save);
 
