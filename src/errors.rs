@@ -1,4 +1,4 @@
-use crate::{file::Eu4FileEntryName, ZipInflationError};
+use crate::file::Eu4FileEntryName;
 use jomini::binary;
 use std::{fmt, io};
 use zip::result::ZipError;
@@ -94,15 +94,6 @@ impl From<jomini::Error> for Eu4Error {
         };
 
         Eu4Error::new(kind)
-    }
-}
-
-impl From<ZipInflationError> for Eu4ErrorKind {
-    fn from(x: ZipInflationError) -> Self {
-        match x {
-            ZipInflationError::BadData { msg } => Eu4ErrorKind::ZipBadData { msg },
-            ZipInflationError::EarlyEof { written } => Eu4ErrorKind::ZipEarlyEof { written },
-        }
     }
 }
 

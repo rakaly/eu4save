@@ -1,6 +1,5 @@
 use once_cell::sync::Lazy;
 use std::fs::File;
-use std::io::Read;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -44,12 +43,6 @@ pub fn request_file<S: AsRef<str>>(input: S) -> File {
     std::fs::File::open(cache).unwrap()
 }
 
-pub fn request<S: AsRef<str>>(input: S) -> Vec<u8> {
-    let mut output = Vec::new();
-    request_file(input).read_to_end(&mut output).unwrap();
-    output
-}
-
 pub fn inflate(file: File) -> Vec<u8> {
     let mut buf = vec![0u8; rawzip::RECOMMENDED_BUFFER_SIZE];
     let archive = rawzip::ZipArchive::from_file(file, &mut buf).unwrap();
@@ -59,10 +52,7 @@ pub fn inflate(file: File) -> Vec<u8> {
     let mut output = Vec::with_capacity(wayfinder.uncompressed_size_hint() as usize);
     let zip_entry = archive.get_entry(wayfinder).unwrap();
     let inflater = flate2::read::DeflateDecoder::new(zip_entry.reader());
-    let mut verifier = rawzip::ZipVerifier::new(inflater);
+    let mut verifier = zip_entry.verifier(inflater);
     std::io::copy(&mut verifier, &mut output).unwrap();
-    let claim = verifier.verification_claim();
-    let reader = verifier.into_inner().into_inner();
-    reader.verify_claim(claim).unwrap();
     output
 }
