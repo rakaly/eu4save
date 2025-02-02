@@ -1,9 +1,8 @@
-use once_cell::sync::Lazy;
 use std::fs::File;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
-static DATA: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+static DATA: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 /// Fetch an eu4 save file. Save files can be quite large, so the save files are not stored in the
 /// repo. Instead they are stored in a public S3 bucket. This function will check if the file has
