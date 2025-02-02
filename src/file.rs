@@ -78,20 +78,17 @@ impl Eu4File {
                         _ => {}
                     }
 
-                    match (meta, gamestate, ai) {
-                        (Some(meta), Some(gamestate), Some(ai)) => {
-                            return Ok(Eu4SliceFile {
-                                kind: Eu4SliceFileKind::Zip(Eu4SliceZip {
-                                    archive,
-                                    meta,
-                                    gamestate,
-                                    ai,
-                                    compression,
-                                    is_text,
-                                }),
-                            })
-                        }
-                        _ => {}
+                    if let (Some(meta), Some(gamestate), Some(ai)) = (meta, gamestate, ai) {
+                        return Ok(Eu4SliceFile {
+                            kind: Eu4SliceFileKind::Zip(Box::new(Eu4SliceZip {
+                                archive,
+                                meta,
+                                gamestate,
+                                ai,
+                                compression,
+                                is_text,
+                            })),
+                        });
                     }
                 }
 
@@ -108,7 +105,7 @@ impl Eu4File {
                     .into());
                 }
 
-                return Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Ai).into());
+                Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Ai).into())
             }
         }
     }
@@ -167,20 +164,17 @@ impl Eu4File {
                         _ => {}
                     }
 
-                    match (meta, gamestate, ai) {
-                        (Some(meta), Some(gamestate), Some(ai)) => {
-                            return Ok(Eu4FsFile {
-                                kind: Eu4FsFileKind::Zip(Eu4FsZip {
-                                    archive,
-                                    meta,
-                                    gamestate,
-                                    ai,
-                                    compression,
-                                    is_text,
-                                }),
-                            })
-                        }
-                        _ => {}
+                    if let (Some(meta), Some(gamestate), Some(ai)) = (meta, gamestate, ai) {
+                        return Ok(Eu4FsFile {
+                            kind: Eu4FsFileKind::Zip(Box::new(Eu4FsZip {
+                                archive,
+                                meta,
+                                gamestate,
+                                ai,
+                                compression,
+                                is_text,
+                            })),
+                        });
                     }
                 }
 
@@ -197,7 +191,7 @@ impl Eu4File {
                     .into());
                 }
 
-                return Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Ai).into());
+                Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Ai).into())
             }
         }
     }
@@ -206,14 +200,14 @@ impl Eu4File {
 enum Eu4SliceFileKind<'a> {
     Text(&'a [u8]),
     Binary(&'a [u8]),
-    Zip(Eu4SliceZip<'a>),
+    Zip(Box<Eu4SliceZip<'a>>),
 }
 
 pub struct Eu4SliceFile<'a> {
     kind: Eu4SliceFileKind<'a>,
 }
 
-impl<'a> Eu4SliceFile<'a> {
+impl Eu4SliceFile<'_> {
     pub fn encoding(&self) -> Encoding {
         match &self.kind {
             Eu4SliceFileKind::Text(_) => Encoding::Text,
@@ -351,7 +345,7 @@ struct Eu4SliceZip<'a> {
     ai: rawzip::ZipArchiveEntryWayfinder,
     is_text: bool,
 }
-impl<'a> Eu4SliceZip<'a> {
+impl Eu4SliceZip<'_> {
     pub fn deserialize_entry<T, RES>(
         &self,
         entry: rawzip::ZipArchiveEntryWayfinder,
@@ -380,16 +374,16 @@ impl<'a> Eu4SliceZip<'a> {
                 let data: T = modeller.deserialize()?;
                 Ok(data)
             }
-            _ => return Err(Eu4ErrorKind::UnknownCompression.into()),
+            _ => Err(Eu4ErrorKind::UnknownCompression.into()),
         }
     }
 }
 
-pub struct Eu4FsZipEntry<'archive, R, ReadAt> {
+pub struct Eu4FsZipEntry<'archive, R: Read, ReadAt> {
     reader: ZipVerifier<'archive, CompressedFileReader<R>, ReadAt>,
 }
 
-impl<'archive, R, ReadAt> Eu4FsZipEntry<'_, R, ReadAt>
+impl<R, ReadAt> Eu4FsZipEntry<'_, R, ReadAt>
 where
     R: Read,
     ReadAt: ReaderAt,
@@ -424,7 +418,7 @@ where
     }
 }
 
-impl<'archive, R, ReadAt> Read for Eu4FsZipEntry<'_, R, ReadAt>
+impl<R, ReadAt> Read for Eu4FsZipEntry<'_, R, ReadAt>
 where
     R: Read,
     ReadAt: ReaderAt,
@@ -509,7 +503,7 @@ impl BinaryFile {
 pub enum Eu4FsFileKind {
     Text(File),
     Binary(BinaryFile),
-    Zip(Eu4FsZip),
+    Zip(Box<Eu4FsZip>),
 }
 
 pub struct Eu4FsFile {
@@ -769,17 +763,17 @@ impl<'de, 'res: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deseriali
     }
 }
 
-enum CompressedReaderKind<R> {
+enum CompressedReaderKind<R: Read> {
     Deflate(flate2::read::DeflateDecoder<R>),
     #[cfg(feature = "zstd")]
     Zstd(zstd::stream::Decoder<'static, BufReader<R>>),
 }
 
-struct CompressedFileReader<R> {
+struct CompressedFileReader<R: Read> {
     reader: CompressedReaderKind<R>,
 }
 
-impl<R> CompressedFileReader<R> {
+impl<R: Read> CompressedFileReader<R> {
     pub fn from_compressed(reader: R, compression: CompressionMethod) -> Result<Self, Eu4Error>
     where
         R: Read,
