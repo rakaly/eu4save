@@ -447,7 +447,10 @@ impl Eu4FsZip {
     pub fn get(
         &self,
         name: crate::file::Eu4FileEntryName,
-    ) -> Result<Eu4FsZipEntry<'_, rawzip::ZipReader<'_, rawzip::FileReader>, rawzip::FileReader>, Eu4Error> {
+    ) -> Result<
+        Eu4FsZipEntry<'_, rawzip::ZipReader<'_, rawzip::FileReader>, rawzip::FileReader>,
+        Eu4Error,
+    > {
         let entry = match name {
             crate::file::Eu4FileEntryName::Meta => self.meta,
             crate::file::Eu4FileEntryName::Gamestate => self.gamestate,
@@ -456,7 +459,7 @@ impl Eu4FsZip {
 
         let entry = self.archive.get_entry(entry).map_err(Eu4ErrorKind::Zip)?;
         let reader = CompressedFileReader::from_compressed(entry.reader(), self.compression)?;
-        let reader = entry.verifier(reader);
+        let reader = entry.verifying_reader(reader);
 
         Ok(Eu4FsZipEntry { reader })
     }
@@ -591,8 +594,10 @@ impl Eu4FsFile {
             Eu4FsFileKind::Zip(zip) => {
                 if zip.is_text {
                     let meta = zip.archive.get_entry(zip.meta).map_err(Eu4ErrorKind::Zip)?;
-                    let mut reader =
-                        meta.verifier(CompressedFileReader::from_compressed(meta.reader(), zip.compression)?);
+                    let mut reader = meta.verifying_reader(CompressedFileReader::from_compressed(
+                        meta.reader(),
+                        zip.compression,
+                    )?);
                     std::io::copy(&mut reader, &mut output)?;
 
                     let mut header = [0u8; TXT_HEADER.len() + 1];
@@ -600,14 +605,17 @@ impl Eu4FsFile {
                         .archive
                         .get_entry(zip.gamestate)
                         .map_err(Eu4ErrorKind::Zip)?;
-                    let mut reader =
-                        gamestate.verifier(CompressedFileReader::from_compressed(gamestate.reader(), zip.compression)?);
+                    let mut reader = gamestate.verifying_reader(
+                        CompressedFileReader::from_compressed(gamestate.reader(), zip.compression)?,
+                    );
                     reader.read_exact(&mut header)?;
                     std::io::copy(&mut reader, &mut output)?;
 
                     let ai = zip.archive.get_entry(zip.ai).map_err(Eu4ErrorKind::Zip)?;
-                    let mut reader =
-                        ai.verifier(CompressedFileReader::from_compressed(ai.reader(), zip.compression)?);
+                    let mut reader = ai.verifying_reader(CompressedFileReader::from_compressed(
+                        ai.reader(),
+                        zip.compression,
+                    )?);
                     reader.read_exact(&mut header)?;
                     std::io::copy(&mut reader, &mut output)?;
 
@@ -615,8 +623,10 @@ impl Eu4FsFile {
                 } else {
                     output.write_all(b"EU4txt\n")?;
                     let meta = zip.archive.get_entry(zip.meta).map_err(Eu4ErrorKind::Zip)?;
-                    let reader =
-                        meta.verifier(CompressedFileReader::from_compressed(meta.reader(), zip.compression)?);
+                    let reader = meta.verifying_reader(CompressedFileReader::from_compressed(
+                        meta.reader(),
+                        zip.compression,
+                    )?);
                     let meta_result =
                         melt(reader, &mut output, &resolver, options.skip_checksum(true))?;
 
@@ -624,14 +634,18 @@ impl Eu4FsFile {
                         .archive
                         .get_entry(zip.gamestate)
                         .map_err(Eu4ErrorKind::Zip)?;
-                    let reader =
-                        gamestate.verifier(CompressedFileReader::from_compressed(gamestate.reader(), zip.compression)?);
+                    let reader = gamestate.verifying_reader(CompressedFileReader::from_compressed(
+                        gamestate.reader(),
+                        zip.compression,
+                    )?);
                     let gamestate_result =
                         melt(reader, &mut output, &resolver, options.skip_checksum(true))?;
 
                     let ai = zip.archive.get_entry(zip.ai).map_err(Eu4ErrorKind::Zip)?;
-                    let reader =
-                        ai.verifier(CompressedFileReader::from_compressed(ai.reader(), zip.compression)?);
+                    let reader = ai.verifying_reader(CompressedFileReader::from_compressed(
+                        ai.reader(),
+                        zip.compression,
+                    )?);
                     let ai_result =
                         melt(reader, &mut output, &resolver, options.skip_checksum(false))?;
 

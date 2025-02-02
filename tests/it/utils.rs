@@ -52,7 +52,7 @@ pub fn inflate(file: File) -> Vec<u8> {
     let mut output = Vec::with_capacity(wayfinder.uncompressed_size_hint() as usize);
     let zip_entry = archive.get_entry(wayfinder).unwrap();
     let inflater = flate2::read::DeflateDecoder::new(zip_entry.reader());
-    let mut verifier = zip_entry.verifier(inflater);
+    let mut verifier = zip_entry.verifying_reader(inflater);
     std::io::copy(&mut verifier, &mut output).unwrap();
     output
 }
