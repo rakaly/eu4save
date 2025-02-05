@@ -554,11 +554,16 @@ where
 pub struct Eu4Modeller<'res, Reader, Resolver> {
     reader: Reader,
     resolver: &'res Resolver,
+    encoding: Encoding,
 }
 
 impl<'res, Reader: Read, Resolver: TokenResolver> Eu4Modeller<'res, Reader, Resolver> {
     pub fn from_reader(reader: Reader, resolver: &'res Resolver) -> Self {
-        Eu4Modeller { reader, resolver }
+        Eu4Modeller { reader, resolver, encoding: Encoding::Text }
+    }
+
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
     }
 
     pub fn deserialize<T>(&mut self) -> Result<T, Eu4Error>
@@ -600,14 +605,14 @@ impl<'de, 'res: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deseriali
         self.reader.read_exact(&mut header)?;
         if header == BIN_HEADER {
             use jomini::binary::BinaryFlavor;
-            // self.encoding = Encoding::Binary;
+            self.encoding = Encoding::Binary;
             let flavor = Eu4Flavor::new();
             let mut deser = flavor
                 .deserializer()
                 .from_reader(&mut self.reader, self.resolver);
             Ok(deser.deserialize_struct(name, fields, visitor)?)
         } else if header == TXT_HEADER {
-            // self.encoding = Encoding::Text;
+            self.encoding = Encoding::Text;
             let reader = jomini::text::TokenReader::new(&mut self.reader);
             let mut deser = TextDeserializer::from_windows1252_reader(reader);
             Ok(deser.deserialize_struct(name, fields, visitor)?)
