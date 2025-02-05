@@ -72,7 +72,7 @@ impl Eu4File {
     }
 }
 
-enum Eu4SliceFileKind<'a> {
+pub enum Eu4SliceFileKind<'a> {
     Text(&'a [u8]),
     Binary(&'a [u8]),
     Zip(Box<Eu4Zip<&'a [u8]>>),
@@ -82,7 +82,15 @@ pub struct Eu4SliceFile<'a> {
     kind: Eu4SliceFileKind<'a>,
 }
 
-impl Eu4SliceFile<'_> {
+impl<'a> Eu4SliceFile<'a> {
+    pub fn kind(&self) -> &Eu4SliceFileKind {
+        &self.kind
+    }
+
+    pub fn kind_mut(&'a mut self) -> &'a mut Eu4SliceFileKind<'a> {
+        &mut self.kind
+    }
+
     pub fn encoding(&self) -> Encoding {
         match &self.kind {
             Eu4SliceFileKind::Text(_) => Encoding::Text,
@@ -218,12 +226,12 @@ where
 {
     pub fn try_from_archive(
         archive: rawzip::ZipArchive<R>,
-        mut buf: &mut [u8],
+        buf: &mut [u8],
     ) -> Result<Self, Eu4Error> {
         let mut meta = None;
         let mut gamestate = None;
         let mut ai = None;
-        let mut entries = archive.entries(&mut buf);
+        let mut entries = archive.entries(buf);
         let mut is_text = true;
         let mut header = [0u8; TXT_HEADER.len()];
 
