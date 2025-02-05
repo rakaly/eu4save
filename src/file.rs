@@ -10,7 +10,7 @@ use jomini::{
     text::{de::TextReaderDeserializer, ObjectReader},
     BinaryDeserializer, TextDeserializer, TextTape, Windows1252Encoding,
 };
-use rawzip::{CompressionMethod, ReaderAt, ZipVerifier};
+use rawzip::{CompressionMethod, FileReader, ReaderAt, ZipVerifier};
 use serde::{de::DeserializeOwned, Deserialize};
 use std::{
     collections::HashSet,
@@ -38,79 +38,18 @@ impl Eu4File {
             }),
             _ => {
                 let archive = rawzip::ZipArchive::from_slice(data).map_err(Eu4ErrorKind::Zip)?;
-                let mut meta = None;
-                let mut gamestate = None;
-                let mut ai = None;
-                let mut entries = archive.entries();
-                let mut is_text = true;
+                let archive = archive.into_owned();
 
-                while let Ok(Some(entry)) = entries.next_entry() {
-                    let compression = entry.compression_method();
-                    match entry.file_raw_path() {
-                        b"meta" => {
-                            let wayfinder = entry.wayfinder();
-                            meta = Some(wayfinder);
-
-                            let ent = archive.get_entry(wayfinder).map_err(Eu4ErrorKind::Zip)?;
-
-                            let mut header = [0u8; TXT_HEADER.len()];
-                            match compression {
-                                rawzip::CompressionMethod::Deflate => {
-                                    flate2::read::DeflateDecoder::new(ent.data())
-                                        .read_exact(&mut header)?
-                                }
-                                #[cfg(feature = "zstd")]
-                                rawzip::CompressionMethod::Zstd => {
-                                    zstd::stream::Decoder::new(ent.data())?
-                                        .read_exact(&mut header)?
-                                }
-                                _ => return Err(Eu4ErrorKind::UnknownCompression.into()),
-                            }
-
-                            match &header[..] {
-                                TXT_HEADER => is_text = true,
-                                BIN_HEADER => is_text = false,
-                                _ => return Err(Eu4ErrorKind::UnknownHeader.into()),
-                            }
-                        }
-                        b"gamestate" => gamestate = Some(entry.wayfinder()),
-                        b"ai" => ai = Some(entry.wayfinder()),
-                        _ => {}
-                    }
-
-                    if let (Some(meta), Some(gamestate), Some(ai)) = (meta, gamestate, ai) {
-                        return Ok(Eu4SliceFile {
-                            kind: Eu4SliceFileKind::Zip(Box::new(Eu4SliceZip {
-                                archive,
-                                meta,
-                                gamestate,
-                                ai,
-                                compression,
-                                is_text,
-                            })),
-                        });
-                    }
-                }
-
-                if meta.is_none() {
-                    return Err(
-                        Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Meta).into(),
-                    );
-                }
-
-                if gamestate.is_none() {
-                    return Err(Eu4ErrorKind::MissingFile(
-                        crate::file::Eu4FileEntryName::Gamestate,
-                    )
-                    .into());
-                }
-
-                Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Ai).into())
+                let mut buf = vec![0u8; rawzip::RECOMMENDED_BUFFER_SIZE];
+                let archive = Eu4Zip::try_from_archive(archive, &mut buf)?;
+                Ok(Eu4SliceFile {
+                    kind: Eu4SliceFileKind::Zip(Box::new(archive)),
+                })
             }
         }
     }
 
-    pub fn from_file(mut file: File) -> Result<Eu4FsFile, Eu4Error> {
+    pub fn from_file(mut file: File) -> Result<Eu4FsFile<FileReader>, Eu4Error> {
         let mut header = [0u8; TXT_HEADER.len()];
         file.read_exact(&mut header)?;
         match &header[..] {
@@ -124,74 +63,10 @@ impl Eu4File {
                 let mut buf = vec![0u8; rawzip::RECOMMENDED_BUFFER_SIZE];
                 let archive =
                     rawzip::ZipArchive::from_file(file, &mut buf).map_err(Eu4ErrorKind::Zip)?;
-
-                let mut meta = None;
-                let mut gamestate = None;
-                let mut ai = None;
-                let mut entries = archive.entries(&mut buf);
-                let mut is_text = true;
-
-                while let Ok(Some(entry)) = entries.next_entry() {
-                    let compression = entry.compression_method();
-                    match entry.file_raw_path() {
-                        b"meta" => {
-                            let wayfinder = entry.wayfinder();
-                            meta = Some(wayfinder);
-
-                            let ent = archive.get_entry(wayfinder).map_err(Eu4ErrorKind::Zip)?;
-
-                            match compression {
-                                rawzip::CompressionMethod::Deflate => {
-                                    flate2::read::DeflateDecoder::new(ent.reader())
-                                        .read_exact(&mut header)?
-                                }
-                                #[cfg(feature = "zstd")]
-                                rawzip::CompressionMethod::Zstd => {
-                                    zstd::stream::Decoder::new(ent.reader())?
-                                        .read_exact(&mut header)?
-                                }
-                                _ => return Err(Eu4ErrorKind::UnknownCompression.into()),
-                            }
-
-                            match &header[..] {
-                                TXT_HEADER => is_text = true,
-                                BIN_HEADER => is_text = false,
-                                _ => return Err(Eu4ErrorKind::UnknownHeader.into()),
-                            }
-                        }
-                        b"gamestate" => gamestate = Some(entry.wayfinder()),
-                        b"ai" => ai = Some(entry.wayfinder()),
-                        _ => {}
-                    }
-
-                    if let (Some(meta), Some(gamestate), Some(ai)) = (meta, gamestate, ai) {
-                        return Ok(Eu4FsFile {
-                            kind: Eu4FsFileKind::Zip(Box::new(Eu4FsZip {
-                                archive,
-                                meta,
-                                gamestate,
-                                ai,
-                                compression,
-                                is_text,
-                            })),
-                        });
-                    }
-                }
-
-                if meta.is_none() {
-                    return Err(
-                        Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Meta).into(),
-                    );
-                }
-
-                if gamestate.is_none() {
-                    return Err(Eu4ErrorKind::MissingFile(
-                        crate::file::Eu4FileEntryName::Gamestate,
-                    )
-                    .into());
-                }
-
-                Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Ai).into())
+                let archive = Eu4Zip::try_from_archive(archive, &mut buf)?;
+                Ok(Eu4FsFile {
+                    kind: Eu4FsFileKind::Zip(Box::new(archive)),
+                })
             }
         }
     }
@@ -200,7 +75,7 @@ impl Eu4File {
 enum Eu4SliceFileKind<'a> {
     Text(&'a [u8]),
     Binary(&'a [u8]),
-    Zip(Box<Eu4SliceZip<'a>>),
+    Zip(Box<Eu4Zip<&'a [u8]>>),
 }
 
 pub struct Eu4SliceFile<'a> {
@@ -274,116 +149,16 @@ impl Eu4SliceFile<'_> {
                     options.check_header(false),
                 )?)
             }
-            Eu4SliceFileKind::Zip(zip) => {
-                if zip.is_text {
-                    let meta = zip.archive.get_entry(zip.meta).map_err(Eu4ErrorKind::Zip)?;
-                    let mut reader =
-                        CompressedFileReader::from_compressed(meta.data(), zip.compression)?;
-                    std::io::copy(&mut reader, &mut output)?;
-
-                    let mut header = [0u8; TXT_HEADER.len() + 1];
-                    let gamestate = zip
-                        .archive
-                        .get_entry(zip.gamestate)
-                        .map_err(Eu4ErrorKind::Zip)?;
-                    let mut reader =
-                        CompressedFileReader::from_compressed(gamestate.data(), zip.compression)?;
-                    reader.read_exact(&mut header)?;
-                    std::io::copy(&mut reader, &mut output)?;
-
-                    let ai = zip.archive.get_entry(zip.ai).map_err(Eu4ErrorKind::Zip)?;
-                    let mut reader =
-                        CompressedFileReader::from_compressed(ai.data(), zip.compression)?;
-                    reader.read_exact(&mut header)?;
-                    std::io::copy(&mut reader, &mut output)?;
-
-                    Ok(MeltedDocument::new())
-                } else {
-                    output.write_all(b"EU4txt\n")?;
-                    let meta = zip.archive.get_entry(zip.meta).map_err(Eu4ErrorKind::Zip)?;
-                    let reader =
-                        CompressedFileReader::from_compressed(meta.data(), zip.compression)?;
-                    let meta_result =
-                        melt(reader, &mut output, &resolver, options.skip_checksum(true))?;
-
-                    let gamestate = zip
-                        .archive
-                        .get_entry(zip.gamestate)
-                        .map_err(Eu4ErrorKind::Zip)?;
-                    let reader =
-                        CompressedFileReader::from_compressed(gamestate.data(), zip.compression)?;
-                    let gamestate_result =
-                        melt(reader, &mut output, &resolver, options.skip_checksum(true))?;
-
-                    let ai = zip.archive.get_entry(zip.ai).map_err(Eu4ErrorKind::Zip)?;
-                    let reader = CompressedFileReader::from_compressed(ai.data(), zip.compression)?;
-                    let ai_result =
-                        melt(reader, &mut output, &resolver, options.skip_checksum(false))?;
-
-                    let union = meta_result
-                        .unknown_tokens
-                        .iter()
-                        .chain(gamestate_result.unknown_tokens.iter())
-                        .chain(ai_result.unknown_tokens.iter())
-                        .copied()
-                        .collect::<HashSet<u16>>();
-
-                    Ok(MeltedDocument {
-                        unknown_tokens: union,
-                    })
-                }
-            }
+            Eu4SliceFileKind::Zip(zip) => zip.melt(options, resolver, output),
         }
     }
 }
 
-struct Eu4SliceZip<'a> {
-    archive: rawzip::ZipSliceArchive<'a>,
-    compression: rawzip::CompressionMethod,
-    meta: rawzip::ZipArchiveEntryWayfinder,
-    gamestate: rawzip::ZipArchiveEntryWayfinder,
-    ai: rawzip::ZipArchiveEntryWayfinder,
-    is_text: bool,
-}
-impl Eu4SliceZip<'_> {
-    pub fn deserialize_entry<T, RES>(
-        &self,
-        entry: rawzip::ZipArchiveEntryWayfinder,
-        resolver: RES,
-    ) -> Result<T, Eu4Error>
-    where
-        T: DeserializeOwned,
-        RES: TokenResolver,
-    {
-        let zip_entry = self.archive.get_entry(entry).map_err(Eu4ErrorKind::Zip)?;
-        match self.compression {
-            rawzip::CompressionMethod::Deflate => {
-                let inflater = flate2::bufread::DeflateDecoder::new(zip_entry.data());
-                let verifier = zip_entry.verifier(inflater);
-
-                let mut modeller = Eu4Modeller::from_reader(verifier, &resolver);
-                let data: T = modeller.deserialize()?;
-                Ok(data)
-            }
-            #[cfg(feature = "zstd")]
-            rawzip::CompressionMethod::Zstd => {
-                let inflater = zstd::Decoder::new(zip_entry.data())?;
-                let verifier = zip_entry.verifier(inflater);
-
-                let mut modeller = Eu4Modeller::from_reader(verifier, &resolver);
-                let data: T = modeller.deserialize()?;
-                Ok(data)
-            }
-            _ => Err(Eu4ErrorKind::UnknownCompression.into()),
-        }
-    }
-}
-
-pub struct Eu4FsZipEntry<'archive, R: Read, ReadAt> {
+pub struct Eu4ZipEntry<'archive, R: Read, ReadAt> {
     reader: ZipVerifier<'archive, CompressedFileReader<R>, ReadAt>,
 }
 
-impl<R, ReadAt> Eu4FsZipEntry<'_, R, ReadAt>
+impl<R, ReadAt> Eu4ZipEntry<'_, R, ReadAt>
 where
     R: Read,
     ReadAt: ReaderAt,
@@ -418,7 +193,7 @@ where
     }
 }
 
-impl<R, ReadAt> Read for Eu4FsZipEntry<'_, R, ReadAt>
+impl<R, ReadAt> Read for Eu4ZipEntry<'_, R, ReadAt>
 where
     R: Read,
     ReadAt: ReaderAt,
@@ -428,8 +203,8 @@ where
     }
 }
 
-pub struct Eu4FsZip {
-    archive: rawzip::ZipArchive<rawzip::FileReader>,
+pub struct Eu4Zip<R> {
+    archive: rawzip::ZipArchive<R>,
     compression: rawzip::CompressionMethod,
     meta: rawzip::ZipArchiveEntryWayfinder,
     gamestate: rawzip::ZipArchiveEntryWayfinder,
@@ -437,14 +212,71 @@ pub struct Eu4FsZip {
     is_text: bool,
 }
 
-impl Eu4FsZip {
+impl<R> Eu4Zip<R>
+where
+    R: rawzip::ReaderAt,
+{
+    pub fn try_from_archive(
+        archive: rawzip::ZipArchive<R>,
+        mut buf: &mut [u8],
+    ) -> Result<Self, Eu4Error> {
+        let mut meta = None;
+        let mut gamestate = None;
+        let mut ai = None;
+        let mut entries = archive.entries(&mut buf);
+        let mut is_text = true;
+        let mut header = [0u8; TXT_HEADER.len()];
+
+        while let Ok(Some(entry)) = entries.next_entry() {
+            let compression = entry.compression_method();
+            match entry.file_raw_path() {
+                b"meta" => {
+                    let wayfinder = entry.wayfinder();
+                    meta = Some(wayfinder);
+
+                    let ent = archive.get_entry(wayfinder).map_err(Eu4ErrorKind::Zip)?;
+                    let mut reader =
+                        CompressedFileReader::from_compressed(ent.reader(), compression)?;
+                    reader.read_exact(&mut header)?;
+
+                    match &header[..] {
+                        TXT_HEADER => is_text = true,
+                        BIN_HEADER => is_text = false,
+                        _ => return Err(Eu4ErrorKind::UnknownHeader.into()),
+                    }
+                }
+                b"gamestate" => gamestate = Some(entry.wayfinder()),
+                b"ai" => ai = Some(entry.wayfinder()),
+                _ => {}
+            }
+
+            if let (Some(meta), Some(gamestate), Some(ai)) = (meta, gamestate, ai) {
+                return Ok(Eu4Zip {
+                    archive,
+                    meta,
+                    gamestate,
+                    ai,
+                    compression,
+                    is_text,
+                });
+            }
+        }
+
+        if meta.is_none() {
+            return Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Meta).into());
+        }
+
+        if gamestate.is_none() {
+            return Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Gamestate).into());
+        }
+
+        Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Ai).into())
+    }
+
     pub fn get(
         &self,
         name: crate::file::Eu4FileEntryName,
-    ) -> Result<
-        Eu4FsZipEntry<'_, rawzip::ZipReader<'_, rawzip::FileReader>, rawzip::FileReader>,
-        Eu4Error,
-    > {
+    ) -> Result<Eu4ZipEntry<'_, rawzip::ZipReader<'_, R>, R>, Eu4Error> {
         let entry = match name {
             crate::file::Eu4FileEntryName::Meta => self.meta,
             crate::file::Eu4FileEntryName::Gamestate => self.gamestate,
@@ -455,7 +287,7 @@ impl Eu4FsZip {
         let reader = CompressedFileReader::from_compressed(entry.reader(), self.compression)?;
         let reader = entry.verifying_reader(reader);
 
-        Ok(Eu4FsZipEntry { reader })
+        Ok(Eu4ZipEntry { reader })
     }
 
     pub fn encoding(&self) -> Encoding {
@@ -477,8 +309,95 @@ impl Eu4FsZip {
     {
         let zip_entry = self.archive.get_entry(entry).map_err(Eu4ErrorKind::Zip)?;
         let reader = CompressedFileReader::from_compressed(zip_entry.reader(), self.compression)?;
+        let reader = zip_entry.verifying_reader(reader);
         let data: T = Eu4Modeller::from_reader(reader, &resolver).deserialize()?;
         Ok(data)
+    }
+
+    pub fn melt<Resolver, Writer>(
+        &self,
+        options: MeltOptions,
+        resolver: Resolver,
+        mut output: Writer,
+    ) -> Result<MeltedDocument, Eu4Error>
+    where
+        Resolver: TokenResolver,
+        Writer: Write,
+    {
+        if self.is_text {
+            let meta = self
+                .archive
+                .get_entry(self.meta)
+                .map_err(Eu4ErrorKind::Zip)?;
+            let mut reader = meta.verifying_reader(CompressedFileReader::from_compressed(
+                meta.reader(),
+                self.compression,
+            )?);
+            std::io::copy(&mut reader, &mut output)?;
+
+            let mut header = [0u8; TXT_HEADER.len() + 1];
+            let gamestate = self
+                .archive
+                .get_entry(self.gamestate)
+                .map_err(Eu4ErrorKind::Zip)?;
+            let mut reader = gamestate.verifying_reader(CompressedFileReader::from_compressed(
+                gamestate.reader(),
+                self.compression,
+            )?);
+            reader.read_exact(&mut header)?;
+            std::io::copy(&mut reader, &mut output)?;
+
+            let ai = self.archive.get_entry(self.ai).map_err(Eu4ErrorKind::Zip)?;
+            let mut reader = ai.verifying_reader(CompressedFileReader::from_compressed(
+                ai.reader(),
+                self.compression,
+            )?);
+            reader.read_exact(&mut header)?;
+            std::io::copy(&mut reader, &mut output)?;
+
+            Ok(MeltedDocument::new())
+        } else {
+            output.write_all(b"EU4txt\n")?;
+            let meta = self
+                .archive
+                .get_entry(self.meta)
+                .map_err(Eu4ErrorKind::Zip)?;
+            let reader = meta.verifying_reader(CompressedFileReader::from_compressed(
+                meta.reader(),
+                self.compression,
+            )?);
+            let meta_result = melt(reader, &mut output, &resolver, options.skip_checksum(true))?;
+
+            let gamestate = self
+                .archive
+                .get_entry(self.gamestate)
+                .map_err(Eu4ErrorKind::Zip)?;
+            let reader = gamestate.verifying_reader(CompressedFileReader::from_compressed(
+                gamestate.reader(),
+                self.compression,
+            )?);
+            let gamestate_result =
+                melt(reader, &mut output, &resolver, options.skip_checksum(true))?;
+
+            let ai = self.archive.get_entry(self.ai).map_err(Eu4ErrorKind::Zip)?;
+            let reader = ai.verifying_reader(CompressedFileReader::from_compressed(
+                ai.reader(),
+                self.compression,
+            )?);
+            let ai_result = melt(reader, &mut output, &resolver, options.skip_checksum(false))?;
+
+            let union = meta_result
+                .unknown_tokens
+                .iter()
+                .chain(gamestate_result.unknown_tokens.iter())
+                .chain(ai_result.unknown_tokens.iter())
+                .copied()
+                .collect::<HashSet<u16>>();
+
+            Ok(MeltedDocument {
+                unknown_tokens: union,
+            })
+        }
     }
 }
 
@@ -500,22 +419,25 @@ impl BinaryFile {
     }
 }
 
-pub enum Eu4FsFileKind {
+pub enum Eu4FsFileKind<R> {
     Text(File),
     Binary(BinaryFile),
-    Zip(Box<Eu4FsZip>),
+    Zip(Box<Eu4Zip<R>>),
 }
 
-pub struct Eu4FsFile {
-    kind: Eu4FsFileKind,
+pub struct Eu4FsFile<R> {
+    kind: Eu4FsFileKind<R>,
 }
 
-impl Eu4FsFile {
-    pub fn kind(&self) -> &Eu4FsFileKind {
+impl<R> Eu4FsFile<R>
+where
+    R: ReaderAt,
+{
+    pub fn kind(&self) -> &Eu4FsFileKind<R> {
         &self.kind
     }
 
-    pub fn kind_mut(&mut self) -> &mut Eu4FsFileKind {
+    pub fn kind_mut(&mut self) -> &mut Eu4FsFileKind<R> {
         &mut self.kind
     }
 
@@ -533,9 +455,9 @@ impl Eu4FsFile {
         }
     }
 
-    pub fn parse_save<R>(&self, resolver: R) -> Result<Eu4Save, Eu4Error>
+    pub fn parse_save<RES>(&self, resolver: RES) -> Result<Eu4Save, Eu4Error>
     where
-        R: TokenResolver,
+        RES: TokenResolver,
     {
         match &self.kind {
             Eu4FsFileKind::Text(file) => {
@@ -585,77 +507,7 @@ impl Eu4FsFile {
                     options.check_header(false),
                 )?)
             }
-            Eu4FsFileKind::Zip(zip) => {
-                if zip.is_text {
-                    let meta = zip.archive.get_entry(zip.meta).map_err(Eu4ErrorKind::Zip)?;
-                    let mut reader = meta.verifying_reader(CompressedFileReader::from_compressed(
-                        meta.reader(),
-                        zip.compression,
-                    )?);
-                    std::io::copy(&mut reader, &mut output)?;
-
-                    let mut header = [0u8; TXT_HEADER.len() + 1];
-                    let gamestate = zip
-                        .archive
-                        .get_entry(zip.gamestate)
-                        .map_err(Eu4ErrorKind::Zip)?;
-                    let mut reader = gamestate.verifying_reader(
-                        CompressedFileReader::from_compressed(gamestate.reader(), zip.compression)?,
-                    );
-                    reader.read_exact(&mut header)?;
-                    std::io::copy(&mut reader, &mut output)?;
-
-                    let ai = zip.archive.get_entry(zip.ai).map_err(Eu4ErrorKind::Zip)?;
-                    let mut reader = ai.verifying_reader(CompressedFileReader::from_compressed(
-                        ai.reader(),
-                        zip.compression,
-                    )?);
-                    reader.read_exact(&mut header)?;
-                    std::io::copy(&mut reader, &mut output)?;
-
-                    Ok(MeltedDocument::new())
-                } else {
-                    output.write_all(b"EU4txt\n")?;
-                    let meta = zip.archive.get_entry(zip.meta).map_err(Eu4ErrorKind::Zip)?;
-                    let reader = meta.verifying_reader(CompressedFileReader::from_compressed(
-                        meta.reader(),
-                        zip.compression,
-                    )?);
-                    let meta_result =
-                        melt(reader, &mut output, &resolver, options.skip_checksum(true))?;
-
-                    let gamestate = zip
-                        .archive
-                        .get_entry(zip.gamestate)
-                        .map_err(Eu4ErrorKind::Zip)?;
-                    let reader = gamestate.verifying_reader(CompressedFileReader::from_compressed(
-                        gamestate.reader(),
-                        zip.compression,
-                    )?);
-                    let gamestate_result =
-                        melt(reader, &mut output, &resolver, options.skip_checksum(true))?;
-
-                    let ai = zip.archive.get_entry(zip.ai).map_err(Eu4ErrorKind::Zip)?;
-                    let reader = ai.verifying_reader(CompressedFileReader::from_compressed(
-                        ai.reader(),
-                        zip.compression,
-                    )?);
-                    let ai_result =
-                        melt(reader, &mut output, &resolver, options.skip_checksum(false))?;
-
-                    let union = meta_result
-                        .unknown_tokens
-                        .iter()
-                        .chain(gamestate_result.unknown_tokens.iter())
-                        .chain(ai_result.unknown_tokens.iter())
-                        .copied()
-                        .collect::<HashSet<u16>>();
-
-                    Ok(MeltedDocument {
-                        unknown_tokens: union,
-                    })
-                }
-            }
+            Eu4FsFileKind::Zip(zip) => zip.melt(options, resolver, output),
         }
     }
 }

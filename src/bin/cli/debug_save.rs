@@ -8,20 +8,25 @@ pub fn run(path: &str) -> Result<(), Box<dyn Error>> {
     let start = Instant::now();
     let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();
     let resolver = BasicTokenResolver::from_text_lines(file_data.as_slice())?;
+    let mut counter = 0;
+    while counter < 40 {
+        let save = file.parse_save(&resolver)?;
+        counter += 1;
+    }
     let save = file.parse_save(&resolver)?;
     let after_parse = Instant::now();
     println!("parse: {}ms", after_parse.duration_since(start).as_millis());
 
-    let query = eu4save::query::Query::from_save(save);
-    let owners = query.province_owners();
-    let nation_events = query.nation_events(&owners);
-    let player = query.player_histories(&nation_events);
-    let ledger = query.nation_size_statistics_ledger(&player[0].history);
-    let after_rest = Instant::now();
-    println!(
-        "rest: {}ms",
-        after_rest.duration_since(after_parse).as_millis()
-    );
-    println!("{}", ledger.len());
+    // let query = eu4save::query::Query::from_save(save);
+    // let owners = query.province_owners();
+    // let nation_events = query.nation_events(&owners);
+    // let player = query.player_histories(&nation_events);
+    // let ledger = query.nation_size_statistics_ledger(&player[0].history);
+    // let after_rest = Instant::now();
+    // println!(
+    //     "rest: {}ms",
+    //     after_rest.duration_since(after_parse).as_millis()
+    // );
+    // println!("{}", ledger.len());
     Ok(())
 }
