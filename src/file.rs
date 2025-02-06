@@ -75,6 +75,10 @@ impl Eu4File {
 pub struct Eu4Text<'a>(&'a [u8]);
 
 impl Eu4Text<'_> {
+    pub fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+
     pub fn deserializer(&self) -> Eu4Modeller<&[u8], HashMap<u16, String>> {
         Eu4Modeller {
             reader: self.0,
@@ -87,6 +91,10 @@ impl Eu4Text<'_> {
 pub struct Eu4Binary<R>(R);
 
 impl<R> Eu4Binary<R> where R: Read {
+    pub fn as_ref(&self) -> &R {
+        &self.0
+    }
+
     pub fn deserializer<RES>(&mut self, resolver: RES) -> Eu4Modeller<&'_ mut R, RES> {
         Eu4Modeller {
             reader: &mut self.0,
