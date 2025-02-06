@@ -13,7 +13,7 @@ use jomini::{
 use rawzip::{CompressionMethod, FileReader, ReaderAt, ZipVerifier};
 use serde::{de::DeserializeOwned, Deserialize};
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fmt::Display,
     fs::File,
     io::{Read, Write},
@@ -31,10 +31,10 @@ impl Eu4File {
     pub fn from_slice(data: &[u8]) -> Result<Eu4SliceFile, Eu4Error> {
         match data.get(..TXT_HEADER.len()) {
             Some(TXT_HEADER) => Ok(Eu4SliceFile {
-                kind: Eu4SliceFileKind::Text(&data[TXT_HEADER.len()..]),
+                kind: Eu4SliceFileKind::Text(Eu4Text(&data[TXT_HEADER.len()..])),
             }),
             Some(BIN_HEADER) => Ok(Eu4SliceFile {
-                kind: Eu4SliceFileKind::Binary(&data[BIN_HEADER.len()..]),
+                kind: Eu4SliceFileKind::Binary(Eu4Binary(&data[BIN_HEADER.len()..])),
             }),
             _ => {
                 let archive = rawzip::ZipArchive::from_slice(data).map_err(Eu4ErrorKind::Zip)?;
@@ -72,9 +72,33 @@ impl Eu4File {
     }
 }
 
+pub struct Eu4Text<'a>(&'a [u8]);
+
+impl<'a> Eu4Text<'a> {
+    pub fn deserializer(&self) -> Eu4Modeller<&[u8], HashMap<u16, String>> {
+        Eu4Modeller {
+            reader: self.0,
+            resolver: HashMap::new(),
+            encoding: Some(Encoding::Text),
+        }
+    }
+}
+
+pub struct Eu4Binary<'a>(&'a [u8]);
+
+impl<'a> Eu4Binary<'a> {
+    pub fn deserializer<RES>(&self, resolver: RES) -> Eu4Modeller<&[u8], RES> {
+        Eu4Modeller {
+            reader: self.0,
+            resolver,
+            encoding: Some(Encoding::Binary),
+        }
+    }
+}
+
 pub enum Eu4SliceFileKind<'a> {
-    Text(&'a [u8]),
-    Binary(&'a [u8]),
+    Text(Eu4Text<'a>),
+    Binary(Eu4Binary<'a>),
     Zip(Box<Eu4Zip<&'a [u8]>>),
 }
 
@@ -111,24 +135,24 @@ impl<'a> Eu4SliceFile<'a> {
     {
         match &self.kind {
             Eu4SliceFileKind::Text(data) => {
-                let reader = jomini::text::TokenReader::new(*data);
-                let deserializer = TextDeserializer::from_windows1252_reader(reader);
-                let mut deserializer = Eu4TextDeserializer {
-                    deser: deserializer,
-                };
-                deserializer.deserialize()
+                data.deserializer().deserialize()
             }
             Eu4SliceFileKind::Binary(data) => {
-                let mut deserializer = BinaryDeserializer::builder_flavor(Eu4Flavor::new())
-                    .from_slice(data, &resolver);
-                let result = deserializer.deserialize()?;
-                Ok(result)
+                data.deserializer(resolver).deserialize()
             }
             Eu4SliceFileKind::Zip(archive) => {
                 let meta: Meta = archive.deserialize_entry(archive.meta, &resolver)?;
                 let game: GameState = archive.deserialize_entry(archive.gamestate, &resolver)?;
                 Ok(Eu4Save { meta, game })
             }
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match &self.kind {
+            Eu4SliceFileKind::Text(data) => data.0.len(),
+            Eu4SliceFileKind::Binary(data) => data.0.len(),
+            Eu4SliceFileKind::Zip(archive) => (archive.meta.uncompressed_size_hint() + archive.gamestate.uncompressed_size_hint() + archive.ai.uncompressed_size_hint()) as usize,
         }
     }
 
@@ -145,13 +169,13 @@ impl<'a> Eu4SliceFile<'a> {
         match &self.kind {
             Eu4SliceFileKind::Text(data) => {
                 output.write_all(b"EU4txt\n")?;
-                output.write_all(data)?;
+                output.write_all(data.0)?;
                 Ok(MeltedDocument::new())
             }
             Eu4SliceFileKind::Binary(data) => {
                 output.write_all(b"EU4txt\n")?;
                 Ok(melt::melt(
-                    *data,
+                    data.0,
                     output,
                     resolver,
                     options.check_header(false),
@@ -271,24 +295,24 @@ where
         }
 
         if meta.is_none() {
-            return Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Meta).into());
+            return Err(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Meta).into());
         }
 
         if gamestate.is_none() {
-            return Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Gamestate).into());
+            return Err(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Gamestate).into());
         }
 
-        Err(Eu4ErrorKind::MissingFile(crate::file::Eu4FileEntryName::Ai).into())
+        Err(Eu4ErrorKind::MissingFile(Eu4FileEntryName::Ai).into())
     }
 
     pub fn get(
         &self,
-        name: crate::file::Eu4FileEntryName,
+        name: Eu4FileEntryName,
     ) -> Result<Eu4ZipEntry<'_, rawzip::ZipReader<'_, R>, R>, Eu4Error> {
         let entry = match name {
-            crate::file::Eu4FileEntryName::Meta => self.meta,
-            crate::file::Eu4FileEntryName::Gamestate => self.gamestate,
-            crate::file::Eu4FileEntryName::Ai => self.ai,
+            Eu4FileEntryName::Meta => self.meta,
+            Eu4FileEntryName::Gamestate => self.gamestate,
+            Eu4FileEntryName::Ai => self.ai,
         };
 
         let entry = self.archive.get_entry(entry).map_err(Eu4ErrorKind::Zip)?;
@@ -551,19 +575,19 @@ where
 }
 
 #[derive(Debug)]
-pub struct Eu4Modeller<'res, Reader, Resolver> {
+pub struct Eu4Modeller<Reader, Resolver> {
     reader: Reader,
-    resolver: &'res Resolver,
-    encoding: Encoding,
+    resolver: Resolver,
+    encoding: Option<Encoding>,
 }
 
-impl<'res, Reader: Read, Resolver: TokenResolver> Eu4Modeller<'res, Reader, Resolver> {
-    pub fn from_reader(reader: Reader, resolver: &'res Resolver) -> Self {
-        Eu4Modeller { reader, resolver, encoding: Encoding::Text }
+impl<Reader: Read, Resolver: TokenResolver> Eu4Modeller<Reader, Resolver> {
+    pub fn from_reader(reader: Reader, resolver: Resolver) -> Self {
+        Eu4Modeller { reader, resolver, encoding: None }
     }
 
     pub fn encoding(&self) -> Encoding {
-        self.encoding
+        self.encoding.unwrap_or(Encoding::Text)
     }
 
     pub fn deserialize<T>(&mut self) -> Result<T, Eu4Error>
@@ -578,8 +602,8 @@ impl<'res, Reader: Read, Resolver: TokenResolver> Eu4Modeller<'res, Reader, Reso
     }
 }
 
-impl<'de, 'res: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deserializer<'de>
-    for &'_ mut Eu4Modeller<'res, Reader, Resolver>
+impl<'de, 'a: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deserializer<'de>
+    for &'a mut Eu4Modeller<Reader, Resolver>
 {
     type Error = Eu4Error;
 
@@ -601,23 +625,33 @@ impl<'de, 'res: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deseriali
     where
         V: serde::de::Visitor<'de>,
     {
-        let mut header = [0u8; BIN_HEADER.len()];
-        self.reader.read_exact(&mut header)?;
-        if header == BIN_HEADER {
+
+        let encoding = match self.encoding {
+            Some(e) => e,
+            None => {
+                let mut header = [0u8; BIN_HEADER.len()];
+                self.reader.read_exact(&mut header)?;
+                let encoding = match &header[..] {
+                    BIN_HEADER => Encoding::Binary,
+                    TXT_HEADER => Encoding::Text,
+                    _ => return Err(Eu4ErrorKind::UnknownHeader.into()),
+                };
+                self.encoding = Some(encoding);
+                encoding
+            }
+        };
+
+        if matches!(encoding, Encoding::Binary) {
             use jomini::binary::BinaryFlavor;
-            self.encoding = Encoding::Binary;
             let flavor = Eu4Flavor::new();
             let mut deser = flavor
                 .deserializer()
-                .from_reader(&mut self.reader, self.resolver);
+                .from_reader(&mut self.reader, &self.resolver);
             Ok(deser.deserialize_struct(name, fields, visitor)?)
-        } else if header == TXT_HEADER {
-            self.encoding = Encoding::Text;
+        } else {
             let reader = jomini::text::TokenReader::new(&mut self.reader);
             let mut deser = TextDeserializer::from_windows1252_reader(reader);
             Ok(deser.deserialize_struct(name, fields, visitor)?)
-        } else {
-            Err(Eu4ErrorKind::UnknownHeader.into())
         }
     }
 
