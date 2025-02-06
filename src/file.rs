@@ -57,7 +57,7 @@ impl Eu4File {
                 kind: Eu4FsFileKind::Text(file),
             }),
             BIN_HEADER => Ok(Eu4FsFile {
-                kind: Eu4FsFileKind::Binary(BinaryFile(file)),
+                kind: Eu4FsFileKind::Binary(Eu4Binary(file)),
             }),
             _ => {
                 let mut buf = vec![0u8; rawzip::RECOMMENDED_BUFFER_SIZE];
@@ -74,7 +74,7 @@ impl Eu4File {
 
 pub struct Eu4Text<'a>(&'a [u8]);
 
-impl<'a> Eu4Text<'a> {
+impl Eu4Text<'_> {
     pub fn deserializer(&self) -> Eu4Modeller<&[u8], HashMap<u16, String>> {
         Eu4Modeller {
             reader: self.0,
@@ -84,21 +84,45 @@ impl<'a> Eu4Text<'a> {
     }
 }
 
-pub struct Eu4Binary<'a>(&'a [u8]);
+pub struct Eu4Binary<R>(R);
 
-impl<'a> Eu4Binary<'a> {
-    pub fn deserializer<RES>(&self, resolver: RES) -> Eu4Modeller<&[u8], RES> {
+impl<R> Eu4Binary<R> where R: Read {
+    pub fn deserializer<RES>(&mut self, resolver: RES) -> Eu4Modeller<&'_ mut R, RES> {
         Eu4Modeller {
-            reader: self.0,
+            reader: &mut self.0,
             resolver,
             encoding: Some(Encoding::Binary),
         }
     }
+
+    pub fn melt<Resolver, Writer>(
+        &mut self,
+        options: MeltOptions,
+        resolver: Resolver,
+        mut output: Writer,
+    ) -> Result<MeltedDocument, Eu4Error>
+    where
+        Resolver: TokenResolver,
+        Writer: Write,
+    {
+        output.write_all(b"EU4txt\n")?;
+        melt::melt(&mut self.0, output, resolver, options.check_header(false))
+    }
+}
+
+impl <R> Clone for Eu4Binary<R> where R: Clone {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<R> Copy for Eu4Binary<R> where R: Copy {
+
 }
 
 pub enum Eu4SliceFileKind<'a> {
     Text(Eu4Text<'a>),
-    Binary(Eu4Binary<'a>),
+    Binary(Eu4Binary<&'a [u8]>),
     Zip(Box<Eu4Zip<&'a [u8]>>),
 }
 
@@ -138,7 +162,7 @@ impl<'a> Eu4SliceFile<'a> {
                 data.deserializer().deserialize()
             }
             Eu4SliceFileKind::Binary(data) => {
-                data.deserializer(resolver).deserialize()
+                data.clone().deserializer(resolver).deserialize()
             }
             Eu4SliceFileKind::Zip(archive) => {
                 let meta: Meta = archive.deserialize_entry(archive.meta, &resolver)?;
@@ -433,27 +457,9 @@ where
     }
 }
 
-pub struct BinaryFile(File);
-
-impl BinaryFile {
-    pub fn melt<Resolver, Writer>(
-        &mut self,
-        options: MeltOptions,
-        resolver: Resolver,
-        mut output: Writer,
-    ) -> Result<MeltedDocument, Eu4Error>
-    where
-        Resolver: TokenResolver,
-        Writer: Write,
-    {
-        output.write_all(b"EU4txt\n")?;
-        melt::melt(&mut self.0, output, resolver, options.check_header(false))
-    }
-}
-
 pub enum Eu4FsFileKind<R> {
     Text(File),
-    Binary(BinaryFile),
+    Binary(Eu4Binary<File>),
     Zip(Box<Eu4Zip<R>>),
 }
 
@@ -625,7 +631,6 @@ impl<'de, 'a: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deserialize
     where
         V: serde::de::Visitor<'de>,
     {
-
         let encoding = match self.encoding {
             Some(e) => e,
             None => {

@@ -2,8 +2,8 @@ use eu4save::{BasicTokenResolver, Eu4File, PdsDate};
 use std::error::Error;
 
 pub fn run(path: &str) -> Result<(), Box<dyn Error>> {
-    let data = std::fs::read(path)?;
-    let file = Eu4File::from_slice(&data)?;
+    let file = std::fs::File::open(path)?;
+    let file = Eu4File::from_file(file)?;
 
     let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();
     let resolver = BasicTokenResolver::from_text_lines(file_data.as_slice())?;
