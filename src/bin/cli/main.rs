@@ -1,4 +1,4 @@
-use std::{env, error::Error, io::Read};
+use std::{env, error::Error};
 
 mod csv;
 mod debug_save;
@@ -9,18 +9,14 @@ mod melt;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
-    let stdin = std::io::stdin();
-    let mut lock = stdin.lock();
-    let mut buf = Vec::new();
-    lock.read_to_end(&mut buf)?;
 
     match args[1].as_str() {
-        "csv" => csv::run(&buf),
-        "debug" => debug_save::run(&buf),
-        "deducer" => deducer::run(&buf),
-        "fmt" => fmt::run(&buf),
-        "json" => json::run(&buf),
-        "melt" => melt::run(&buf),
+        "csv" => csv::run(args[2].as_str()),
+        "debug" => debug_save::run(args[2].as_str()),
+        "deducer" => deducer::run(args[2].as_str()),
+        "fmt" => fmt::run(args[2].as_str()),
+        "json" => json::run(args[2].as_str()),
+        "melt" => melt::run(args[2].as_str()),
         x => panic!("unrecognized argument: {}", x),
     }?;
 

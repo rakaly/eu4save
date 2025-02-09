@@ -4,7 +4,8 @@ use std::{
     io::{stdout, BufWriter, Write},
 };
 
-pub fn run(file_data: &[u8]) -> Result<(), Box<dyn Error>> {
+pub fn run(path: &str) -> Result<(), Box<dyn Error>> {
+    let file_data = std::fs::read(path)?;
     let header = b"EU4txt";
     if file_data.len() < header.len() {
         eprintln!("can only format plain eu4 file");
