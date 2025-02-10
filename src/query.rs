@@ -521,8 +521,8 @@ impl Query {
             for x in &mut result {
                 if x.is_human && x.player_names.len() == 1 && x.history.stored == x.history.latest {
                     let country = self.country(&x.history.stored);
-                    let rpa = country.map_or(false, |x| x.has_switched_nation);
-                    let alive = country.map_or(false, |x| x.num_of_cities > 0);
+                    let rpa = country.is_some_and(|x| x.has_switched_nation);
+                    let alive = country.is_some_and(|x| x.num_of_cities > 0);
                     if rpa && alive {
                         if let Some(end) = leftovers.pop() {
                             x.history.initial = end.history.initial;
@@ -570,7 +570,7 @@ impl Query {
             !x.history
                 .events
                 .first()
-                .map_or(false, |x| x.kind == NationEventKind::Appeared)
+                .is_some_and(|x| x.kind == NationEventKind::Appeared)
         });
         let first = preexisting.next();
         let second = preexisting.next();
@@ -620,7 +620,7 @@ impl Query {
             .country
             .religion
             .as_ref()
-            .map_or(false, |x| x == "catholic");
+            .is_some_and(|x| x == "catholic");
 
         let ruler = country
             .country
@@ -1466,7 +1466,7 @@ fn province_religions(save: &Eu4Save, lookup: &ReligionLookup) -> ProvinceReligi
             if let ProvinceEvent::Religion(new_religion) = event {
                 if let Some(new_religion_index) = lookup.index(new_religion) {
                     let old_religion = religions[prov_id].replace(new_religion_index);
-                    if old_religion.map_or(true, |x| new_religion_index != x) {
+                    if old_religion != Some(new_religion_index) {
                         changes.push(ProvinceReligionChange {
                             date: *date,
                             province: id,

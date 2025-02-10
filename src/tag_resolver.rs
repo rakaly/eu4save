@@ -110,7 +110,7 @@ pub struct TagResolverDated<'a> {
     date: Eu4Date,
 }
 
-impl<'a> TagResolverDated<'a> {
+impl TagResolverDated<'_> {
     fn filter_events(&self, nation: &NationEvents) -> Option<(CountryTag, CountryTag)> {
         nation
             .events

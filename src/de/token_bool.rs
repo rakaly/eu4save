@@ -7,7 +7,7 @@ where
 {
     struct TokenBoolVisitor;
 
-    impl<'de> de::Visitor<'de> for TokenBoolVisitor {
+    impl de::Visitor<'_> for TokenBoolVisitor {
         type Value = bool;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

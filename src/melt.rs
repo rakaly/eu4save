@@ -407,7 +407,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
-            &expected[..]
+            expected
         );
     }
 
@@ -437,7 +437,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
-            &expected[..]
+            expected
         );
     }
 
@@ -464,7 +464,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
-            &expected[..]
+            expected
         );
     }
 
@@ -491,7 +491,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             std::str::from_utf8(out.into_inner().as_slice()).unwrap(),
-            &expected[..]
+            expected
         );
     }
 }

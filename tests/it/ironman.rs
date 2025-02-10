@@ -431,7 +431,7 @@ ironman_test!(
             "GBR"
         );
 
-        let lei_income = query.income_statistics_ledger(&lei_events);
+        let lei_income = query.income_statistics_ledger(lei_events);
         assert_eq!(
             lei_income,
             vec![
@@ -970,7 +970,7 @@ ironman_test!(
     },
     |query: Query, _melted_data: &[u8]| {
         let player = query.country(&"TUR".parse().unwrap()).unwrap();
-        let m = query.country_mana_breakdown(&player);
+        let m = query.country_mana_breakdown(player);
 
         #[rustfmt::skip]
         fn assertions(m: CountryManaUsage) {
@@ -1039,7 +1039,7 @@ ironman_test!(
     },
     |query: Query, _melted_data: &[u8]| {
         let player = query.country(&"RUS".parse().unwrap()).unwrap();
-        let m = query.country_mana_breakdown(&player);
+        let m = query.country_mana_breakdown(player);
 
         #[rustfmt::skip]
         fn assertions(m: CountryManaUsage) {

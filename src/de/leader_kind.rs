@@ -9,7 +9,7 @@ impl<'de> Deserialize<'de> for LeaderKind {
     {
         struct LeaderKindVisitor;
 
-        impl<'de> de::Visitor<'de> for LeaderKindVisitor {
+        impl de::Visitor<'_> for LeaderKindVisitor {
             type Value = LeaderKind;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

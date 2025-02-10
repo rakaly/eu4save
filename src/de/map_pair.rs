@@ -48,7 +48,7 @@ struct ExtendVec<'a, K, V> {
     values: &'a mut Vec<(K, V)>,
 }
 
-impl<'de, 'a, K, V> de::DeserializeSeed<'de> for ExtendVec<'a, K, V>
+impl<'de, K, V> de::DeserializeSeed<'de> for ExtendVec<'_, K, V>
 where
     K: Deserialize<'de>,
     V: Deserialize<'de>,
@@ -63,7 +63,7 @@ where
             values: &'a mut Vec<(K1, V1)>,
         }
 
-        impl<'de, 'a, K1, V1> de::Visitor<'de> for ExtendVecVisitor<'a, K1, V1>
+        impl<'de, K1, V1> de::Visitor<'de> for ExtendVecVisitor<'_, K1, V1>
         where
             K1: Deserialize<'de>,
             V1: Deserialize<'de>,

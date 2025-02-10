@@ -142,7 +142,7 @@ struct ExtendVec<'a> {
     countries: &'a mut Vec<CountryTrade>,
 }
 
-impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
+impl<'de> de::DeserializeSeed<'de> for ExtendVec<'_> {
     type Value = ();
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -154,7 +154,7 @@ impl<'de, 'a> de::DeserializeSeed<'de> for ExtendVec<'a> {
             countries: &'a mut Vec<CountryTrade>,
         }
 
-        impl<'de, 'a> de::Visitor<'de> for ExtendVecVisitor<'a> {
+        impl<'de> de::Visitor<'de> for ExtendVecVisitor<'_> {
             type Value = ();
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

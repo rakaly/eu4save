@@ -180,7 +180,7 @@ impl<'de> Deserialize<'de> for CountryTag {
     {
         struct CountryTagVisitor;
 
-        impl<'de> de::Visitor<'de> for CountryTagVisitor {
+        impl de::Visitor<'_> for CountryTagVisitor {
             type Value = CountryTag;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

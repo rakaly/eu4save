@@ -522,7 +522,7 @@ enum FileHeader {
     Binary,
 }
 
-fn file_header<'a>(data: &'a [u8]) -> Option<(FileHeader, &'a [u8])> {
+fn file_header(data: &[u8]) -> Option<(FileHeader, &[u8])> {
     if data.len() < TXT_HEADER.len() {
         return None;
     }
