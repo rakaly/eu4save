@@ -6,12 +6,11 @@ use crate::{
     Encoding, Eu4Error, Eu4ErrorKind, MeltOptions, MeltedDocument,
 };
 use jomini::{
-    binary::{de::BinaryReaderDeserializer, TokenResolver},
-    text::{de::TextReaderDeserializer, ObjectReader},
-    BinaryDeserializer, TextDeserializer, TextTape, Windows1252Encoding,
+    binary::TokenResolver, text::ObjectReader, BinaryDeserializer, TextDeserializer, TextTape,
+    Windows1252Encoding,
 };
 use rawzip::{CompressionMethod, FileReader, ReaderAt, ZipVerifier};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::de::DeserializeOwned;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -479,11 +478,8 @@ where
         match &self.kind {
             Eu4FsFileKind::Text(file) => {
                 let reader = jomini::text::TokenReader::new(file);
-                let deserializer = TextDeserializer::from_windows1252_reader(reader);
-                let mut deserializer = Eu4TextDeserializer {
-                    deser: deserializer,
-                };
-                deserializer.deserialize()
+                let mut deserializer = TextDeserializer::from_windows1252_reader(reader);
+                Ok(deserializer.deserialize()?)
             }
             Eu4FsFileKind::Binary(file) => {
                 let mut deserializer = BinaryDeserializer::builder_flavor(Eu4Flavor::new())
@@ -536,36 +532,6 @@ fn file_header<'a>(data: &'a [u8]) -> Option<(FileHeader, &'a [u8])> {
         TXT_HEADER => Some((FileHeader::Text, rest)),
         BIN_HEADER => Some((FileHeader::Binary, rest)),
         _ => None,
-    }
-}
-
-/// Deserializes binary data into custom structures
-pub struct Eu4TextDeserializer<R> {
-    pub(crate) deser: TextReaderDeserializer<R, jomini::Windows1252Encoding>,
-}
-
-impl<R: Read> Eu4TextDeserializer<R> {
-    pub fn deserialize<'de, T>(&mut self) -> Result<T, Eu4Error>
-    where
-        T: Deserialize<'de>,
-    {
-        T::deserialize(self)
-    }
-}
-
-pub struct Eu4BinaryDeserializer<'res, RES, R> {
-    pub(crate) deser: BinaryReaderDeserializer<'res, RES, Eu4Flavor, R>,
-}
-
-impl<'de, 'res: 'de, RES: TokenResolver, R> Eu4BinaryDeserializer<'res, RES, R>
-where
-    R: Read,
-{
-    pub fn deserialize<T>(&mut self) -> Result<T, Eu4Error>
-    where
-        T: Deserialize<'de>,
-    {
-        T::deserialize(self)
     }
 }
 

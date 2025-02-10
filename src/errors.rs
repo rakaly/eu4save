@@ -79,18 +79,16 @@ pub enum Eu4ErrorKind {
 
 impl From<jomini::Error> for Eu4Error {
     fn from(value: jomini::Error) -> Self {
-        let kind = if matches!(value.kind(), jomini::ErrorKind::Deserialize(_)) {
-            match value.into_kind() {
-                jomini::ErrorKind::Deserialize(x) => match x.kind() {
-                    &jomini::DeserializeErrorKind::UnknownToken { token_id } => {
-                        Eu4ErrorKind::UnknownToken { token_id }
-                    }
-                    _ => Eu4ErrorKind::Deserialize(x),
-                },
-                _ => unreachable!(),
-            }
-        } else {
-            Eu4ErrorKind::Parse(value)
+        let kind = match value.into_kind() {
+            jomini::ErrorKind::Deserialize(x) => match x.kind() {
+                &jomini::DeserializeErrorKind::UnknownToken { token_id } => {
+                    Eu4ErrorKind::UnknownToken { token_id }
+                }
+                _ => Eu4ErrorKind::Deserialize(x),
+            },
+            _ => Eu4ErrorKind::DeserializeImpl {
+                msg: String::from("unexpected error"),
+            },
         };
 
         Eu4Error::new(kind)
