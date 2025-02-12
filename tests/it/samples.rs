@@ -6,7 +6,7 @@ use eu4save::{
         BuildingConstruction, BuildingEvent, NationEvent, NationEventKind, NationEvents,
         PlayerHistory, Query,
     },
-    Encoding, Eu4Date, Eu4File, PdsDate, ProvinceId,
+    Encoding, Eu4Date, Eu4File, PdsDate, ProvinceId, SegmentedResolver,
 };
 use std::{collections::HashMap, error::Error};
 
@@ -16,7 +16,7 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     let data = utils::inflate(file);
 
     let file = Eu4File::from_slice(&data)?;
-    let save = file.parse_save(HashMap::<u16, &str>::new())?;
+    let save = file.parse_save(&SegmentedResolver::empty())?;
 
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "ENG");
@@ -81,7 +81,7 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
 fn test_eu4_compressed_text() -> Result<(), Box<dyn Error>> {
     let data = utils::request_file("eng.txt.compressed.eu4");
     let file = Eu4File::from_file(data)?;
-    let save = file.parse_save(HashMap::<u16, &str>::new())?;
+    let save = file.parse_save(&SegmentedResolver::empty())?;
     assert_eq!(file.encoding(), Encoding::TextZip);
     assert_eq!(save.meta.player, "ENG");
 
@@ -98,7 +98,7 @@ fn test_eu4_compressed_text_raw() -> Result<(), Box<dyn Error>> {
     };
 
     let mut meta_entry = zip.get(Eu4FileEntryName::Meta)?;
-    let meta: Meta = meta_entry.deserialize(HashMap::<u16, &str>::new())?;
+    let meta: Meta = meta_entry.deserialize(&SegmentedResolver::empty())?;
 
     assert_eq!(file.encoding(), Encoding::TextZip);
     assert_eq!(meta.player, "ENG");
@@ -109,7 +109,7 @@ fn test_eu4_compressed_text_raw() -> Result<(), Box<dyn Error>> {
 pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
     let data = utils::request_file("mp_Uesugi.eu4");
     let file = Eu4File::from_file(data)?;
-    let save = file.parse_save(HashMap::<u16, &str>::new())?;
+    let save = file.parse_save(&SegmentedResolver::empty())?;
     assert!(save.meta.multiplayer);
 
     let query = Query::from_save(save);
@@ -309,7 +309,7 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
 pub fn parse_overflowing_losses() -> Result<(), Box<dyn Error>> {
     let data = utils::request_file("losses.eu4");
     let file = Eu4File::from_file(data)?;
-    let save = file.parse_save(HashMap::<u16, &str>::new())?;
+    let save = file.parse_save(&SegmentedResolver::empty())?;
     let country_negative_loss = save
         .game
         .countries
@@ -326,7 +326,7 @@ fn test_missing_leader_activation_save() -> Result<(), Box<dyn Error>> {
     let data = utils::inflate(file);
 
     let file = Eu4File::from_slice(&data)?;
-    let save = file.parse_save(HashMap::<u16, &str>::new())?;
+    let save = file.parse_save(&SegmentedResolver::empty())?;
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "NED");
 
@@ -359,7 +359,7 @@ fn test_handle_heavily_nested_events() {
     // fires. https://eu4.paradoxwikis.com/English_events#Symposium
     let data = utils::request_file("HashMP_Game56_S7End.eu4");
     let file = Eu4File::from_file(data).unwrap();
-    let _save = file.parse_save(HashMap::<u16, &str>::new()).unwrap();
+    let _save = file.parse_save(&SegmentedResolver::empty()).unwrap();
     assert_eq!(file.encoding(), Encoding::TextZip);
 }
 
@@ -368,7 +368,7 @@ fn test_paperman_text() -> Result<(), Box<dyn Error>> {
     let file = utils::request_file("paperman.eu4.zip");
     let data = utils::inflate(file);
     let file = Eu4File::from_slice(&data).unwrap();
-    let save = file.parse_save(HashMap::<u16, &str>::new()).unwrap();
+    let save = file.parse_save(&SegmentedResolver::empty()).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "GER");
     Ok(())
@@ -378,5 +378,5 @@ fn test_paperman_text() -> Result<(), Box<dyn Error>> {
 fn fix_crash_on_long_country_tag_debug_mode() {
     let file = std::fs::File::open("tests/it/fixtures/crash1.bin").unwrap();
     let file = Eu4File::from_file(file).unwrap();
-    let _save = file.parse_save(HashMap::<u16, &str>::new());
+    let _save = file.parse_save(&SegmentedResolver::empty());
 }

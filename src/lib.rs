@@ -3,12 +3,11 @@ EU4 Save is a library to ergonomically work with EU4 saves (ironman + mp).
 
 ```rust
 use std::collections::HashMap;
-use eu4save::{Eu4File, Encoding, CountryTag};
+use eu4save::{Eu4File, Encoding, CountryTag, SegmentedResolver};
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let file = Eu4File::from_slice(&data)?;
-let resolver = HashMap::<u16, &str>::new();
-let save = file.parse_save(&resolver)?;
+let save = file.parse_save(&SegmentedResolver::empty())?;
 assert_eq!(file.encoding(), Encoding::TextZip);
 assert_eq!(save.meta.player, "ENG");
 # Ok::<(), Box<dyn std::error::Error>>(())
@@ -31,12 +30,11 @@ To help solve questions like these, the `Query` API was created
 
 ```rust
 use std::collections::HashMap;
-use eu4save::{Eu4File, Encoding, CountryTag, query::Query};
+use eu4save::{Eu4File, Encoding, CountryTag, query::Query, SegmentedResolver};
 
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let file = Eu4File::from_slice(&data)?;
-let resolver = HashMap::<u16, &str>::new();
-let save = file.parse_save(&resolver)?;
+let save = file.parse_save(&SegmentedResolver::empty())?;
 let save_query = Query::from_save(save);
 let trade = save_query.country(&"ENG".parse()?)
     .map(|country| save_query.country_income_breakdown(country))
@@ -66,6 +64,7 @@ pub mod models;
 mod province_id;
 /// Ergonomic module for querying info from a save file
 pub mod query;
+mod resolver;
 mod tag_resolver;
 
 pub use country_tag::*;
@@ -77,4 +76,5 @@ pub use file::Eu4File;
 pub use jomini::binary::{BasicTokenResolver, FailedResolveStrategy};
 pub use melt::*;
 pub use province_id::*;
+pub use resolver::{SegmentedResolver, SegmentedResolverBuilder};
 pub use tag_resolver::*;

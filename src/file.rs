@@ -3,6 +3,7 @@ use crate::{
     flavor::Eu4Flavor,
     melt,
     models::{Eu4Save, GameState, Meta},
+    resolver::SegmentedResolver,
     Encoding, Eu4Error, Eu4ErrorKind, MeltOptions, MeltedDocument,
 };
 use jomini::{
@@ -11,7 +12,7 @@ use jomini::{
 use rawzip::{CompressionMethod, FileReader, ReaderAt, ZipVerifier};
 use serde::de::DeserializeOwned;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fmt::Display,
     fs::File,
     io::{Read, Write},
@@ -70,6 +71,9 @@ impl Eu4File {
     }
 }
 
+const EMPTY_RESOLVER: SegmentedResolver<'static> = SegmentedResolver::empty();
+const EMPTY_RESOLVER_REF: &SegmentedResolver<'static> = &EMPTY_RESOLVER;
+
 pub struct Eu4Text<'a>(&'a [u8]);
 
 impl Eu4Text<'_> {
@@ -77,8 +81,8 @@ impl Eu4Text<'_> {
         self.0
     }
 
-    pub fn deserializer(&self) -> Eu4Modeller<HashMap<u16, String>> {
-        Eu4Modeller::from_reader(Box::new(self.0), HashMap::new()).with_encoding(Encoding::Text)
+    pub fn deserializer(&self) -> Eu4Modeller {
+        Eu4Modeller::from_reader(Box::new(self.0), EMPTY_RESOLVER_REF).with_encoding(Encoding::Text)
     }
 }
 
@@ -92,7 +96,10 @@ where
         &self.0
     }
 
-    pub fn deserializer<RES>(&mut self, resolver: RES) -> Eu4Modeller<RES> {
+    pub fn deserializer<'a, 'b>(
+        &'a mut self,
+        resolver: &'a SegmentedResolver<'b>,
+    ) -> Eu4Modeller<'a, 'b> {
         Eu4Modeller::from_reader(Box::new(&mut self.0), resolver).with_encoding(Encoding::Binary)
     }
 
@@ -155,16 +162,13 @@ impl<'a> Eu4SliceFile<'a> {
         }
     }
 
-    pub fn parse_save<R>(&self, resolver: R) -> Result<Eu4Save, Eu4Error>
-    where
-        R: TokenResolver,
-    {
+    pub fn parse_save(&self, resolver: &SegmentedResolver) -> Result<Eu4Save, Eu4Error> {
         match &self.kind {
             Eu4SliceFileKind::Text(data) => data.deserializer().deserialize(),
             Eu4SliceFileKind::Binary(data) => data.clone().deserializer(resolver).deserialize(),
             Eu4SliceFileKind::Zip(archive) => {
-                let meta: Meta = archive.deserialize_entry(archive.meta, &resolver)?;
-                let game: GameState = archive.deserialize_entry(archive.gamestate, &resolver)?;
+                let meta: Meta = archive.deserialize_entry(archive.meta, resolver)?;
+                let game: GameState = archive.deserialize_entry(archive.gamestate, resolver)?;
                 Ok(Eu4Save { meta, game })
             }
         }
@@ -221,12 +225,11 @@ where
     R: Read,
     ReadAt: ReaderAt,
 {
-    pub fn deserialize<T, RES>(&mut self, resolver: RES) -> Result<T, Eu4Error>
+    pub fn deserialize<T>(&mut self, resolver: &SegmentedResolver) -> Result<T, Eu4Error>
     where
         T: DeserializeOwned,
-        RES: TokenResolver,
     {
-        let mut modeller = Eu4Modeller::from_reader(&mut self.reader, &resolver);
+        let mut modeller = Eu4Modeller::from_reader(&mut self.reader, resolver);
         let data: T = modeller.deserialize()?;
         Ok(data)
     }
@@ -355,19 +358,18 @@ where
         }
     }
 
-    pub fn deserialize_entry<T, RES>(
+    pub fn deserialize_entry<T>(
         &self,
         entry: rawzip::ZipArchiveEntryWayfinder,
-        resolver: RES,
+        resolver: &SegmentedResolver<'_>,
     ) -> Result<T, Eu4Error>
     where
         T: DeserializeOwned,
-        RES: TokenResolver,
     {
         let zip_entry = self.archive.get_entry(entry).map_err(Eu4ErrorKind::Zip)?;
         let reader = CompressedFileReader::from_compressed(zip_entry.reader(), self.compression)?;
         let reader = zip_entry.verifying_reader(reader);
-        let data: T = Eu4Modeller::from_reader(reader, &resolver).deserialize()?;
+        let data: T = Eu4Modeller::from_reader(reader, resolver).deserialize()?;
         Ok(data)
     }
 
@@ -462,10 +464,7 @@ where
         }
     }
 
-    pub fn parse_save<RES>(&self, resolver: RES) -> Result<Eu4Save, Eu4Error>
-    where
-        RES: TokenResolver,
-    {
+    pub fn parse_save(&self, resolver: &SegmentedResolver<'_>) -> Result<Eu4Save, Eu4Error> {
         match &self.kind {
             Eu4FsFileKind::Text(file) => Ok(Eu4Modeller::from_reader(file, resolver)
                 .with_encoding(Encoding::Text)
@@ -476,8 +475,8 @@ where
                     .deserialize()?)
             }
             Eu4FsFileKind::Zip(archive) => {
-                let meta: Meta = archive.deserialize_entry(archive.meta, &resolver)?;
-                let game: GameState = archive.deserialize_entry(archive.gamestate, &resolver)?;
+                let meta: Meta = archive.deserialize_entry(archive.meta, resolver)?;
+                let game: GameState = archive.deserialize_entry(archive.gamestate, resolver)?;
                 Ok(Eu4Save { meta, game })
             }
         }
@@ -523,14 +522,17 @@ fn file_header(data: &[u8]) -> Option<(FileHeader, &[u8])> {
     }
 }
 
-pub struct Eu4Modeller<'obj, Resolver> {
+pub struct Eu4Modeller<'obj, 'resolver> {
     reader: Box<dyn Read + 'obj>,
-    resolver: Resolver,
+    resolver: &'obj SegmentedResolver<'resolver>,
     encoding: Option<Encoding>,
 }
 
-impl<'obj, Resolver> Eu4Modeller<'obj, Resolver> {
-    pub fn from_reader<R: Read + 'obj>(reader: R, resolver: Resolver) -> Self {
+impl<'obj, 'resolver> Eu4Modeller<'obj, 'resolver> {
+    pub fn from_reader<R: Read + 'obj>(
+        reader: R,
+        resolver: &'obj SegmentedResolver<'resolver>,
+    ) -> Self {
         Eu4Modeller {
             reader: Box::new(reader),
             resolver,
@@ -552,14 +554,13 @@ impl<'obj, Resolver> Eu4Modeller<'obj, Resolver> {
     pub fn deserialize<T>(&mut self) -> Result<T, Eu4Error>
     where
         T: DeserializeOwned,
-        Resolver: TokenResolver,
     {
         T::deserialize(self)
     }
 }
 
-impl<'de, 'a: 'de, Resolver: TokenResolver> serde::de::Deserializer<'de>
-    for &'a mut Eu4Modeller<'_, Resolver>
+impl<'de, 'a: 'de, 'resolver: 'de> serde::de::Deserializer<'de>
+    for &'a mut Eu4Modeller<'_, 'resolver>
 {
     type Error = Eu4Error;
 

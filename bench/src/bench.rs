@@ -11,14 +11,14 @@ fn parse_save(c: &mut Criterion) {
         total_size += entry.uncompressed_size_hint();
     }
 
-    let file_data = std::fs::read("../assets/eu4.txt").unwrap();
-    let tokens = eu4save::BasicTokenResolver::from_text_lines(file_data.as_slice()).unwrap();
+    let file_data = std::fs::read("../assets/eu4.txt").unwrap_or_default();
+    let segments = eu4save::SegmentedResolver::parse(file_data.as_slice()).unwrap();
 
     group.throughput(Throughput::Bytes(total_size as u64));
     group.bench_function("text", |b| {
         b.iter(|| {
             let file = eu4save::Eu4File::from_slice(&data).unwrap();
-            let _ = file.parse_save(&tokens);
+            let _ = file.parse_save(&segments.resolver());
         })
     });
     group.finish();

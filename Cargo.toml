@@ -20,7 +20,6 @@ specta = ["dep:specta"]
 
 [dependencies]
 jomini = { version = "0.27.2", features = ["json"] }
-zip = { version =  "0.6", default-features = false }
 serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 zstd = { version = "0.13", default-features = false, optional = true }
