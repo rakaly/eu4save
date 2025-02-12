@@ -61,3 +61,11 @@ jobs:
       run: |
         cargo install cargo-fuzz
         cargo fuzz build fuzz_extract
+
+  testbench:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Build benchmark
+      run: cargo bench --manifest-path bench/Cargo.toml --no-run

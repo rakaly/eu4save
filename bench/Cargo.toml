@@ -1,0 +1,31 @@
+[package]
+publish = false
+name = "eu4save-bench"
+version = "0.0.1"
+authors = ["Nick Babcock <nbabcock19@hotmail.com>"]
+description = "Criterion benchmark suite for eu4save."
+homepage = "https://github.com/rakaly/eu4save/tree/master/bench"
+repository = "https://github.com/rakaly/eu4save"
+license = "MIT"
+edition = "2021"
+
+[workspace]
+
+[lib]
+bench = false
+
+[[bench]]
+name = "eu4-bench"
+harness = false
+path = "src/bench.rs"
+
+[dependencies]
+criterion = "0.5.1"
+eu4save = { path = "../" }
+rawzip = "0.0.5"
+
+[profile.release]
+debug = true
+
+[profile.bench]
+debug = true

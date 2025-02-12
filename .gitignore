@@ -1,5 +1,5 @@
 assets/saves/*
-/target
+**/target
 **/*.rs.bk
 Cargo.lock
 assets/eu4.txt
