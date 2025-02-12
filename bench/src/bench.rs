@@ -1,4 +1,4 @@
-use criterion::{BenchmarkId, Criterion, Throughput};
+use criterion::{Criterion, Throughput};
 
 fn parse_save(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_save");
