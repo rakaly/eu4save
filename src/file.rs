@@ -6,8 +6,7 @@ use crate::{
     Encoding, Eu4Error, Eu4ErrorKind, MeltOptions, MeltedDocument,
 };
 use jomini::{
-    binary::TokenResolver, text::ObjectReader, BinaryDeserializer, TextDeserializer, TextTape,
-    Windows1252Encoding,
+    binary::TokenResolver, text::ObjectReader, TextDeserializer, TextTape, Windows1252Encoding,
 };
 use rawzip::{CompressionMethod, FileReader, ReaderAt, ZipVerifier};
 use serde::de::DeserializeOwned;
@@ -78,12 +77,8 @@ impl Eu4Text<'_> {
         self.0
     }
 
-    pub fn deserializer(&self) -> Eu4Modeller<&[u8], HashMap<u16, String>> {
-        Eu4Modeller {
-            reader: self.0,
-            resolver: HashMap::new(),
-            encoding: Some(Encoding::Text),
-        }
+    pub fn deserializer(&self) -> Eu4Modeller<HashMap<u16, String>> {
+        Eu4Modeller::from_reader(Box::new(self.0), HashMap::new()).with_encoding(Encoding::Text)
     }
 }
 
@@ -97,12 +92,8 @@ where
         &self.0
     }
 
-    pub fn deserializer<RES>(&mut self, resolver: RES) -> Eu4Modeller<&'_ mut R, RES> {
-        Eu4Modeller {
-            reader: &mut self.0,
-            resolver,
-            encoding: Some(Encoding::Binary),
-        }
+    pub fn deserializer<RES>(&mut self, resolver: RES) -> Eu4Modeller<RES> {
+        Eu4Modeller::from_reader(Box::new(&mut self.0), resolver).with_encoding(Encoding::Binary)
     }
 
     pub fn melt<Resolver, Writer>(
@@ -476,16 +467,13 @@ where
         RES: TokenResolver,
     {
         match &self.kind {
-            Eu4FsFileKind::Text(file) => {
-                let reader = jomini::text::TokenReader::new(file);
-                let mut deserializer = TextDeserializer::from_windows1252_reader(reader);
-                Ok(deserializer.deserialize()?)
-            }
+            Eu4FsFileKind::Text(file) => Ok(Eu4Modeller::from_reader(file, resolver)
+                .with_encoding(Encoding::Text)
+                .deserialize()?),
             Eu4FsFileKind::Binary(file) => {
-                let mut deserializer = BinaryDeserializer::builder_flavor(Eu4Flavor::new())
-                    .from_reader(&file.0, &resolver);
-                let result = deserializer.deserialize()?;
-                Ok(result)
+                Ok(Eu4Modeller::from_reader(Box::new(file.get_ref()), resolver)
+                    .with_encoding(Encoding::Binary)
+                    .deserialize()?)
             }
             Eu4FsFileKind::Zip(archive) => {
                 let meta: Meta = archive.deserialize_entry(archive.meta, &resolver)?;
@@ -535,19 +523,25 @@ fn file_header(data: &[u8]) -> Option<(FileHeader, &[u8])> {
     }
 }
 
-#[derive(Debug)]
-pub struct Eu4Modeller<Reader, Resolver> {
-    reader: Reader,
+pub struct Eu4Modeller<'obj, Resolver> {
+    reader: Box<dyn Read + 'obj>,
     resolver: Resolver,
     encoding: Option<Encoding>,
 }
 
-impl<Reader: Read, Resolver: TokenResolver> Eu4Modeller<Reader, Resolver> {
-    pub fn from_reader(reader: Reader, resolver: Resolver) -> Self {
+impl<'obj, Resolver> Eu4Modeller<'obj, Resolver> {
+    pub fn from_reader<R: Read + 'obj>(reader: R, resolver: Resolver) -> Self {
         Eu4Modeller {
-            reader,
+            reader: Box::new(reader),
             resolver,
             encoding: None,
+        }
+    }
+
+    pub fn with_encoding(self, encoding: Encoding) -> Self {
+        Eu4Modeller {
+            encoding: Some(encoding),
+            ..self
         }
     }
 
@@ -558,17 +552,14 @@ impl<Reader: Read, Resolver: TokenResolver> Eu4Modeller<Reader, Resolver> {
     pub fn deserialize<T>(&mut self) -> Result<T, Eu4Error>
     where
         T: DeserializeOwned,
+        Resolver: TokenResolver,
     {
         T::deserialize(self)
     }
-
-    pub fn into_inner(self) -> Reader {
-        self.reader
-    }
 }
 
-impl<'de, 'a: 'de, Reader: Read, Resolver: TokenResolver> serde::de::Deserializer<'de>
-    for &'a mut Eu4Modeller<Reader, Resolver>
+impl<'de, 'a: 'de, Resolver: TokenResolver> serde::de::Deserializer<'de>
+    for &'a mut Eu4Modeller<'_, Resolver>
 {
     type Error = Eu4Error;
 
