@@ -87,7 +87,6 @@ impl Eu4Text<'_> {
 }
 
 pub struct Eu4Binary<R>(R);
-
 impl<R> Eu4Binary<R>
 where
     R: Read,
@@ -96,15 +95,22 @@ where
         &self.0
     }
 
+    pub fn as_ref(&self) -> Eu4Binary<&R> {
+        Eu4Binary(&self.0)
+    }
+
     pub fn deserializer<'a, 'b>(
-        &'a mut self,
+        self,
         resolver: &'a SegmentedResolver<'b>,
-    ) -> Eu4Modeller<'a, 'b> {
-        Eu4Modeller::from_reader(Box::new(&mut self.0), resolver).with_encoding(Encoding::Binary)
+    ) -> Eu4Modeller<'a, 'b>
+    where
+        R: Read + 'a,
+    {
+        Eu4Modeller::from_reader(self.0, resolver).with_encoding(Encoding::Binary)
     }
 
     pub fn melt<Resolver, Writer>(
-        &mut self,
+        self,
         options: MeltOptions,
         resolver: Resolver,
         mut output: Writer,
@@ -114,7 +120,7 @@ where
         Writer: Write,
     {
         output.write_all(b"EU4txt\n")?;
-        melt::melt(&mut self.0, output, resolver, options.check_header(false))
+        melt::melt(self.0, output, resolver, options.check_header(false))
     }
 }
 
@@ -165,7 +171,7 @@ impl<'a> Eu4SliceFile<'a> {
     pub fn parse_save(&self, resolver: &SegmentedResolver) -> Result<Eu4Save, Eu4Error> {
         match &self.kind {
             Eu4SliceFileKind::Text(data) => data.deserializer().deserialize(),
-            Eu4SliceFileKind::Binary(data) => data.clone().deserializer(resolver).deserialize(),
+            Eu4SliceFileKind::Binary(data) => data.deserializer(resolver).deserialize(),
             Eu4SliceFileKind::Zip(archive) => {
                 let meta: Meta = archive.deserialize_entry(archive.meta, resolver)?;
                 let game: GameState = archive.deserialize_entry(archive.gamestate, resolver)?;
@@ -202,15 +208,7 @@ impl<'a> Eu4SliceFile<'a> {
                 output.write_all(data.0)?;
                 Ok(MeltedDocument::new())
             }
-            Eu4SliceFileKind::Binary(data) => {
-                output.write_all(b"EU4txt\n")?;
-                Ok(melt::melt(
-                    data.0,
-                    output,
-                    resolver,
-                    options.check_header(false),
-                )?)
-            }
+            Eu4SliceFileKind::Binary(data) => data.melt(options, resolver, output),
             Eu4SliceFileKind::Zip(zip) => zip.melt(options, resolver, output),
         }
     }
@@ -469,11 +467,7 @@ where
             Eu4FsFileKind::Text(file) => Ok(Eu4Modeller::from_reader(file, resolver)
                 .with_encoding(Encoding::Text)
                 .deserialize()?),
-            Eu4FsFileKind::Binary(file) => {
-                Ok(Eu4Modeller::from_reader(Box::new(file.get_ref()), resolver)
-                    .with_encoding(Encoding::Binary)
-                    .deserialize()?)
-            }
+            Eu4FsFileKind::Binary(file) => file.as_ref().deserializer(resolver).deserialize(),
             Eu4FsFileKind::Zip(archive) => {
                 let meta: Meta = archive.deserialize_entry(archive.meta, resolver)?;
                 let game: GameState = archive.deserialize_entry(archive.gamestate, resolver)?;
@@ -483,7 +477,7 @@ where
     }
 
     pub fn melt<Resolver, Writer>(
-        &mut self,
+        &self,
         options: MeltOptions,
         resolver: Resolver,
         mut output: Writer,
@@ -492,13 +486,14 @@ where
         Resolver: TokenResolver,
         Writer: Write,
     {
-        match &mut self.kind {
+        match &self.kind {
             Eu4FsFileKind::Text(file) => {
+                let mut reader = file;
                 output.write_all(b"EU4txt\n")?;
-                std::io::copy(file, &mut output)?;
+                std::io::copy(&mut reader, &mut output)?;
                 Ok(MeltedDocument::new())
             }
-            Eu4FsFileKind::Binary(file) => file.melt(options, resolver, output),
+            Eu4FsFileKind::Binary(file) => file.as_ref().melt(options, resolver, output),
             Eu4FsFileKind::Zip(zip) => zip.melt(options, resolver, output),
         }
     }

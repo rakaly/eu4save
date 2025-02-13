@@ -240,7 +240,7 @@ fn test_inheritance_values() {
 fn test_roundtrip_melt() {
     skip_if_no_tokens!();
     let file = utils::request_file("kandy2.bin.eu4");
-    let mut file = Eu4File::from_file(file).unwrap();
+    let file = Eu4File::from_file(file).unwrap();
     let mut out = Cursor::new(Vec::new());
     file.melt(
         MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Error),
@@ -262,7 +262,7 @@ macro_rules! ironman_test {
             fn [<test_ $name>]() {
                 skip_if_no_tokens!();
                 let file = utils::request_file($fp);
-                let mut file = Eu4File::from_file(file).unwrap();
+                let file = Eu4File::from_file(file).unwrap();
 
                 // Ensure that every ironman can be melted with all tokens resolvable.
                 // Deserialization will not try and resolve tokens that aren't used. Melting
