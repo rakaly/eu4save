@@ -7,15 +7,14 @@ use eu4save::{
         CountryManaUsage, LedgerPoint, NationEvent, NationEventKind, NationEvents, PlayerHistory,
         Query,
     },
-    BasicTokenResolver, CountryTag, Encoding, Eu4Date, Eu4File, FailedResolveStrategy, MeltOptions,
-    PdsDate, ProvinceId,
+    CountryTag, Encoding, Eu4Date, Eu4File, FailedResolveStrategy, MeltOptions, PdsDate,
+    ProvinceId, SegmentedResolver, SegmentedResolverBuilder,
 };
-use jomini::binary::TokenResolver;
 use paste::paste;
 
-static TOKENS: LazyLock<BasicTokenResolver> = LazyLock::new(|| {
+static TOKENS: LazyLock<SegmentedResolverBuilder> = LazyLock::new(|| {
     let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();
-    BasicTokenResolver::from_text_lines(file_data.as_slice()).unwrap()
+    SegmentedResolver::parse(file_data.as_slice()).unwrap()
 });
 
 macro_rules! skip_if_no_tokens {
@@ -31,7 +30,7 @@ fn test_eu4_bin() {
     skip_if_no_tokens!();
     let file = utils::request_file("ragusa2.bin.eu4");
     let file = Eu4File::from_file(file).unwrap();
-    let save = file.parse_save(&*TOKENS).unwrap();
+    let save = file.parse_save(&TOKENS.resolver()).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "CRO");
 
@@ -66,7 +65,7 @@ fn test_eu4_kandy_bin() {
     skip_if_no_tokens!();
     let file = utils::request_file("kandy2.bin.eu4");
     let file = Eu4File::from_file(file).unwrap();
-    let save = file.parse_save(&*TOKENS).unwrap();
+    let save = file.parse_save(&TOKENS.resolver()).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "BHA");
 
@@ -166,7 +165,7 @@ fn test_eu4_kandy_bin_zst() {
     skip_if_no_tokens!();
     let file = utils::request_file("kandy2.bin.zst.eu4");
     let file = Eu4File::from_file(file).unwrap();
-    let save = file.parse_save(&*TOKENS).unwrap();
+    let save = file.parse_save(&TOKENS.resolver()).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "BHA");
 }
@@ -178,8 +177,8 @@ fn test_eu4_same_campaign_id() {
     let file2 = utils::request_file("ita2_later.eu4");
     let file = Eu4File::from_file(file).unwrap();
     let file2 = Eu4File::from_file(file2).unwrap();
-    let save = file.parse_save(&*TOKENS).unwrap();
-    let save2 = file2.parse_save(&*TOKENS).unwrap();
+    let save = file.parse_save(&TOKENS.resolver()).unwrap();
+    let save2 = file2.parse_save(&TOKENS.resolver()).unwrap();
     assert_eq!(save.meta.campaign_id, save2.meta.campaign_id);
     assert!(save.meta.date < save2.meta.date);
 }
@@ -189,7 +188,7 @@ fn test_eu4_ita1() {
     skip_if_no_tokens!();
     let file = utils::request_file("ita1.eu4");
     let file = Eu4File::from_file(file).unwrap();
-    let save = file.parse_save(&*TOKENS).unwrap();
+    let save = file.parse_save(&TOKENS.resolver()).unwrap();
     assert_eq!(file.encoding(), Encoding::BinaryZip);
     assert_eq!(save.meta.player, "ITA");
     let settings = &save.game.gameplay_settings.options;
@@ -222,7 +221,7 @@ fn test_inheritance_values() {
     skip_if_no_tokens!();
     let file = utils::request_file("patch132.eu4");
     let file = Eu4File::from_file(file).unwrap();
-    let save = file.parse_save(&*TOKENS).unwrap();
+    let save = file.parse_save(&TOKENS.resolver()).unwrap();
     let query = Query::from_save(save);
 
     let inherit = query.inherit(&query.save_country(&"WUR".parse().unwrap()).unwrap());
@@ -241,17 +240,17 @@ fn test_inheritance_values() {
 fn test_roundtrip_melt() {
     skip_if_no_tokens!();
     let file = utils::request_file("kandy2.bin.eu4");
-    let mut file = Eu4File::from_file(file).unwrap();
+    let file = Eu4File::from_file(file).unwrap();
     let mut out = Cursor::new(Vec::new());
     file.melt(
         MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Error),
-        &*TOKENS,
+        &TOKENS.resolver(),
         &mut out,
     )
     .unwrap();
 
     let file = Eu4File::from_slice(out.get_ref().as_slice()).unwrap();
-    let save = file.parse_save(&*TOKENS).unwrap();
+    let save = file.parse_save(&TOKENS.resolver()).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "BHA");
 }
@@ -263,7 +262,7 @@ macro_rules! ironman_test {
             fn [<test_ $name>]() {
                 skip_if_no_tokens!();
                 let file = utils::request_file($fp);
-                let mut file = Eu4File::from_file(file).unwrap();
+                let file = Eu4File::from_file(file).unwrap();
 
                 // Ensure that every ironman can be melted with all tokens resolvable.
                 // Deserialization will not try and resolve tokens that aren't used. Melting
@@ -271,11 +270,11 @@ macro_rules! ironman_test {
                 let mut out = Cursor::new(Vec::new());
                 file.melt(
                     MeltOptions::new().on_failed_resolve(FailedResolveStrategy::Error),
-                    &*TOKENS,
+                    &TOKENS.resolver(),
                     &mut out,
                 ).unwrap();
 
-                let save = file.parse_save(&*TOKENS).unwrap();
+                let save = file.parse_save(&TOKENS.resolver()).unwrap();
 
                 assert_eq!(file.encoding(), Encoding::BinaryZip);
                 let expected = $query;

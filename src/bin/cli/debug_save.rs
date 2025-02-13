@@ -1,4 +1,4 @@
-use eu4save::{BasicTokenResolver, Eu4File};
+use eu4save::{Eu4File, SegmentedResolver};
 use std::{error::Error, time::Instant};
 
 pub fn run(path: &str) -> Result<(), Box<dyn Error>> {
@@ -7,7 +7,8 @@ pub fn run(path: &str) -> Result<(), Box<dyn Error>> {
 
     let start = Instant::now();
     let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();
-    let resolver = BasicTokenResolver::from_text_lines(file_data.as_slice())?;
+    let resolver_builder = SegmentedResolver::parse(file_data.as_slice())?;
+    let resolver = resolver_builder.resolver();
     let save = file.parse_save(&resolver)?;
     let after_parse = Instant::now();
     println!("parse: {}ms", after_parse.duration_since(start).as_millis());

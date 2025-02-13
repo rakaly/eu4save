@@ -1,4 +1,4 @@
-use eu4save::{BasicTokenResolver, CountryTag, Eu4File};
+use eu4save::{CountryTag, Eu4File, SegmentedResolver};
 use std::{collections::HashSet, error::Error, fmt::Display};
 
 #[derive(Debug)]
@@ -50,7 +50,8 @@ pub fn run(path: &str) -> Result<(), Box<dyn Error>> {
     let file = Eu4File::from_file(file)?;
 
     let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();
-    let resolver = BasicTokenResolver::from_text_lines(file_data.as_slice())?;
+    let resolver_builder = SegmentedResolver::parse(file_data.as_slice())?;
+    let resolver = resolver_builder.resolver();
     let save = file.parse_save(&resolver)?;
     deduce_vec(
         save.game
