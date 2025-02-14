@@ -1,7 +1,6 @@
 use crate::file::Eu4FileEntryName;
 use jomini::binary;
 use std::{fmt, io};
-use zip::result::ZipError;
 
 /// An EU4 Error
 #[derive(thiserror::Error, Debug)]
@@ -30,15 +29,6 @@ impl From<Eu4ErrorKind> for Eu4Error {
 pub enum Eu4ErrorKind {
     #[error("zip error: {0}")]
     Zip(#[from] rawzip::Error),
-
-    #[error("unable to parse as zip: {0}")]
-    ZipArchive(#[from] ZipError),
-
-    #[error("unable to inflate zip entry: {msg}")]
-    ZipBadData { msg: String },
-
-    #[error("early eof, only able to write {written} bytes")]
-    ZipEarlyEof { written: usize },
 
     #[error("unknown header found in zip entry. Must be EU4txt or EU4bin")]
     ZipHeader,
@@ -75,23 +65,28 @@ pub enum Eu4ErrorKind {
 
     #[error("io error: {0}")]
     Io(#[from] io::Error),
+
+    #[error("invalid syntax: {0}")]
+    InvalidSyntax(String),
 }
 
 impl From<jomini::Error> for Eu4Error {
     fn from(value: jomini::Error) -> Self {
-        let kind = match value.into_kind() {
-            jomini::ErrorKind::Deserialize(x) => match x.kind() {
-                &jomini::DeserializeErrorKind::UnknownToken { token_id } => {
-                    Eu4ErrorKind::UnknownToken { token_id }
-                }
-                _ => Eu4ErrorKind::Deserialize(x),
-            },
-            _ => Eu4ErrorKind::DeserializeImpl {
-                msg: String::from("unexpected error"),
-            },
-        };
+        if let jomini::ErrorKind::Deserialize(_) = value.kind() {
+            let jomini::ErrorKind::Deserialize(x) = value.into_kind() else {
+                unreachable!("Error should be a deserialize error")
+            };
 
-        Eu4Error::new(kind)
+            if let jomini::DeserializeErrorKind::UnknownToken { token_id } = x.kind() {
+                Eu4Error::new(Eu4ErrorKind::UnknownToken {
+                    token_id: *token_id,
+                })
+            } else {
+                Eu4Error::new(Eu4ErrorKind::Deserialize(x))
+            }
+        } else {
+            Eu4Error::new(Eu4ErrorKind::Parse(value))
+        }
     }
 }
 

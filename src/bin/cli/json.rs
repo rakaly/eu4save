@@ -26,7 +26,7 @@ pub fn run(path: &str) -> Result<(), Box<dyn Error>> {
         }
         Eu4FsFileKind::Binary(x) => {
             let mut buf = Vec::new();
-            x.melt(melt_options, resolver, &mut buf)?;
+            x.as_ref().melt(melt_options, resolver, &mut buf)?;
             let text = Eu4ParsedText::from_slice(&buf)?;
             json_to_stdout(&text);
         }

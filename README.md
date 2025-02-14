@@ -5,10 +5,10 @@
 EU4 Save is a library to ergonomically work with EU4 saves (ironman + mp).
 
 ```rust
-use eu4save::{Eu4File, Encoding, CountryTag, EnvTokens};
+use eu4save::{Eu4File, Encoding, CountryTag, SegmentedResolver};
 let data = std::fs::read("assets/saves/eng.txt.compressed.eu4")?;
 let file = Eu4File::from_slice(&data)?;
-let save = file.parse_save(&EnvTokens)?;
+let save = file.parse_save(&SegmentedResolver)?;
 assert_eq!(file.encoding(), Encoding::TextZip);
 assert_eq!(save.meta.player, "ENG".parse()?);
 ```

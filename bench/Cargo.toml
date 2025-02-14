@@ -21,8 +21,10 @@ path = "src/bench.rs"
 
 [dependencies]
 criterion = "0.5.1"
+erased-serde = "0.4.5"
 eu4save = { path = "../" }
 rawzip = "0.0.5"
+serde_path_to_error = "0.1.16"
 
 [profile.release]
 debug = true
