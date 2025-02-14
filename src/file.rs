@@ -99,10 +99,7 @@ where
         Eu4Binary(&self.0)
     }
 
-    pub fn deserializer<'a, 'b>(
-        self,
-        resolver: &'a SegmentedResolver<'b>,
-    ) -> Eu4Modeller<'a, 'b>
+    pub fn deserializer<'a, 'b>(self, resolver: &'a SegmentedResolver<'b>) -> Eu4Modeller<'a, 'b>
     where
         R: Read + 'a,
     {
