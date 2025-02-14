@@ -1,5 +1,3 @@
-use std::{io::Cursor, sync::LazyLock};
-
 use crate::utils;
 use eu4save::{
     models::{GameDifficulty, ProvinceEvent, ProvinceEventValue, TaxManpowerModifier},
@@ -10,7 +8,9 @@ use eu4save::{
     CountryTag, Encoding, Eu4Date, Eu4File, FailedResolveStrategy, MeltOptions, PdsDate,
     ProvinceId, SegmentedResolver, SegmentedResolverBuilder,
 };
+use highway::{HighwayHash, HighwayHasher};
 use paste::paste;
+use std::{io::Cursor, sync::LazyLock};
 
 static TOKENS: LazyLock<SegmentedResolverBuilder> = LazyLock::new(|| {
     let file_data = std::fs::read("assets/eu4.txt").unwrap_or_default();
@@ -58,6 +58,12 @@ fn test_eu4_bin() {
         player_names: Vec::new(),
     }];
     assert_eq!(expected_histories, histories);
+
+    let mut output = Vec::new();
+    file.melt(MeltOptions::new(), &TOKENS.resolver(), &mut output)
+        .unwrap();
+    let checksum = HighwayHasher::default().hash256(output.as_slice());
+    insta::assert_snapshot!(format!("{:016x}{:016x}{:016x}{:016x}", checksum[0], checksum[1], checksum[2], checksum[3]), @"83441f7282de4f211b37fba460ff71c55c91c7552e68ac8ac56f4700a124fa7a");
 }
 
 #[test]

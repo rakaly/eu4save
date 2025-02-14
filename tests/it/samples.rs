@@ -6,8 +6,9 @@ use eu4save::{
         BuildingConstruction, BuildingEvent, NationEvent, NationEventKind, NationEvents,
         PlayerHistory, Query,
     },
-    Encoding, Eu4Date, Eu4File, PdsDate, ProvinceId, SegmentedResolver,
+    Encoding, Eu4Date, Eu4File, MeltOptions, PdsDate, ProvinceId, SegmentedResolver,
 };
+use highway::{HighwayHash, HighwayHasher};
 use std::{collections::HashMap, error::Error};
 
 #[test]
@@ -73,6 +74,11 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     assert_eq!(inherit.end_t2_year, 1463);
 
     assert_eq!(histories, expected_histories);
+
+    let mut output = Vec::new();
+    file.melt(MeltOptions::new(), &SegmentedResolver::empty(), &mut output)?;
+    let checksum = HighwayHasher::default().hash256(output.as_slice());
+    insta::assert_snapshot!(format!("{:016x}{:016x}{:016x}{:016x}", checksum[0], checksum[1], checksum[2], checksum[3]), @"6f4a62395ed5c6e2e62d362763fff9ed1ff4e1e923401aaad35c2f89edc49b8d");
 
     Ok(())
 }
@@ -301,6 +307,11 @@ pub fn parse_multiplayer_saves() -> Result<(), Box<dyn Error>> {
             player_names: vec![String::from("TheOnlySimen"), String::from("Strawman")],
         }
     );
+
+    let mut output = Vec::new();
+    file.melt(MeltOptions::new(), &SegmentedResolver::empty(), &mut output)?;
+    let checksum = HighwayHasher::default().hash256(output.as_slice());
+    insta::assert_snapshot!(format!("{:016x}{:016x}{:016x}{:016x}", checksum[0], checksum[1], checksum[2], checksum[3]), @"c894bda05e79a131dad5419e4e909e3f2d58df1aea1922f938aaa70a52e44f8f");
 
     Ok(())
 }
