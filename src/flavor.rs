@@ -11,9 +11,25 @@ impl Eu4Flavor {
     }
 }
 
+/// Converts a utf-16 encoded string to a utf-8 encoded string. This is for the
+/// Chinese supplementary mod: https://github.com/matanki-saito/EU4dll
+#[cold]
+fn to_utf16(data: &[u8]) -> String {
+    let pairs = data
+        .chunks_exact(2)
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]));
+
+    char::decode_utf16(pairs).flat_map(Result::ok).collect()
+}
+
 impl Encoding for Eu4Flavor {
     fn decode<'a>(&self, data: &'a [u8]) -> std::borrow::Cow<'a, str> {
-        self.0.decode(data)
+        // Heuristic to detect utf-16 encoded strings
+        if matches!(data.get(0), Some(&0x10) | Some(&0x12)) {
+            std::borrow::Cow::Owned(to_utf16(data))
+        } else {
+            self.0.decode(data)
+        }
     }
 }
 
