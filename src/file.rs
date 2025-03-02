@@ -37,7 +37,7 @@ impl Eu4File {
             }),
             None => {
                 let archive = rawzip::ZipArchive::from_slice(data).map_err(Eu4ErrorKind::Zip)?;
-                let archive = archive.into_owned();
+                let archive = archive.into_reader();
 
                 let mut buf = vec![0u8; rawzip::RECOMMENDED_BUFFER_SIZE];
                 let archive = Eu4Zip::try_from_archive(archive, &mut buf)?;
