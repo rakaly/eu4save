@@ -25,7 +25,7 @@ fn to_utf16(data: &[u8]) -> String {
 impl Encoding for Eu4Flavor {
     fn decode<'a>(&self, data: &'a [u8]) -> std::borrow::Cow<'a, str> {
         // Heuristic to detect utf-16 encoded strings
-        if matches!(data.get(0), Some(&0x10) | Some(&0x12)) {
+        if matches!(data.first(), Some(&0x10) | Some(&0x12)) {
             std::borrow::Cow::Owned(to_utf16(data))
         } else {
             self.0.decode(data)
