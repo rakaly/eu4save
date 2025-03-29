@@ -3,6 +3,7 @@ mod country_history;
 mod gameplay_settings;
 mod leader_kind;
 mod list_overflow_byte;
+mod map_capacity;
 mod map_pair;
 mod positive_vec;
 mod province_event_value;
@@ -15,6 +16,7 @@ mod yes_map;
 
 pub(crate) use alternating_key_values::*;
 pub(crate) use list_overflow_byte::*;
+pub(crate) use map_capacity::*;
 pub(crate) use map_pair::*;
 pub(crate) use positive_vec::*;
 pub(crate) use token_bool::*;

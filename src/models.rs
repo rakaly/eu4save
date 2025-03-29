@@ -201,8 +201,12 @@ pub struct GameState {
     pub religions: Vec<(String, ReligionGameState)>,
     pub religion_instance_data: HashMap<String, ReligionInstanceDatum>,
     pub empire: Option<HRE>,
-    #[jomini(default, deserialize_with = "deserialize_vec_pair")]
+    #[jomini(
+        default,
+        deserialize_with = "deserialize_vec_pair_with_capacity::<_, _, _, 1400>"
+    )]
     pub countries: Vec<(CountryTag, Country)>,
+    #[jomini(deserialize_with = "deserialize_map_with_capacity::<_, _, _, 5000>")]
     pub provinces: HashMap<ProvinceId, Province>,
     pub income_statistics: LedgerData,
     pub nation_size_statistics: LedgerData,
