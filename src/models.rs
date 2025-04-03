@@ -1080,6 +1080,17 @@ pub struct Ship {
     pub morale: f32,
     #[serde(default = "default_strength")]
     pub strength: f32,
+    pub flagship: Option<Flagship>,
+}
+
+#[derive(Debug, Clone, JominiDeserialize)]
+#[cfg_attr(feature = "serialize", derive(Serialize))]
+pub struct Flagship {
+    pub name: String,
+    pub original_owner: CountryTag,
+    pub is_captured: bool,
+    #[jomini(duplicated, alias = "modification")]
+    pub modifications: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
