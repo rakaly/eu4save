@@ -751,7 +751,7 @@ ironman_test!(
         date: Eu4Date::parse("1800.01.01").unwrap()
     },
     |query: Query, _melted_data: &[u8]| {
-        assert_eq!(query.save().meta.displayed_country_name, "⠐ႄ卢倐");
+        assert_eq!(query.save().meta.displayed_country_name, "萨卢佐");
     }
 );
 
