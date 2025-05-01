@@ -1328,7 +1328,7 @@ fn nation_events(save: &Eu4Save, province_owners: &ProvinceOwners) -> Vec<Nation
                 NationEventKind::TagSwitch(t) => Some(t),
                 _ => None,
             })
-            .last()
+            .next_back()
             .unwrap_or(initial);
 
         // If a stored tag never owned a province in the entire playthrough, exclude it
