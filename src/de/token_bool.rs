@@ -11,7 +11,7 @@ where
         type Value = bool;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a string containing json data")
+            formatter.write_str("a string containing bool data")
         }
 
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>

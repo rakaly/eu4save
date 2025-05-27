@@ -41,6 +41,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                 let mut primary_culture = None;
                 let mut religion = None;
                 let mut add_government_reform = Vec::new();
+                let mut capital = None;
                 let mut events = Vec::new();
                 let hint = map.size_hint().unwrap_or_default();
                 let estimate = hint.max(8);
@@ -52,6 +53,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                         Chf::PrimaryCulture => primary_culture = Some(map.next_value()?),
                         Chf::Religion => religion = Some(map.next_value()?),
                         Chf::AddGovernmentReform => add_government_reform.push(map.next_value()?),
+                        Chf::Capital => capital = Some(map.next_value()?),
                         Chf::Date(date) => map.next_value_seed(ExtendVec {
                             date,
                             estimate,
@@ -62,6 +64,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                         }
                     }
                 }
+
                 Ok(CountryHistory {
                     government,
                     technology_group,
@@ -69,6 +72,7 @@ impl<'de> Deserialize<'de> for CountryHistory {
                     religion,
                     add_government_reform,
                     events,
+                    capital,
                 })
             }
         }
@@ -85,6 +89,7 @@ enum Chf {
     PrimaryCulture,
     Religion,
     TechnologyGroup,
+    Capital,
 }
 
 impl<'de> de::Deserialize<'de> for Chf {
@@ -110,6 +115,7 @@ impl<'de> de::Deserialize<'de> for Chf {
                     "primary_culture" => Ok(Chf::PrimaryCulture),
                     "religion" => Ok(Chf::Religion),
                     "add_government_reform" => Ok(Chf::AddGovernmentReform),
+                    "capital" => Ok(Chf::Capital),
                     x => Eu4Date::parse(x).map(Chf::Date).or(Ok(Chf::Other)),
                 }
             }

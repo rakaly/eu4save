@@ -40,6 +40,8 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                 let mut base_production = None;
                 let mut base_manpower = None;
                 let mut religion = None;
+                let mut hre = false;
+                let mut is_city = false;
                 let mut events = Vec::new();
                 let mut other = HashMap::new();
                 let hint = map.size_hint().unwrap_or_default();
@@ -57,6 +59,8 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                             estimate,
                             events: &mut events,
                         })?,
+                        Phf::Hre => hre = map.next_value::<HistoryBool>()?.0,
+                        Phf::IsCity => is_city = map.next_value()?,
                         Phf::Other(key) => {
                             if let x @ ProvinceEventValue::Bool(_) = map.next_value()? {
                                 other.insert(key.to_string(), x);
@@ -75,6 +79,8 @@ impl<'de> Deserialize<'de> for ProvinceHistory {
                     base_production,
                     base_manpower,
                     religion,
+                    hre,
+                    is_city,
                     events,
                     other,
                 })
@@ -95,6 +101,7 @@ enum Phf {
     Date(Eu4Date),
     DiscoveredBy,
     Hre,
+    IsCity,
     Other(String),
     Owner,
     Religion,
@@ -130,6 +137,7 @@ impl<'de> de::Deserialize<'de> for Phf {
                     "capital" => Ok(Phf::Capital),
                     "add_core" => Ok(Phf::AddCore),
                     "hre" => Ok(Phf::Hre),
+                    "is_city" => Ok(Phf::IsCity),
                     x => {
                         if let Ok(date) = Eu4Date::parse(x) {
                             Ok(Phf::Date(date))
@@ -152,15 +160,18 @@ enum Pef {
     BaseManpower,
     BaseProduction,
     BaseTax,
+    Capital,
     Controller,
     Culture,
     DiscoveredBy,
+    Hre,
     IsCity,
     Other(String),
     Owner,
     Religion,
     RemoveClaim,
     RemoveCore,
+    TradeCompany,
     TradeGoods,
 }
 
@@ -182,21 +193,24 @@ impl<'de> de::Deserialize<'de> for Pef {
                 E: de::Error,
             {
                 match v {
-                    "owner" => Ok(Pef::Owner),
-                    "controller" => Ok(Pef::Controller),
-                    "base_tax" => Ok(Pef::BaseTax),
+                    "add_claim" => Ok(Pef::AddClaim),
+                    "add_core" => Ok(Pef::AddCore),
+                    "advisor" => Ok(Pef::Advisor),
                     "base_manpower" => Ok(Pef::BaseManpower),
                     "base_production" => Ok(Pef::BaseProduction),
-                    "religion" => Ok(Pef::Religion),
-                    "add_claim" => Ok(Pef::AddClaim),
-                    "remove_claim" => Ok(Pef::RemoveClaim),
-                    "add_core" => Ok(Pef::AddCore),
-                    "remove_core" => Ok(Pef::RemoveCore),
-                    "advisor" => Ok(Pef::Advisor),
-                    "trade_goods" => Ok(Pef::TradeGoods),
-                    "discovered_by" => Ok(Pef::DiscoveredBy),
+                    "base_tax" => Ok(Pef::BaseTax),
+                    "capital" => Ok(Pef::Capital),
+                    "controller" => Ok(Pef::Controller),
                     "culture" => Ok(Pef::Culture),
+                    "discovered_by" => Ok(Pef::DiscoveredBy),
+                    "hre" => Ok(Pef::Hre),
                     "is_city" => Ok(Pef::IsCity),
+                    "owner" => Ok(Pef::Owner),
+                    "religion" => Ok(Pef::Religion),
+                    "remove_claim" => Ok(Pef::RemoveClaim),
+                    "remove_core" => Ok(Pef::RemoveCore),
+                    "trade_goods" => Ok(Pef::TradeGoods),
+                    "tradecompany" => Ok(Pef::TradeCompany),
                     x => Ok(Pef::Other(String::from(x))),
                 }
             }
@@ -258,6 +272,11 @@ impl<'de> de::DeserializeSeed<'de> for ExtendVec<'_> {
                         Pef::BaseManpower => ProvinceEvent::BaseManpower(map.next_value()?),
                         Pef::BaseProduction => ProvinceEvent::BaseProduction(map.next_value()?),
                         Pef::Religion => ProvinceEvent::Religion(map.next_value()?),
+                        Pef::Hre => ProvinceEvent::Hre(map.next_value::<HistoryBool>()?.0),
+                        Pef::IsCity => ProvinceEvent::IsCity(map.next_value()?),
+                        Pef::TradeCompany => {
+                            ProvinceEvent::TradeCompany(map.next_value::<HistoryBool>()?.0)
+                        }
                         Pef::Other(key) => {
                             if let x @ ProvinceEventValue::Bool(_) = map.next_value()? {
                                 ProvinceEvent::KV((key, x))
@@ -290,5 +309,55 @@ impl<'de> de::DeserializeSeed<'de> for ExtendVec<'_> {
             estimate: self.estimate,
             events: self.events,
         })
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+struct HistoryBool(bool);
+
+impl<'de> Deserialize<'de> for HistoryBool {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct HistoryBoolVisitor;
+
+        impl<'de> de::Visitor<'de> for HistoryBoolVisitor {
+            type Value = HistoryBool;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a string containing bool data")
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(HistoryBool(v == "yes"))
+            }
+
+            fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(HistoryBool(v == "yes"))
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(HistoryBool(v == "yes"))
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(HistoryBool(v))
+            }
+        }
+
+        deserializer.deserialize_bool(HistoryBoolVisitor)
     }
 }

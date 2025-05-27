@@ -475,6 +475,8 @@ pub struct ProvinceHistory {
     pub base_production: Option<f32>,
     pub base_manpower: Option<f32>,
     pub religion: Option<String>,
+    pub hre: bool,
+    pub is_city: bool,
     pub other: HashMap<String, ProvinceEventValue>,
     pub events: Vec<(Eu4Date, ProvinceEvent)>,
 }
@@ -482,12 +484,15 @@ pub struct ProvinceHistory {
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(feature = "serialize", derive(Serialize))]
 pub enum ProvinceEvent {
-    Owner(CountryTag),
-    Controller(ControllerEvent),
-    BaseTax(f32),
-    BaseProduction(f32),
     BaseManpower(f32),
+    BaseProduction(f32),
+    BaseTax(f32),
+    Controller(ControllerEvent),
+    Hre(bool),
+    IsCity(bool),
+    Owner(CountryTag),
     Religion(String),
+    TradeCompany(bool),
     KV((String, ProvinceEventValue)),
 }
 
@@ -790,6 +795,7 @@ pub struct CountryHistory {
     pub technology_group: Option<String>,
     pub primary_culture: Option<String>,
     pub religion: Option<String>,
+    pub capital: Option<ProvinceId>,
     pub add_government_reform: Vec<String>,
     pub events: Vec<(Eu4Date, CountryEvent)>,
 }
