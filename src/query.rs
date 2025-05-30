@@ -1,7 +1,6 @@
 use crate::{
     models::{
-        Country, CountryEvent, Eu4Save, LedgerData, LedgerDatum, Province, ProvinceEvent,
-        ProvinceEventValue, WarEvent,
+        Country, CountryEvent, EntityId, Eu4Save, LedgerData, LedgerDatum, NationalFocus, Province, ProvinceEvent, ProvinceEventValue, WarEvent
     },
     ProvinceId, TagResolver,
 };
@@ -595,7 +594,7 @@ impl Query {
         let hre_ruler = hre_controller
             .and_then(|x| self.country(&x))
             .and_then(|x| x.monarch.as_ref())
-            .map(|x| i64::from(x.id))
+            .map(|x| i64::from(u32::from(x.id)))
             .unwrap_or_default();
 
         let papacy_controller = self
@@ -626,14 +625,14 @@ impl Query {
             .country
             .monarch
             .as_ref()
-            .map(|x| i64::from(x.id))
+            .map(|x| i64::from(u32::from(x.id)))
             .unwrap_or_default();
 
         let previous_rulers = country
             .country
             .previous_monarchs
             .iter()
-            .map(|x| i64::from(x.id))
+            .map(|x| i64::from(u32::from(x.id)))
             .sum::<i64>();
 
         let heir = country
@@ -653,7 +652,7 @@ impl Query {
                 let enabled = x.birth_date.days_until(&self.save().meta.date) < 15 * 365;
                 HeirInheritanceCalculation {
                     enabled,
-                    heir_id: Some(i64::from(x.id.id)),
+                    heir_id: Some(i64::from(u32::from(x.id.id))),
                 }
             })
             .unwrap_or_else(|| HeirInheritanceCalculation {
@@ -1537,4 +1536,73 @@ mod tests {
         let result = binary_search_all(&data, |x| x.cmp(&2));
         assert!(result.is_empty());
     }
+}
+
+
+struct ProvinceEvents {
+    dates: Vec<Eu4Date>,
+    counts: Vec<u32>, // number of events on a given date
+    provinces: Vec<ProvinceId>,
+    events: Vec<ProvinceEventKind>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct ReligionInd(u16);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct CultureInd(u16);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct BuildingInd(u16);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct WarInd(u16);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct InHre(bool);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct InTradeCompany(bool);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct NameInd(u32);
+
+enum ProvinceEventKind {
+    Battle(WarInd),
+    Constructed(BuildingInd),
+    Controller(CountryTag),
+    Culture(CultureInd),
+    Demolished(BuildingInd),
+    InHre(InHre),
+    InTradeCompany(InTradeCompany),
+    Owner(CountryTag),
+    Religion(ReligionInd),
+}
+
+enum CountryEventKind {
+    AddAcceptedCulture(CultureInd),
+    Annexed,
+    Appeared,
+    Capital(ProvinceId),
+    CountryAdjective(NameInd),
+    CountryName(NameInd),
+    Decision(NameInd),
+    Flag(NameInd),
+    GoldenEra,
+    GrantedEstatePrivilege(NameInd),
+    Heir(EntityId),
+    Leader(EntityId),
+    MapColor([u8; 3]),
+    Monarch(EntityId),
+    MonarchConsort(EntityId),
+    MonarchHeir(EntityId),
+    NationalFocus(NationalFocus),
+    Peace { war: WarInd, separate_peace: bool },
+    PrimaryCulture(CultureInd),
+    Queen(EntityId),
+    Religion(ReligionInd),
+    RemoveAcceptedCulture(CultureInd),
+    TagSwitch(CountryTag),
+    Union(EntityId),
+    War { war: WarInd,  main_participant: bool, is_attacker: bool },
 }

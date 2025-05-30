@@ -808,8 +808,8 @@ pub enum CountryEvent {
     MonarchHeir(Monarch),
     MonarchConsort(Monarch),
     Queen(Monarch),
-    Union(u32),
-    Capital(u32),
+    Union(EntityId),
+    Capital(ProvinceId),
     ChangedCountryNameFrom(String),
     ChangedCountryAdjectiveFrom(String),
     ChangedCountryMapColorFrom(
@@ -1102,9 +1102,39 @@ pub struct Flagship {
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
 pub struct ObjId {
-    pub id: u32,
+    pub id: EntityId,
     #[serde(alias = "type")]
     pub _type: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize, Default)]
+#[cfg_attr(feature = "tsify", derive(tsify::Tsify))]
+pub struct EntityId(u32);
+
+impl EntityId {
+    #[inline]
+    pub const fn new(id: u32) -> Self {
+        EntityId(id)
+    }
+
+    #[inline]
+    pub const fn value(&self) -> u32 {
+        self.0
+    }
+}
+
+impl From<u32> for EntityId {
+    #[inline]
+    fn from(id: u32) -> Self {
+        EntityId::new(id)
+    }
+}
+
+impl From<EntityId> for u32 {
+    #[inline]
+    fn from(id: EntityId) -> Self {
+        id.value()
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
