@@ -294,7 +294,7 @@ where
 
         while let Ok(Some(entry)) = entries.next_entry() {
             let compression = entry.compression_method();
-            match entry.file_raw_path() {
+            match entry.file_path().as_ref() {
                 b"meta" => {
                     let wayfinder = entry.wayfinder();
                     meta = Some(wayfinder);
