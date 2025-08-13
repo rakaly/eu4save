@@ -27,7 +27,7 @@ const BIN_HEADER: &[u8] = b"EU4bin";
 pub struct Eu4File {}
 
 impl Eu4File {
-    pub fn from_slice(data: &[u8]) -> Result<Eu4SliceFile, Eu4Error> {
+    pub fn from_slice(data: &[u8]) -> Result<Eu4SliceFile<'_>, Eu4Error> {
         match file_header(data) {
             Some((FileHeader::Text, data)) => Ok(Eu4SliceFile {
                 kind: Eu4SliceFileKind::Text(Eu4Text(data)),
@@ -143,7 +143,7 @@ pub struct Eu4SliceFile<'a> {
 }
 
 impl<'a> Eu4SliceFile<'a> {
-    pub fn kind(&self) -> &Eu4SliceFileKind {
+    pub fn kind(&self) -> &Eu4SliceFileKind<'_> {
         &self.kind
     }
 
@@ -705,7 +705,7 @@ impl<'a> Eu4ParsedText<'a> {
         Ok(Eu4ParsedText { tape })
     }
 
-    pub fn reader(&self) -> ObjectReader<Windows1252Encoding> {
+    pub fn reader(&self) -> ObjectReader<'_, '_, Windows1252Encoding> {
         self.tape.windows1252_reader()
     }
 }

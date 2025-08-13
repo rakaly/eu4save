@@ -89,7 +89,7 @@ impl TagResolver {
 
     /// Create a resolver that only considers nation events priot to the given
     /// date.
-    pub fn at(&self, date: Eu4Date) -> TagResolverDated {
+    pub fn at(&self, date: Eu4Date) -> TagResolverDated<'_> {
         TagResolverDated { inner: self, date }
     }
 }

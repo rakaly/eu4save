@@ -108,7 +108,7 @@ impl SegmentedResolverBuilder {
         self.values.is_empty()
     }
 
-    pub fn resolver(&self) -> SegmentedResolver {
+    pub fn resolver(&self) -> SegmentedResolver<'_> {
         SegmentedResolver {
             values: self.values.iter().map(|x| x.as_str()).collect(),
             lower_sequence_end: self.lower_sequence_end,

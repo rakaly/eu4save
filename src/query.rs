@@ -429,7 +429,7 @@ impl Query {
         &self.save
     }
 
-    pub fn countries(&self) -> impl Iterator<Item = SaveCountry> + '_ {
+    pub fn countries(&self) -> impl Iterator<Item = SaveCountry<'_>> + '_ {
         self.save
             .game
             .countries
@@ -442,7 +442,7 @@ impl Query {
             })
     }
 
-    pub fn save_country(&self, tag: &CountryTag) -> Option<SaveCountry> {
+    pub fn save_country(&self, tag: &CountryTag) -> Option<SaveCountry<'_>> {
         self.tag_lookup.get(tag).and_then(|tag_id| {
             self.save
                 .game
