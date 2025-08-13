@@ -18,8 +18,11 @@ use std::{
     io::{Read, Write},
 };
 
-#[cfg(feature = "zstd")]
+#[cfg(feature = "zstd_c")]
 use std::io::BufReader;
+
+#[cfg(feature = "zstd_rust")]
+use ruzstd::decoding::{StreamingDecoder, FrameDecoder};
 
 const TXT_HEADER: &[u8] = b"EU4txt";
 const BIN_HEADER: &[u8] = b"EU4bin";
@@ -621,8 +624,10 @@ impl<'de, 'a: 'de, R: jomini::binary::TokenResolver> serde::de::Deserializer<'de
 
 enum CompressedReaderKind<R: Read> {
     Deflate(flate2::read::DeflateDecoder<R>),
-    #[cfg(feature = "zstd")]
-    Zstd(zstd::stream::Decoder<'static, BufReader<R>>),
+    #[cfg(feature = "zstd_c")]
+    ZstdC(zstd::stream::Decoder<'static, BufReader<R>>),
+    #[cfg(feature = "zstd_rust")]
+    ZstdRust(StreamingDecoder<R, FrameDecoder>),
 }
 
 struct CompressedFileReader<R: Read> {
@@ -641,12 +646,24 @@ impl<R: Read> CompressedFileReader<R> {
                     reader: CompressedReaderKind::Deflate(inflater),
                 })
             }
-            #[cfg(feature = "zstd")]
+            #[cfg(any(feature = "zstd_c", feature = "zstd_rust"))]
             CompressionMethod::Zstd => {
-                let inflater = zstd::Decoder::new(reader)?;
-                Ok(CompressedFileReader {
-                    reader: CompressedReaderKind::Zstd(inflater),
-                })
+                #[cfg(feature = "zstd_c")]
+                {
+                    let inflater = zstd::Decoder::new(reader)?;
+                    Ok(CompressedFileReader {
+                        reader: CompressedReaderKind::ZstdC(inflater),
+                    })
+                }
+                #[cfg(all(feature = "zstd_rust", not(feature = "zstd_c")))]
+                {
+                    let inflater = StreamingDecoder::new(reader).map_err(|e| {
+                        Eu4ErrorKind::InvalidSyntax(format!("Failed to create ruzstd decoder: {}", e))
+                    })?;
+                    Ok(CompressedFileReader {
+                        reader: CompressedReaderKind::ZstdRust(inflater),
+                    })
+                }
             }
             _ => Err(Eu4ErrorKind::UnknownCompression.into()),
         }
@@ -660,8 +677,10 @@ where
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match &mut self.reader {
             CompressedReaderKind::Deflate(reader) => reader.read(buf),
-            #[cfg(feature = "zstd")]
-            CompressedReaderKind::Zstd(reader) => reader.read(buf),
+            #[cfg(feature = "zstd_c")]
+            CompressedReaderKind::ZstdC(reader) => reader.read(buf),
+            #[cfg(feature = "zstd_rust")]
+            CompressedReaderKind::ZstdRust(reader) => reader.read(buf),
         }
     }
 }

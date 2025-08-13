@@ -13,7 +13,8 @@ categories = ["parsing"]
 
 [features]
 default = []
-zstd = ["dep:zstd"]
+zstd_c = ["dep:zstd"] # faster but can't be compiled for wasm on windows (preferred)
+zstd_rust = ["dep:ruzstd"] # slower but more compatible
 serialize = []
 tsify = ["dep:tsify", "dep:wasm-bindgen"]
 specta = ["dep:specta"]
@@ -23,6 +24,7 @@ jomini = { version = "0.28.0", features = ["json"] }
 serde = { version = "1.0.195", features = ["derive"] }
 thiserror = "2.0.0"
 zstd = { version = "0.13", default-features = false, optional = true }
+ruzstd = { version = "0.8", optional = true }
 tsify = { version = "0.5.5", default-features = false, optional = true }
 wasm-bindgen = { version = "0.2", default-features = false, optional = true }
 specta = { version = "1.0.4", optional = true }
