@@ -69,3 +69,24 @@ jobs:
       uses: actions/checkout@v4
     - name: Build benchmark
       run: cargo bench --manifest-path bench/Cargo.toml --no-run
+
+  wasm-test:
+    name: WASM cross-compilation test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+        - os: windows-latest
+          target: wasm32-unknown-unknown
+          features: zstd_rust
+        - os: ubuntu-latest
+          target: wasm32-unknown-unknown
+          features: zstd_c
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    - name: Build for WASM with ${{ matrix.features }}
+      run: cargo build --target ${{ matrix.target }} --features ${{ matrix.features }} --verbose

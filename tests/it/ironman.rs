@@ -165,7 +165,7 @@ fn test_eu4_kandy_bin() {
     );
 }
 
-#[cfg(feature = "zstd")]
+#[cfg(any(feature = "zstd_c", feature = "zstd_rust"))]
 #[test]
 fn test_eu4_kandy_bin_zst() {
     skip_if_no_tokens!();
