@@ -3,3 +3,4 @@ assets/saves/*
 **/*.rs.bk
 Cargo.lock
 assets/eu4.txt
+.vscode/settings.json
