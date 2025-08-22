@@ -22,7 +22,7 @@ use std::{
 use std::io::BufReader;
 
 #[cfg(feature = "zstd_rust")]
-use ruzstd::decoding::{StreamingDecoder, FrameDecoder};
+use ruzstd::decoding::{FrameDecoder, StreamingDecoder};
 
 const TXT_HEADER: &[u8] = b"EU4txt";
 const BIN_HEADER: &[u8] = b"EU4bin";
@@ -221,11 +221,11 @@ impl<'a> Eu4SliceFile<'a> {
     }
 }
 
-pub struct Eu4ZipEntry<'archive, R: Read, ReadAt> {
-    reader: ZipVerifier<'archive, CompressedFileReader<R>, ReadAt>,
+pub struct Eu4ZipEntry<R: Read, ReadAt> {
+    reader: ZipVerifier<CompressedFileReader<R>, ReadAt>,
 }
 
-impl<R, ReadAt> Eu4ZipEntry<'_, R, ReadAt>
+impl<R, ReadAt> Eu4ZipEntry<R, ReadAt>
 where
     R: Read,
     ReadAt: ReaderAt,
@@ -260,7 +260,7 @@ where
     }
 }
 
-impl<R, ReadAt> Read for Eu4ZipEntry<'_, R, ReadAt>
+impl<R, ReadAt> Read for Eu4ZipEntry<R, ReadAt>
 where
     R: Read,
     ReadAt: ReaderAt,
@@ -342,7 +342,7 @@ where
     pub fn get(
         &self,
         name: Eu4FileEntryName,
-    ) -> Result<Eu4ZipEntry<'_, rawzip::ZipReader<'_, R>, R>, Eu4Error> {
+    ) -> Result<Eu4ZipEntry<rawzip::ZipReader<&R>, &R>, Eu4Error> {
         let entry = match name {
             Eu4FileEntryName::Meta => self.meta,
             Eu4FileEntryName::Gamestate => self.gamestate,
@@ -658,7 +658,10 @@ impl<R: Read> CompressedFileReader<R> {
                 #[cfg(all(feature = "zstd_rust", not(feature = "zstd_c")))]
                 {
                     let inflater = StreamingDecoder::new(reader).map_err(|e| {
-                        Eu4ErrorKind::InvalidSyntax(format!("Failed to create ruzstd decoder: {}", e))
+                        Eu4ErrorKind::InvalidSyntax(format!(
+                            "Failed to create ruzstd decoder: {}",
+                            e
+                        ))
                     })?;
                     Ok(CompressedFileReader {
                         reader: CompressedReaderKind::ZstdRust(inflater),
