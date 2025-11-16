@@ -28,7 +28,7 @@ ruzstd = { version = "0.8", optional = true }
 tsify = { version = "0.5.5", default-features = false, optional = true }
 wasm-bindgen = { version = "0.2", default-features = false, optional = true }
 specta = { version = "1.0.4", optional = true }
-flate2 = { version = "1.1.0", default-features = false, features = ["zlib-rs"] }
+flate2 = { version = "1.1.5", default-features = false, features = ["zlib-rs"] }
 rawzip = "0.4.0"
 
 [dev-dependencies]
