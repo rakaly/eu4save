@@ -324,6 +324,27 @@ where
                     }
                 },
             },
+            jomini::binary::Token::LookupU8(_) | jomini::binary::Token::LookupU16(_) => {
+                let x = match token {
+                    jomini::binary::Token::LookupU8(v) => v as u16,
+                    jomini::binary::Token::LookupU16(v) => v,
+                    _ => unreachable!(),
+                };
+
+                match resolver.lookup(x) {
+                    Some(s) => wtr.write_unquoted(s.as_bytes())?,
+                    None => match options.on_failed_resolve {
+                        FailedResolveStrategy::Error => {
+                            return Err(Eu4ErrorKind::UnknownToken { token_id: x }.into());
+                        }
+                        _ => {
+                            unknown_tokens.insert(x);
+                            let replacement = format!("__id_0x{x:x}");
+                            wtr.write_unquoted(replacement.as_bytes())?;
+                        }
+                    },
+                }
+            }
         }
     }
 
