@@ -170,6 +170,7 @@ pub struct PlayerHistory {
     pub player_names: Vec<String>,
 }
 
+#[derive(Debug)]
 pub struct ProvinceOwners {
     /// Initial owners of provinces, index using province id
     pub initial: Vec<CountryTag>,
@@ -219,6 +220,7 @@ pub struct ProvinceReligionChange {
     pub date: Eu4Date,
 }
 
+#[derive(Debug)]
 pub struct ReligionLookup {
     religions: Vec<String>,
 }
