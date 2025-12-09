@@ -306,7 +306,9 @@ where
                 }
                 None => match on_failed_resolve {
                     FailedResolveStrategy::Error => {
-                        return Err(Eu4Error::new(Eu4ErrorKind::UnknownToken { token_id: x }))
+                        return Err(Eu4Error::new(Eu4ErrorKind::UnknownToken {
+                            token_id: x as u32,
+                        }))
                     }
                     FailedResolveStrategy::Ignore if wtr.expecting_key() => {
                         let mut next = reader.read()?;
@@ -324,26 +326,10 @@ where
                     }
                 },
             },
-            jomini::binary::Token::LookupU8(_) | jomini::binary::Token::LookupU16(_) => {
-                let x = match token {
-                    jomini::binary::Token::LookupU8(v) => v as u16,
-                    jomini::binary::Token::LookupU16(v) => v,
-                    _ => unreachable!(),
-                };
-
-                match resolver.lookup(x) {
-                    Some(s) => wtr.write_unquoted(s.as_bytes())?,
-                    None => match options.on_failed_resolve {
-                        FailedResolveStrategy::Error => {
-                            return Err(Eu4ErrorKind::UnknownToken { token_id: x }.into());
-                        }
-                        _ => {
-                            unknown_tokens.insert(x);
-                            let replacement = format!("__id_0x{x:x}");
-                            wtr.write_unquoted(replacement.as_bytes())?;
-                        }
-                    },
-                }
+            jomini::binary::Token::Lookup(_) => {
+                return Err(Eu4Error::new(Eu4ErrorKind::InvalidSyntax(
+                    "lookup tokens are not supported in EU4 files".to_string(),
+                )))
             }
         }
     }

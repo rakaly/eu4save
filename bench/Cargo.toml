@@ -23,7 +23,7 @@ path = "src/bench.rs"
 criterion = "0.6.0"
 erased-serde = "0.4.5"
 eu4save = { path = "../" }
-jomini = "0.33"
+jomini = "0.34"
 rawzip = "0.4.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_path_to_error = "0.1.16"

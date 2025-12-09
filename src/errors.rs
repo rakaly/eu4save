@@ -49,7 +49,7 @@ pub enum Eu4ErrorKind {
     Deserialize(#[from] jomini::DeserializeError),
 
     #[error("unknown binary token encountered: {token_id:#x}")]
-    UnknownToken { token_id: u16 },
+    UnknownToken { token_id: u32 },
 
     #[error("country tags must be 3 letters in length")]
     CountryTagIncorrectSize,
