@@ -13,10 +13,9 @@ use std::{collections::HashMap, error::Error};
 
 #[test]
 fn test_eu4_text() -> Result<(), Box<dyn Error>> {
-    let file = utils::request_file("eng.txt.eu4.zip");
-    let data = utils::inflate(file);
+    let file = utils::request_file("eng-txt.eu4");
 
-    let file = Eu4File::from_slice(&data)?;
+    let file = Eu4File::from_file(file)?;
     let save = file.parse_save(&SegmentedResolver::empty())?;
 
     assert_eq!(file.encoding(), Encoding::Text);
@@ -78,7 +77,7 @@ fn test_eu4_text() -> Result<(), Box<dyn Error>> {
     let mut output = Vec::new();
     file.melt(MeltOptions::new(), &SegmentedResolver::empty(), &mut output)?;
     let checksum = HighwayHasher::default().hash256(output.as_slice());
-    insta::assert_snapshot!(format!("{:016x}{:016x}{:016x}{:016x}", checksum[0], checksum[1], checksum[2], checksum[3]), @"6f4a62395ed5c6e2e62d362763fff9ed1ff4e1e923401aaad35c2f89edc49b8d");
+    insta::assert_snapshot!(format!("{:016x}{:016x}{:016x}{:016x}", checksum[0], checksum[1], checksum[2], checksum[3]), @"30850b29ed85cde28d82e17d80bdea0f75dcca9cec40709bd53872f4924ad764");
 
     Ok(())
 }
@@ -333,10 +332,8 @@ pub fn parse_overflowing_losses() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_missing_leader_activation_save() -> Result<(), Box<dyn Error>> {
-    let file = utils::request_file("skan-cb25b0.eu4.zip");
-    let data = utils::inflate(file);
-
-    let file = Eu4File::from_slice(&data)?;
+    let file = utils::request_file("skan-cb25b0.eu4");
+    let file = Eu4File::from_file(file)?;
     let save = file.parse_save(&SegmentedResolver::empty())?;
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "NED");
@@ -376,9 +373,8 @@ fn test_handle_heavily_nested_events() {
 
 #[test]
 fn test_paperman_text() -> Result<(), Box<dyn Error>> {
-    let file = utils::request_file("paperman.eu4.zip");
-    let data = utils::inflate(file);
-    let file = Eu4File::from_slice(&data).unwrap();
+    let file = utils::request_file("paperman.eu4");
+    let file = Eu4File::from_file(file).unwrap();
     let save = file.parse_save(&SegmentedResolver::empty()).unwrap();
     assert_eq!(file.encoding(), Encoding::Text);
     assert_eq!(save.meta.player, "GER");

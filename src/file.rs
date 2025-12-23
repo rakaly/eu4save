@@ -15,7 +15,7 @@ use std::{
     collections::HashSet,
     fmt::Display,
     fs::File,
-    io::{Read, Write},
+    io::{Read, Seek, Write},
 };
 
 #[cfg(feature = "zstd_c")]
@@ -500,9 +500,9 @@ where
     {
         match &self.kind {
             Eu4FsFileKind::Text(file) => {
-                let mut reader = file;
-                output.write_all(b"EU4txt\n")?;
-                std::io::copy(&mut reader, &mut output)?;
+                let mut file = *&file;
+                file.seek(std::io::SeekFrom::Start(0))?;
+                std::io::copy(&mut file, &mut output)?;
                 Ok(MeltedDocument::new())
             }
             Eu4FsFileKind::Binary(file) => file.as_ref().melt(options, resolver, output),
