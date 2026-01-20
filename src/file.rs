@@ -15,7 +15,7 @@ use std::{
     collections::HashSet,
     fmt::Display,
     fs::File,
-    io::{Read, Seek, Write},
+    io::{Cursor, Read, Seek, Write},
 };
 
 #[cfg(feature = "zstd_c")]
@@ -40,7 +40,7 @@ impl Eu4File {
             }),
             None => {
                 let archive = rawzip::ZipArchive::from_slice(data).map_err(Eu4ErrorKind::Zip)?;
-                let archive = archive.into_reader();
+                let archive = archive.into_zip_archive();
 
                 let mut buf = vec![0u8; rawzip::RECOMMENDED_BUFFER_SIZE];
                 let archive = Eu4Zip::try_from_archive(archive, &mut buf)?;
@@ -138,7 +138,7 @@ impl<R> Copy for Eu4Binary<R> where R: Copy {}
 pub enum Eu4SliceFileKind<'a> {
     Text(Eu4Text<'a>),
     Binary(Eu4Binary<&'a [u8]>),
-    Zip(Box<Eu4Zip<&'a [u8]>>),
+    Zip(Box<Eu4Zip<Cursor<&'a [u8]>>>),
 }
 
 pub struct Eu4SliceFile<'a> {
