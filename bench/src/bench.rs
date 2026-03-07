@@ -1,5 +1,5 @@
 use criterion::{Criterion, Throughput};
-use eu4save::flavor::Eu4Flavor;
+use eu4save::{file::Eu4Modeller, Encoding};
 use jomini::JominiDeserialize;
 use serde::{
     de::{self, SeqAccess},
@@ -206,9 +206,9 @@ fn deserialize_ledger(c: &mut Criterion) {
     let resolver = HashMap::<u16, String>::new();
     group.bench_function("binary-ledger", |b| {
         b.iter(|| {
-            let _: CountryLedger = jomini::BinaryDeserializer::builder_flavor(Eu4Flavor::new())
-                .deserialize_slice(&binary_data[..], &resolver)
-                .unwrap();
+            let mut deser = Eu4Modeller::from_reader(&binary_data[..], &resolver)
+                .with_encoding(Encoding::Binary);
+            let _: CountryLedger = deser.deserialize().unwrap();
         })
     });
 

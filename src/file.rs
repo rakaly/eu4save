@@ -1,13 +1,18 @@
 //! Parsing and deserializing EU4 save files
 use crate::{
-    flavor::Eu4Flavor,
+    flavor::Eu4Format,
     melt,
     models::{Eu4Save, GameState, Meta},
     resolver::SegmentedResolver,
     Encoding, Eu4Error, Eu4ErrorKind, MeltOptions, MeltedDocument,
 };
 use jomini::{
-    binary::TokenResolver, text::ObjectReader, TextDeserializer, TextTape, Windows1252Encoding,
+    binary::{
+        ng::{BinaryConfig, BinaryReaderDeserializer, FieldId, FieldResolver},
+        FailedResolveStrategy, TokenResolver,
+    },
+    text::ObjectReader,
+    TextDeserializer, TextTape, Windows1252Encoding,
 };
 use rawzip::{CompressionMethod, FileReader, ReaderAt, ZipVerifier};
 use serde::de::DeserializeOwned;
@@ -75,6 +80,17 @@ impl Eu4File {
 }
 
 const EMPTY_RESOLVER: SegmentedResolver<'static> = SegmentedResolver::empty();
+
+struct ResolverFieldAdapter<R>(R);
+
+impl<R> FieldResolver for ResolverFieldAdapter<R>
+where
+    R: TokenResolver,
+{
+    fn resolve_field(&self, token: FieldId) -> Option<&str> {
+        self.0.resolve(token.value())
+    }
+}
 
 pub struct Eu4Text<'a>(&'a [u8]);
 
@@ -602,12 +618,16 @@ impl<'de, 'a: 'de, R: jomini::binary::TokenResolver> serde::de::Deserializer<'de
         };
 
         if matches!(encoding, Encoding::Binary) {
-            use jomini::binary::BinaryFlavor;
-            let flavor = Eu4Flavor::new();
-            let mut deser = flavor
-                .deserializer()
-                .from_reader(&mut self.reader, &self.resolver);
-            Ok(deser.deserialize_struct(name, fields, visitor)?)
+            let config = BinaryConfig::new(ResolverFieldAdapter(&self.resolver))
+                .with_failed_resolve_strategy(FailedResolveStrategy::Ignore);
+            let mut deser = BinaryReaderDeserializer::from_reader_with_config(
+                &mut self.reader,
+                Eu4Format::default(),
+                config,
+            );
+            Ok(serde::de::Deserializer::deserialize_struct(
+                &mut deser, name, fields, visitor,
+            )?)
         } else {
             let reader = jomini::text::TokenReader::new(&mut self.reader);
             let mut deser = TextDeserializer::from_windows1252_reader(reader);
