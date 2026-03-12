@@ -391,7 +391,7 @@ where
     {
         let zip_entry = self.archive.get_entry(entry).map_err(Eu4ErrorKind::Zip)?;
         let reader = CompressedFileReader::from_compressed(zip_entry.reader(), self.compression)?;
-        let reader = zip_entry.verifying_reader(reader);
+        // let reader = zip_entry.verifying_reader(reader);
         let data: T = Eu4Modeller::from_reader(reader, resolver).deserialize()?;
         Ok(data)
     }

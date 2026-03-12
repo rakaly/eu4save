@@ -17,7 +17,12 @@ bench = false
 [[bench]]
 name = "eu4-bench"
 harness = false
-path = "src/bench.rs"
+path = "src/criterion_main.rs"
+
+[[bench]]
+name = "eu4-bench-gungraun"
+harness = false
+path = "src/gungraun_main.rs"
 
 [dependencies]
 criterion = "0.6.0"
@@ -27,6 +32,9 @@ jomini = "0.34"
 rawzip = "0.4.0"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_path_to_error = "0.1.16"
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+gungraun = "0.17.2"
 
 [profile.release]
 debug = true
