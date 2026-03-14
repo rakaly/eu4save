@@ -7,10 +7,7 @@ use crate::{
     Encoding, Eu4Error, Eu4ErrorKind, MeltOptions, MeltedDocument,
 };
 use jomini::{
-    binary::{
-        ng::BinaryReaderDeserializer,
-        FailedResolveStrategy, TokenResolver,
-    },
+    binary::{ng::BinaryReaderDeserializer, FailedResolveStrategy, TokenResolver},
     text::ObjectReader,
     TextDeserializer, TextTape, Windows1252Encoding,
 };

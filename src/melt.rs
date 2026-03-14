@@ -1,6 +1,9 @@
-use crate::{flavor::Eu4Flavor, Eu4Date, Eu4Error, Eu4ErrorKind};
+use crate::{
+    flavor::{Eu4Flavor, Eu4Format, Eu4Token},
+    Eu4Date, Eu4Error, Eu4ErrorKind,
+};
 use jomini::{
-    binary::{self, BinaryFlavor, FailedResolveStrategy, TokenReader, TokenResolver},
+    binary::{ng::TokenReader, BinaryFlavor, FailedResolveStrategy, TokenResolver},
     common::PdsDate,
     TextWriterBuilder,
 };
@@ -134,8 +137,27 @@ impl MeltedDocument {
     }
 }
 
+fn skip_container<Reader, Resolver>(
+    reader: &mut TokenReader<Reader, Eu4Format<&Resolver>>,
+) -> Result<(), Eu4Error>
+where
+    Reader: Read,
+    Resolver: TokenResolver,
+{
+    let mut depth = 1usize;
+    while depth > 0 {
+        match reader.read_token()? {
+            Eu4Token::Open => depth += 1,
+            Eu4Token::Close => depth -= 1,
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) fn melt<Reader, Writer, Resolver>(
-    input: Reader,
+    mut input: Reader,
     output: Writer,
     resolver: Resolver,
     options: MeltOptions,
@@ -145,10 +167,15 @@ where
     Writer: Write,
     Resolver: TokenResolver,
 {
-    let mut reader = TokenReader::new(input);
-    if options.check_header && reader.read_bytes(6)? != b"EU4bin" {
-        return Err(Eu4Error::new(Eu4ErrorKind::UnknownHeader));
+    if options.check_header {
+        let mut header = [0u8; 6];
+        input.read_exact(&mut header)?;
+        if &header != b"EU4bin" {
+            return Err(Eu4Error::new(Eu4ErrorKind::UnknownHeader));
+        }
     }
+
+    let mut reader = TokenReader::new(input, Eu4Format::new(&resolver));
 
     let mut wtr = TextWriterBuilder::new()
         .indent_char(b'\t')
@@ -164,20 +191,19 @@ where
     let mut known_number = false;
     let mut known_date = false;
     let mut long_format = false;
-    while let Some(token) = reader.next()? {
+    while let Some(token) = reader.next_token()? {
         match token {
-            jomini::binary::Token::Open => {
+            Eu4Token::Open => {
                 quoter.push();
                 wtr.write_array_start()?
             }
-            jomini::binary::Token::Close => {
+            Eu4Token::Close => {
                 quoter.pop();
                 wtr.write_end()?
             }
-            jomini::binary::Token::Equal => wtr.write_operator(jomini::text::Operator::Equal)?,
-            jomini::binary::Token::U32(x) => wtr.write_u32(x)?,
-            jomini::binary::Token::U64(x) => wtr.write_u64(x)?,
-            jomini::binary::Token::I32(x) => {
+            Eu4Token::Equal => wtr.write_operator(jomini::text::Operator::Equal)?,
+            Eu4Token::U32(x) => wtr.write_u32(x)?,
+            Eu4Token::I32(x) => {
                 if known_number {
                     wtr.write_i32(x)?;
                     known_number = false;
@@ -196,33 +222,34 @@ where
                     wtr.write_i32(x)?;
                 }
             }
-            jomini::binary::Token::Bool(x) => wtr.write_bool(x)?,
-            jomini::binary::Token::Unquoted(x) => wtr.write_unquoted(x.as_bytes())?,
-            jomini::binary::Token::Quoted(x) => match quoter.take_scalar() {
-                QuoteKind::Inactive if wtr.expecting_key() => wtr.write_unquoted(x.as_bytes())?,
-                QuoteKind::Inactive => wtr.write_quoted(x.as_bytes())?,
-                QuoteKind::ForceQuote => wtr.write_quoted(x.as_bytes())?,
-                QuoteKind::UnquoteAll => wtr.write_unquoted(x.as_bytes())?,
-                QuoteKind::UnquoteScalar => wtr.write_unquoted(x.as_bytes())?,
-                QuoteKind::QuoteScalar => wtr.write_quoted(x.as_bytes())?,
+            Eu4Token::Bool(x) => wtr.write_bool(x)?,
+            Eu4Token::Unquoted(x) => wtr.write_unquoted(x)?,
+            Eu4Token::Quoted(x) => match quoter.take_scalar() {
+                QuoteKind::Inactive if wtr.expecting_key() => wtr.write_unquoted(x)?,
+                QuoteKind::Inactive => wtr.write_quoted(x)?,
+                QuoteKind::ForceQuote => wtr.write_quoted(x)?,
+                QuoteKind::UnquoteAll => wtr.write_unquoted(x)?,
+                QuoteKind::UnquoteScalar => wtr.write_unquoted(x)?,
+                QuoteKind::QuoteScalar => wtr.write_quoted(x)?,
             },
-            jomini::binary::Token::F32(x) if long_format => {
+            Eu4Token::F32(x) if long_format => {
                 write!(&mut wtr, "{:.6}", flavor.visit_f32(x))?
             }
-            jomini::binary::Token::F32(x) => write!(&mut wtr, "{:.3}", flavor.visit_f32(x))?,
-            jomini::binary::Token::F64(x) => write!(&mut wtr, "{:.5}", flavor.visit_f64(x))?,
-            jomini::binary::Token::Rgb(x) => wtr.write_rgb(&x)?,
-            jomini::binary::Token::I64(x) => wtr.write_i64(x)?,
-            jomini::binary::Token::Id(x) => match resolver.resolve(x) {
+            Eu4Token::F32(x) => write!(&mut wtr, "{:.3}", flavor.visit_f32(x))?,
+            Eu4Token::F64(x) => write!(&mut wtr, "{:.5}", flavor.visit_f64(x))?,
+            Eu4Token::Field(x) => match resolver.resolve(x.0) {
                 Some(id) => {
                     if (id == "checksum" && skip_checksum) || (id == "is_ironman" && !verbatim) {
-                        let mut next = reader.read()?;
-                        if matches!(next, binary::Token::Equal) {
-                            next = reader.read()?;
-                        }
+                        let is_open = {
+                            let mut next = reader.read_token()?;
+                            if matches!(next, Eu4Token::Equal) {
+                                next = reader.read_token()?;
+                            }
+                            matches!(next, Eu4Token::Open)
+                        };
 
-                        if matches!(next, binary::Token::Open) {
-                            reader.skip_container()?;
+                        if is_open {
+                            skip_container(&mut reader)?;
                         }
                         continue;
                     }
@@ -307,29 +334,27 @@ where
                 None => match on_failed_resolve {
                     FailedResolveStrategy::Error => {
                         return Err(Eu4Error::new(Eu4ErrorKind::UnknownToken {
-                            token_id: x as u32,
+                            token_id: x.0 as u32,
                         }))
                     }
                     FailedResolveStrategy::Ignore if wtr.expecting_key() => {
-                        let mut next = reader.read()?;
-                        if matches!(next, binary::Token::Equal) {
-                            next = reader.read()?;
-                        }
+                        let is_open = {
+                            let mut next = reader.read_token()?;
+                            if matches!(next, Eu4Token::Equal) {
+                                next = reader.read_token()?;
+                            }
+                            matches!(next, Eu4Token::Open)
+                        };
 
-                        if matches!(next, binary::Token::Open) {
-                            reader.skip_container()?;
+                        if is_open {
+                            skip_container(&mut reader)?;
                         }
                     }
                     _ => {
-                        unknown_tokens.insert(x);
-                        write!(wtr, "__unknown_0x{:x}", x)?;
+                        unknown_tokens.insert(x.0);
+                        write!(wtr, "__unknown_0x{:x}", x.0)?;
                     }
                 },
-            },
-            jomini::binary::Token::Lookup(_) => {
-                return Err(Eu4Error::new(Eu4ErrorKind::InvalidSyntax(
-                    "lookup tokens are not supported in EU4 files".to_string(),
-                )))
             }
         }
     }
