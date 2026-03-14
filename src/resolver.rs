@@ -97,12 +97,6 @@ impl jomini::binary::TokenResolver for SegmentedResolver<'_> {
     }
 }
 
-impl jomini::binary::ng::FieldResolver for SegmentedResolver<'_> {
-    fn resolve_field(&self, token: jomini::binary::ng::FieldId) -> Option<&str> {
-        jomini::binary::TokenResolver::resolve(self, token.value())
-    }
-}
-
 pub struct SegmentedResolverBuilder {
     values: Vec<String>,
     lower_sequence_end: u16,

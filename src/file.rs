@@ -8,7 +8,7 @@ use crate::{
 };
 use jomini::{
     binary::{
-        ng::{BinaryConfig, BinaryReaderDeserializer, FieldId, FieldResolver},
+        ng::BinaryReaderDeserializer,
         FailedResolveStrategy, TokenResolver,
     },
     text::ObjectReader,
@@ -80,17 +80,6 @@ impl Eu4File {
 }
 
 const EMPTY_RESOLVER: SegmentedResolver<'static> = SegmentedResolver::empty();
-
-struct ResolverFieldAdapter<R>(R);
-
-impl<R> FieldResolver for ResolverFieldAdapter<R>
-where
-    R: TokenResolver,
-{
-    fn resolve_field(&self, token: FieldId) -> Option<&str> {
-        self.0.resolve(token.value())
-    }
-}
 
 pub struct Eu4Text<'a>(&'a [u8]);
 
@@ -618,12 +607,10 @@ impl<'de, 'a: 'de, R: jomini::binary::TokenResolver> serde::de::Deserializer<'de
         };
 
         if matches!(encoding, Encoding::Binary) {
-            let config = BinaryConfig::new(ResolverFieldAdapter(&self.resolver))
-                .with_failed_resolve_strategy(FailedResolveStrategy::Ignore);
-            let mut deser = BinaryReaderDeserializer::from_reader_with_config(
+            let mut deser = BinaryReaderDeserializer::from_reader(
                 &mut self.reader,
-                Eu4Format::default(),
-                config,
+                Eu4Format::new(&self.resolver)
+                    .with_failed_resolve_strategy(FailedResolveStrategy::Ignore),
             );
             Ok(serde::de::Deserializer::deserialize_struct(
                 &mut deser, name, fields, visitor,
