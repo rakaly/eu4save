@@ -133,8 +133,9 @@ fn eu4_scalar<'a>(data: &'a [u8]) -> Result<Cow<'a, str>, Error> {
     }
 }
 
+/// Low-level EU4 binary tokens produced by [`Eu4Format`].
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum Eu4Token<'a> {
+pub enum Eu4Token<'a> {
     Open,
     Close,
     Equal,
@@ -148,20 +149,24 @@ pub(crate) enum Eu4Token<'a> {
     F64([u8; 8]),
 }
 
-pub(crate) struct Eu4Format<R> {
+/// Low-level EU4 binary token/value format.
+pub struct Eu4Format<R> {
     resolver: R,
     failed_resolve_strategy: FailedResolveStrategy,
 }
 
 impl<R: TokenResolver> Eu4Format<R> {
-    pub(crate) fn new(resolver: R) -> Self {
+    /// Creates a new format that resolves EU4 binary field names with the
+    /// provided token resolver.
+    pub fn new(resolver: R) -> Self {
         Self {
             resolver,
             failed_resolve_strategy: FailedResolveStrategy::Error,
         }
     }
 
-    pub(crate) fn with_failed_resolve_strategy(
+    /// Configures how unresolved field tokens are handled.
+    pub fn with_failed_resolve_strategy(
         mut self,
         failed_resolve_strategy: FailedResolveStrategy,
     ) -> Self {
