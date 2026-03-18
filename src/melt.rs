@@ -137,25 +137,6 @@ impl MeltedDocument {
     }
 }
 
-fn skip_container<Reader, Resolver>(
-    reader: &mut TokenReader<Reader, Eu4Format<&Resolver>>,
-) -> Result<(), Eu4Error>
-where
-    Reader: Read,
-    Resolver: TokenResolver,
-{
-    let mut depth = 1usize;
-    while depth > 0 {
-        match reader.read_token()? {
-            Eu4Token::Open => depth += 1,
-            Eu4Token::Close => depth -= 1,
-            _ => {}
-        }
-    }
-
-    Ok(())
-}
-
 pub(crate) fn melt<Reader, Writer, Resolver>(
     mut input: Reader,
     output: Writer,
@@ -240,16 +221,8 @@ where
             Eu4Token::Field(x) => match resolver.resolve(x.0) {
                 Some(id) => {
                     if (id == "checksum" && skip_checksum) || (id == "is_ironman" && !verbatim) {
-                        let is_open = {
-                            let mut next = reader.read_token()?;
-                            if matches!(next, Eu4Token::Equal) {
-                                next = reader.read_token()?;
-                            }
-                            matches!(next, Eu4Token::Open)
-                        };
-
-                        if is_open {
-                            skip_container(&mut reader)?;
+                        if matches!(reader.read_token()?, Eu4Token::Equal) {
+                            reader.skip_value()?;
                         }
                         continue;
                     }
@@ -338,16 +311,8 @@ where
                         }))
                     }
                     FailedResolveStrategy::Ignore if wtr.expecting_key() => {
-                        let is_open = {
-                            let mut next = reader.read_token()?;
-                            if matches!(next, Eu4Token::Equal) {
-                                next = reader.read_token()?;
-                            }
-                            matches!(next, Eu4Token::Open)
-                        };
-
-                        if is_open {
-                            skip_container(&mut reader)?;
+                        if matches!(reader.read_token()?, Eu4Token::Equal) {
+                            reader.skip_value()?;
                         }
                     }
                     _ => {
