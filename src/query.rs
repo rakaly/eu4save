@@ -571,8 +571,8 @@ impl Query {
         let mut preexisting = histories.iter().filter(|x| {
             !x.history
                 .events
-                .first()
-                .is_some_and(|x| x.kind == NationEventKind::Appeared)
+                .iter()
+                .any(|x| x.kind == NationEventKind::Appeared)
         });
         let first = preexisting.next();
         let second = preexisting.next();
