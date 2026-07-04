@@ -771,19 +771,19 @@ pub struct CountryLedger {
     #[serde(
         default,
         alias = "totalexpensetable",
-        deserialize_with = "positive_vec_f32"
+        deserialize_with = "ledger_vec_f32"
     )]
     pub total_expense_table: Vec<f32>,
     #[serde(
         default,
         alias = "lastyearincome",
-        deserialize_with = "positive_vec_f32"
+        deserialize_with = "ledger_vec_f32"
     )]
     pub last_year_income: Vec<f32>,
     #[serde(
         default,
         alias = "lastyearexpense",
-        deserialize_with = "positive_vec_f32"
+        deserialize_with = "ledger_vec_f32"
     )]
     pub last_year_expense: Vec<f32>,
 }
