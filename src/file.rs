@@ -40,7 +40,7 @@ impl Eu4File {
             }),
             None => {
                 let archive = rawzip::ZipArchive::from_slice(data).map_err(Eu4ErrorKind::Zip)?;
-                let archive = archive.into_zip_archive();
+                let archive = archive.into_cursor_archive();
 
                 let mut buf = vec![0u8; rawzip::RECOMMENDED_BUFFER_SIZE];
                 let archive = Eu4Zip::try_from_archive(archive, &mut buf)?;
@@ -221,14 +221,13 @@ impl<'a> Eu4SliceFile<'a> {
     }
 }
 
-pub struct Eu4ZipEntry<R: Read, ReadAt> {
-    reader: ZipVerifier<CompressedFileReader<R>, ReadAt>,
+pub struct Eu4ZipEntry<R: Read> {
+    reader: ZipVerifier<CompressedFileReader<R>>,
 }
 
-impl<R, ReadAt> Eu4ZipEntry<R, ReadAt>
+impl<R> Eu4ZipEntry<R>
 where
     R: Read,
-    ReadAt: ReaderAt,
 {
     pub fn deserialize<T, Resolver>(&mut self, resolver: Resolver) -> Result<T, Eu4Error>
     where
@@ -260,10 +259,9 @@ where
     }
 }
 
-impl<R, ReadAt> Read for Eu4ZipEntry<R, ReadAt>
+impl<R> Read for Eu4ZipEntry<R>
 where
     R: Read,
-    ReadAt: ReaderAt,
 {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         self.reader.read(buf)
@@ -342,7 +340,7 @@ where
     pub fn get(
         &self,
         name: Eu4FileEntryName,
-    ) -> Result<Eu4ZipEntry<rawzip::ZipReader<&R>, &R>, Eu4Error> {
+    ) -> Result<Eu4ZipEntry<rawzip::ZipReader<&R>>, Eu4Error> {
         let entry = match name {
             Eu4FileEntryName::Meta => self.meta,
             Eu4FileEntryName::Gamestate => self.gamestate,
@@ -640,14 +638,14 @@ impl<R: Read> CompressedFileReader<R> {
         R: Read,
     {
         match compression {
-            CompressionMethod::Deflate => {
+            CompressionMethod::DEFLATE => {
                 let inflater = flate2::read::DeflateDecoder::new(reader);
                 Ok(CompressedFileReader {
                     reader: CompressedReaderKind::Deflate(inflater),
                 })
             }
             #[cfg(any(feature = "zstd_c", feature = "zstd_rust"))]
-            CompressionMethod::Zstd => {
+            CompressionMethod::ZSTD => {
                 #[cfg(feature = "zstd_c")]
                 {
                     let inflater = zstd::Decoder::new(reader)?;
