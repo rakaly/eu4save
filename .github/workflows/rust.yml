@@ -36,9 +36,9 @@ jobs:
           os: windows-latest
           rust: stable
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
     - name: Cache eu4 saves
-      uses: actions/cache@v3
+      uses: actions/cache@v6
       with:
         path: assets/saves
         key: assets/saves
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     - name: Build benchmark
       run: cargo bench --manifest-path bench/Cargo.toml --no-run
 
@@ -83,7 +83,7 @@ jobs:
           target: wasm32-unknown-unknown
           features: zstd_c
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
