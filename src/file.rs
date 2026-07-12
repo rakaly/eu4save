@@ -9,7 +9,7 @@ use crate::{
 use jomini::{
     binary::TokenResolver, text::ObjectReader, TextDeserializer, TextTape, Windows1252Encoding,
 };
-use rawzip::{CompressionMethod, FileReader, ReaderAt, ZipVerifier};
+use rawzip::{CompressionMethod, FileReader, ReaderAt};
 use serde::de::DeserializeOwned;
 use std::{
     collections::HashSet,
@@ -222,7 +222,96 @@ impl<'a> Eu4SliceFile<'a> {
 }
 
 pub struct Eu4ZipEntry<R: Read> {
-    reader: ZipVerifier<CompressedFileReader<R>>,
+    reader: ZipEntryVerifier<CompressedFileReader<R>>,
+}
+
+struct ZipEntryVerifier<R> {
+    reader: R,
+    crc: platform_crc::Crc,
+    expected: rawzip::ZipVerification,
+    size: u64,
+}
+
+impl<R: Read> ZipEntryVerifier<R> {
+    fn new(reader: R, expected: rawzip::ZipVerification) -> Self {
+        Self {
+            reader,
+            crc: platform_crc::Crc::new(),
+            expected,
+            size: 0,
+        }
+    }
+}
+
+impl<R: Read> Read for ZipEntryVerifier<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        let read = self.reader.read(buf)?;
+        self.crc.update(&buf[..read]);
+        self.size += read as u64;
+
+        if read == 0 || self.size >= self.expected.uncompressed_size {
+            verify_zip_entry(
+                self.expected,
+                rawzip::ZipVerification {
+                    crc: self.crc.checksum(),
+                    uncompressed_size: self.size,
+                },
+            )?;
+        }
+
+        Ok(read)
+    }
+}
+
+fn verify_zip_entry(
+    expected: rawzip::ZipVerification,
+    actual: rawzip::ZipVerification,
+) -> std::io::Result<()> {
+    expected
+        .valid(actual)
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+}
+
+#[cfg(target_family = "wasm")]
+mod platform_crc {
+    pub(super) struct Crc(rawzip::Crc32);
+
+    impl Crc {
+        pub(super) fn new() -> Self {
+            Self(rawzip::Crc32::new())
+        }
+
+        pub(super) fn update(&mut self, data: &[u8]) {
+            self.0.update(data);
+        }
+
+        pub(super) fn checksum(&self) -> u32 {
+            self.0.checksum()
+        }
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+mod platform_crc {
+    pub(super) struct Crc(flate2::Crc);
+
+    impl Crc {
+        pub(super) fn new() -> Self {
+            Self(flate2::Crc::new())
+        }
+
+        pub(super) fn update(&mut self, data: &[u8]) {
+            self.0.update(data);
+        }
+
+        pub(super) fn checksum(&self) -> u32 {
+            self.0.sum()
+        }
+    }
 }
 
 impl<R> Eu4ZipEntry<R>
@@ -341,15 +430,20 @@ where
         &self,
         name: Eu4FileEntryName,
     ) -> Result<Eu4ZipEntry<rawzip::ZipReader<&R>>, Eu4Error> {
-        let entry = match name {
+        let wayfinder = match name {
             Eu4FileEntryName::Meta => self.meta,
             Eu4FileEntryName::Gamestate => self.gamestate,
             Eu4FileEntryName::Ai => self.ai,
         };
 
-        let entry = self.archive.get_entry(entry).map_err(Eu4ErrorKind::Zip)?;
-        let reader = CompressedFileReader::from_compressed(entry.reader(), self.compression)?;
-        let reader = entry.verifying_reader(reader);
+        let entry = self
+            .archive
+            .get_entry(wayfinder)
+            .map_err(Eu4ErrorKind::Zip)?;
+        let compressed = entry.reader();
+        let expected = compressed.claim_verifier();
+        let reader = CompressedFileReader::from_compressed(compressed, self.compression)?;
+        let reader = ZipEntryVerifier::new(reader, expected);
 
         Ok(Eu4ZipEntry { reader })
     }
@@ -372,8 +466,10 @@ where
         Resolver: TokenResolver,
     {
         let zip_entry = self.archive.get_entry(entry).map_err(Eu4ErrorKind::Zip)?;
-        let reader = CompressedFileReader::from_compressed(zip_entry.reader(), self.compression)?;
-        let reader = zip_entry.verifying_reader(reader);
+        let compressed = zip_entry.reader();
+        let expected = compressed.claim_verifier();
+        let reader = CompressedFileReader::from_compressed(compressed, self.compression)?;
+        let reader = ZipEntryVerifier::new(reader, expected);
         let data: T = Eu4Modeller::from_reader(reader, resolver).deserialize()?;
         Ok(data)
     }
