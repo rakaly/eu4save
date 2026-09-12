@@ -1,5 +1,7 @@
 ![ci](https://github.com/rakaly/eu4save/workflows/ci/badge.svg) [![](https://docs.rs/eu4save/badge.svg)](https://docs.rs/eu4save) [![Version](https://img.shields.io/crates/v/eu4save.svg?style=flat-square)](https://crates.io/crates/eu4save)
 
+**This repo has been consolidated into the main [jomini repo](https://github.com/rakaly/jomini)**
+
 # EU4 Save
 
 EU4 Save is a library to ergonomically work with EU4 saves (ironman + mp).
